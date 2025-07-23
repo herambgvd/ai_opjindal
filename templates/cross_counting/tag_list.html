@@ -3,9 +3,13 @@
 {% block page_title %}Tag Management{% endblock %}
 {% block page_description %}Manage monitoring areas and occupancy limits{% endblock %}
 
+{% block page_icon %}
+<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
+{% endblock %}
+
 {% block page_actions %}
 {{ block.super }}
-<a href="{% url 'cross_counting:tag_create' %}" class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+<a href="{% url 'cross_counting:tag_create' %}" class="inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent shadow-sm text-sm font-medium rounded-lg text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
     <svg class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
     </svg>
@@ -60,7 +64,7 @@
                         </div>
                     </div>
                     <div class="mt-2 w-full bg-gray-200 rounded-full h-2">
-                        <div class="h-2 rounded-full {% if tag_stat.is_over_capacity %}bg-red-500{% elif tag_stat.utilization_rate > 80 %}bg-yellow-500{% else %}bg-green-500{% endif %}" 
+                        <div class="h-2 rounded-full {% if tag_stat.is_over_capacity %}bg-red-500{% elif tag_stat.utilization_rate > 80 %}bg-yellow-500{% else %}bg-green-500{% endif %}"
                              style="width: {% if tag_stat.utilization_rate > 100 %}100{% else %}{{ tag_stat.utilization_rate }}{% endif %}%"></div>
                     </div>
                     {% if tag_stat.is_over_capacity %}
@@ -109,7 +113,7 @@
                             </svg>
                         </div>
                     </div>
-                    
+
                     <!-- Filter -->
                     <div class="relative" x-data="{ open: false }">
                         <button @click="open = !open" class="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
@@ -118,7 +122,7 @@
                             </svg>
                             Filter
                         </button>
-                        
+
                         <div x-show="open" @click.away="open = false" class="absolute right-0 mt-2 w-56 bg-white rounded-md shadow-lg ring-1 ring-black ring-opacity-5 z-50">
                             <div class="py-1">
                                 <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">All Tags</a>
@@ -131,7 +135,7 @@
                 </div>
             </div>
         </div>
-        
+
         <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">
@@ -164,7 +168,7 @@
                         <td class="px-6 py-4 whitespace-nowrap">
                             <div class="flex items-center">
                                 <div class="w-16 bg-gray-200 rounded-full h-2 mr-2">
-                                    <div class="h-2 rounded-full {% if tag_stat.is_over_capacity %}bg-red-500{% elif tag_stat.utilization_rate > 80 %}bg-yellow-500{% else %}bg-green-500{% endif %}" 
+                                    <div class="h-2 rounded-full {% if tag_stat.is_over_capacity %}bg-red-500{% elif tag_stat.utilization_rate > 80 %}bg-yellow-500{% else %}bg-green-500{% endif %}"
                                          style="width: {% if tag_stat.utilization_rate > 100 %}100{% else %}{{ tag_stat.utilization_rate }}{% endif %}%"></div>
                                 </div>
                                 <span class="text-sm text-gray-900">{{ tag_stat.utilization_rate|floatformat:1 }}%</span>
@@ -219,7 +223,7 @@
                 </tbody>
             </table>
         </div>
-        
+
         <!-- Pagination -->
         {% if is_paginated %}
         <div class="bg-white px-4 py-3 border-t border-gray-200 sm:px-6">
@@ -254,7 +258,7 @@
                                     </svg>
                                 </a>
                             {% endif %}
-                            
+
                             {% for num in page_obj.paginator.page_range %}
                                 {% if page_obj.number == num %}
                                     <span class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-blue-50 text-sm font-medium text-blue-600">{{ num }}</span>
@@ -262,7 +266,7 @@
                                     <a href="?page={{ num }}" class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50">{{ num }}</a>
                                 {% endif %}
                             {% endfor %}
-                            
+
                             {% if page_obj.has_next %}
                                 <a href="?page={{ page_obj.next_page_number }}" class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
                                     <span class="sr-only">Next</span>

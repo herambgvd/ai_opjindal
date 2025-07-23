@@ -3,6 +3,23 @@
 {% block page_title %}Reports{% endblock %}
 {% block page_description %}Analytics and historical data insights{% endblock %}
 
+{% block page_icon %}
+<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+{% endblock %}
+
+{% block page_actions %}
+{{ block.super }}
+<div class="flex items-center space-x-3">
+    <!-- Date Range Picker -->
+    <form method="get" class="flex items-center space-x-2 bg-white rounded-lg border border-gray-200 px-3 py-2">
+        <svg class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+        </svg>
+        <input type="date" name="date{% extends 'cross_counting/base.html' %}
+
+{% block page_title %}Reports{% endblock %}
+{% block page_description %}Analytics and historical data insights{% endblock %}
+
 {% block page_actions %}
 {{ block.super }}
 <div class="flex items-center space-x-3">
