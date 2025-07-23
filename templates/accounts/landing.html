@@ -1,0 +1,333 @@
+{% extends 'accounts/base.html' %}
+
+{% block title %}Clarify - Smart Occupancy Management{% endblock %}
+
+{% block meta_description %}Advanced cross counting and occupancy management system with real-time monitoring, analytics, and intelligent alerts.{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<div class="relative overflow-hidden bg-gradient-to-br from-blue-50 via-white to-purple-50">
+    <!-- Background pattern -->
+    <div class="absolute inset-0">
+        <svg class="absolute inset-0 h-full w-full" preserveAspectRatio="xMidYMid slice" viewBox="0 0 1024 1024" style="opacity: 0.1;">
+            <defs>
+                <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse">
+                    <path d="M 32 0 L 0 0 0 32" fill="none" stroke="#3b82f6" stroke-width="1"/>
+                </pattern>
+            </defs>
+            <rect width="100%" height="100%" fill="url(#grid)"/>
+        </svg>
+    </div>
+    
+    <div class="relative">
+        <!-- Navigation -->
+        <nav class="flex items-center justify-between px-6 py-4 lg:px-8" x-data="{ mobileMenuOpen: false }">
+            <div class="flex lg:flex-1">
+                <a href="{% url 'accounts:landing' %}" class="flex items-center -m-1.5 p-1.5">
+                    <div class="h-10 w-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
+                        <span class="text-white font-bold text-xl">C</span>
+                    </div>
+                    <span class="ml-3 text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">Clarify</span>
+                </a>
+            </div>
+            
+            <div class="flex lg:hidden">
+                <button type="button" @click="mobileMenuOpen = true" class="-m-2.5 inline-flex items-center justify-center rounded-md p-2.5 text-gray-700">
+                    <span class="sr-only">Open main menu</span>
+                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"/>
+                    </svg>
+                </button>
+            </div>
+            
+            <div class="hidden lg:flex lg:gap-x-8">
+                <a href="#features" class="text-sm font-semibold leading-6 text-gray-900 hover:text-blue-600 transition-colors">Features</a>
+                <a href="#about" class="text-sm font-semibold leading-6 text-gray-900 hover:text-blue-600 transition-colors">About</a>
+                <a href="#contact" class="text-sm font-semibold leading-6 text-gray-900 hover:text-blue-600 transition-colors">Contact</a>
+            </div>
+            
+            <div class="hidden lg:flex lg:flex-1 lg:justify-end lg:gap-x-4">
+                <a href="{% url 'accounts:login' %}" class="text-sm font-semibold leading-6 text-gray-900 hover:text-blue-600 transition-colors">
+                    Log in <span aria-hidden="true">&rarr;</span>
+                </a>
+                <a href="{% url 'accounts:register' %}" class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 transition-all">
+                    Get Started
+                </a>
+            </div>
+            
+            <!-- Mobile menu -->
+            <div x-show="mobileMenuOpen" class="lg:hidden" x-cloak>
+                <div class="fixed inset-0 z-50"></div>
+                <div class="fixed inset-y-0 right-0 z-50 w-full overflow-y-auto bg-white px-6 py-6 sm:max-w-sm sm:ring-1 sm:ring-gray-900/10">
+                    <div class="flex items-center justify-between">
+                        <a href="{% url 'accounts:landing' %}" class="flex items-center -m-1.5 p-1.5">
+                            <div class="h-8 w-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+                                <span class="text-white font-bold">C</span>
+                            </div>
+                            <span class="ml-2 text-xl font-bold text-gray-900">Clarify</span>
+                        </a>
+                        <button type="button" @click="mobileMenuOpen = false" class="-m-2.5 rounded-md p-2.5 text-gray-700">
+                            <span class="sr-only">Close menu</span>
+                            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="mt-6 flow-root">
+                        <div class="-my-6 divide-y divide-gray-500/10">
+                            <div class="space-y-2 py-6">
+                                <a href="#features" @click="mobileMenuOpen = false" class="-mx-3 block rounded-lg px-3 py-2 text-base font-semibold leading-7 text-gray-900 hover:bg-gray-50">Features</a>
+                                <a href="#about" @click="mobileMenuOpen = false" class="-mx-3 block rounded-lg px-3 py-2 text-base font-semibold leading-7 text-gray-900 hover:bg-gray-50">About</a>
+                                <a href="#contact" @click="mobileMenuOpen = false" class="-mx-3 block rounded-lg px-3 py-2 text-base font-semibold leading-7 text-gray-900 hover:bg-gray-50">Contact</a>
+                            </div>
+                            <div class="py-6 space-y-2">
+                                <a href="{% url 'accounts:login' %}" class="-mx-3 block rounded-lg px-3 py-2.5 text-base font-semibold leading-7 text-gray-900 hover:bg-gray-50">Log in</a>
+                                <a href="{% url 'accounts:register' %}" class="-mx-3 block rounded-lg px-3 py-2.5 text-base font-semibold leading-7 text-white bg-blue-600 hover:bg-blue-500">Get Started</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </nav>
+        
+        <!-- Hero content -->
+        <div class="mx-auto max-w-7xl px-6 py-24 sm:py-32 lg:px-8">
+            <div class="mx-auto max-w-2xl text-center">
+                <h1 class="text-4xl font-bold tracking-tight text-gray-900 sm:text-6xl animate-fade-in">
+                    Smart Occupancy 
+                    <span class="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">Management</span>
+                </h1>
+                <p class="mt-6 text-lg leading-8 text-gray-600 animate-fade-in" style="animation-delay: 0.2s;">
+                    Advanced cross counting and real-time occupancy monitoring with intelligent analytics. 
+                    Manage spaces efficiently with AI-powered insights and automated alerts.
+                </p>
+                <div class="mt-10 flex items-center justify-center gap-x-6 animate-fade-in" style="animation-delay: 0.4s;">
+                    <a href="{% url 'accounts:register' %}" class="rounded-lg bg-blue-600 px-6 py-3 text-base font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 transition-all transform hover:scale-105">
+                        Get Started Free
+                    </a>
+                    <a href="#features" class="text-base font-semibold leading-7 text-gray-900 hover:text-blue-600 transition-colors">
+                        Learn more <span aria-hidden="true">→</span>
+                    </a>
+                </div>
+            </div>
+            
+            <!-- Hero image/dashboard preview -->
+            <div class="mt-16 flow-root sm:mt-24 animate-fade-in" style="animation-delay: 0.6s;">
+                <div class="-m-2 rounded-xl bg-gray-900/5 p-2 ring-1 ring-inset ring-gray-900/10 lg:-m-4 lg:rounded-2xl lg:p-4">
+                    <div class="rounded-md bg-white p-8 shadow-2xl ring-1 ring-gray-900/10">
+                        <!-- Mock dashboard preview -->
+                        <div class="space-y-4">
+                            <div class="flex items-center justify-between">
+                                <h3 class="text-lg font-semibold text-gray-900">Live Dashboard</h3>
+                                <div class="flex items-center space-x-2">
+                                    <div class="h-2 w-2 bg-green-400 rounded-full animate-pulse"></div>
+                                    <span class="text-sm text-gray-500">Live</span>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div class="bg-blue-50 p-4 rounded-lg">
+                                    <div class="text-2xl font-bold text-blue-600">247</div>
+                                    <div class="text-sm text-gray-600">Current Occupancy</div>
+                                </div>
+                                <div class="bg-green-50 p-4 rounded-lg">
+                                    <div class="text-2xl font-bold text-green-600">12</div>
+                                    <div class="text-sm text-gray-600">Active Cameras</div>
+                                </div>
+                                <div class="bg-purple-50 p-4 rounded-lg">
+                                    <div class="text-2xl font-bold text-purple-600">98%</div>
+                                    <div class="text-sm text-gray-600">Accuracy Rate</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Features Section -->
+<div id="features" class="py-24 sm:py-32 bg-white">
+    <div class="mx-auto max-w-7xl px-6 lg:px-8">
+        <div class="mx-auto max-w-2xl lg:text-center">
+            <h2 class="text-base font-semibold leading-7 text-blue-600">Everything you need</h2>
+            <p class="mt-2 text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
+                Powerful features for modern spaces
+            </p>
+            <p class="mt-6 text-lg leading-8 text-gray-600">
+                From real-time monitoring to predictive analytics, Clarify provides comprehensive tools 
+                for managing occupancy across any space or facility.
+            </p>
+        </div>
+        
+        <div class="mx-auto mt-16 max-w-2xl sm:mt-20 lg:mt-24 lg:max-w-none">
+            <dl class="grid max-w-xl grid-cols-1 gap-x-8 gap-y-16 lg:max-w-none lg:grid-cols-3">
+                <!-- Feature 1 -->
+                <div class="flex flex-col animate-fade-in">
+                    <dt class="flex items-center gap-x-3 text-base font-semibold leading-7 text-gray-900">
+                        <div class="h-10 w-10 flex items-center justify-center rounded-lg bg-blue-600">
+                            <svg class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z"/>
+                            </svg>
+                        </div>
+                        Real-time Monitoring
+                    </dt>
+                    <dd class="mt-4 flex flex-auto flex-col text-base leading-7 text-gray-600">
+                        <p class="flex-auto">
+                            Monitor occupancy levels in real-time with advanced computer vision technology. 
+                            Get instant updates and live data streams from multiple camera feeds.
+                        </p>
+                    </dd>
+                </div>
+                
+                <!-- Feature 2 -->
+                <div class="flex flex-col animate-fade-in" style="animation-delay: 0.2s;">
+                    <dt class="flex items-center gap-x-3 text-base font-semibold leading-7 text-gray-900">
+                        <div class="h-10 w-10 flex items-center justify-center rounded-lg bg-blue-600">
+                            <svg class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z"/>
+                            </svg>
+                        </div>
+                        Smart Analytics
+                    </dt>
+                    <dd class="mt-4 flex flex-auto flex-col text-base leading-7 text-gray-600">
+                        <p class="flex-auto">
+                            Leverage AI-powered analytics to understand patterns, predict peak times, 
+                            and optimize space utilization with actionable insights.
+                        </p>
+                    </dd>
+                </div>
+                
+                <!-- Feature 3 -->
+                <div class="flex flex-col animate-fade-in" style="animation-delay: 0.4s;">
+                    <dt class="flex items-center gap-x-3 text-base font-semibold leading-7 text-gray-900">
+                        <div class="h-10 w-10 flex items-center justify-center rounded-lg bg-blue-600">
+                            <svg class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0"/>
+                            </svg>
+                        </div>
+                        Instant Alerts
+                    </dt>
+                    <dd class="mt-4 flex flex-auto flex-col text-base leading-7 text-gray-600">
+                        <p class="flex-auto">
+                            Receive automated alerts when occupancy limits are exceeded or unusual patterns 
+                            are detected. Stay informed with customizable notification preferences.
+                        </p>
+                    </dd>
+                </div>
+                
+                <!-- Feature 4 -->
+                <div class="flex flex-col animate-fade-in" style="animation-delay: 0.6s;">
+                    <dt class="flex items-center gap-x-3 text-base font-semibold leading-7 text-gray-900">
+                        <div class="h-10 w-10 flex items-center justify-center rounded-lg bg-blue-600">
+                            <svg class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3"/>
+                            </svg>
+                        </div>
+                        Mobile Ready
+                    </dt>
+                    <dd class="mt-4 flex flex-auto flex-col text-base leading-7 text-gray-600">
+                        <p class="flex-auto">
+                            Access your dashboard anywhere with our responsive design. 
+                            Monitor and manage occupancy from desktop, tablet, or mobile devices.
+                        </p>
+                    </dd>
+                </div>
+                
+                <!-- Feature 5 -->
+                <div class="flex flex-col animate-fade-in" style="animation-delay: 0.8s;">
+                    <dt class="flex items-center gap-x-3 text-base font-semibold leading-7 text-gray-900">
+                        <div class="h-10 w-10 flex items-center justify-center rounded-lg bg-blue-600">
+                            <svg class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.623 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z"/>
+                            </svg>
+                        </div>
+                        Enterprise Security
+                    </dt>
+                    <dd class="mt-4 flex flex-auto flex-col text-base leading-7 text-gray-600">
+                        <p class="flex-auto">
+                            Built with enterprise-grade security features including encrypted data transmission, 
+                            role-based access control, and comprehensive audit logging.
+                        </p>
+                    </dd>
+                </div>
+                
+                <!-- Feature 6 -->
+                <div class="flex flex-col animate-fade-in" style="animation-delay: 1s;">
+                    <dt class="flex items-center gap-x-3 text-base font-semibold leading-7 text-gray-900">
+                        <div class="h-10 w-10 flex items-center justify-center rounded-lg bg-blue-600">
+                            <svg class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z"/>
+                            </svg>
+                        </div>
+                        Advanced Reports
+                    </dt>
+                    <dd class="mt-4 flex flex-auto flex-col text-base leading-7 text-gray-600">
+                        <p class="flex-auto">
+                            Generate detailed reports with customizable timeframes, export options, 
+                            and visual charts to track performance and compliance metrics.
+                        </p>
+                    </dd>
+                </div>
+            </dl>
+        </div>
+    </div>
+</div>
+
+<!-- CTA Section -->
+<div class="bg-blue-600">
+    <div class="px-6 py-24 sm:px-6 sm:py-32 lg:px-8">
+        <div class="mx-auto max-w-2xl text-center">
+            <h2 class="text-3xl font-bold tracking-tight text-white sm:text-4xl">
+                Ready to get started?
+            </h2>
+            <p class="mx-auto mt-6 max-w-xl text-lg leading-8 text-blue-100">
+                Join thousands of organizations using Clarify to optimize their spaces 
+                and improve operational efficiency.
+            </p>
+            <div class="mt-10 flex items-center justify-center gap-x-6">
+                <a href="{% url 'accounts:register' %}" class="rounded-lg bg-white px-6 py-3 text-base font-semibold text-blue-600 shadow-sm hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white transition-all transform hover:scale-105">
+                    Start Free Trial
+                </a>
+                <a href="{% url 'accounts:login' %}" class="text-base font-semibold leading-7 text-white hover:text-blue-100 transition-colors">
+                    Already have an account? Sign in <span aria-hidden="true">→</span>
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- About Section -->
+<div id="about" class="py-24 sm:py-32 bg-gray-50">
+    <div class="mx-auto max-w-7xl px-6 lg:px-8">
+        <div class="mx-auto max-w-2xl lg:text-center">
+            <h2 class="text-base font-semibold leading-7 text-blue-600">About Clarify</h2>
+            <p class="mt-2 text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
+                Built for the modern world
+            </p>
+            <p class="mt-6 text-lg leading-8 text-gray-600">
+                Clarify was designed from the ground up to solve real-world occupancy management challenges. 
+                Our platform combines cutting-edge computer vision technology with intuitive design 
+                to deliver actionable insights that drive better decision-making.
+            </p>
+        </div>
+    </div>
+</div>
+
+<!-- Contact Section -->
+<div id="contact" class="py-24 sm:py-32 bg-white">
+    <div class="mx-auto max-w-7xl px-6 lg:px-8">
+        <div class="mx-auto max-w-2xl text-center">
+            <h2 class="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">Get in touch</h2>
+            <p class="mt-2 text-lg leading-8 text-gray-600">
+                Have questions? We'd love to hear from you. Send us a message and we'll respond as soon as possible.
+            </p>
+            <div class="mt-10">
+                <a href="mailto:support@clarify.com" class="rounded-lg bg-blue-600 px-6 py-3 text-base font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 transition-all">
+                    Contact Support
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

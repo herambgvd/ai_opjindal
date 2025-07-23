@@ -1,0 +1,242 @@
+{% extends 'accounts/base.html' %}
+
+{% block extra_css %}
+<style>
+    /* Custom styles for cross counting dashboard */
+    .metric-card {
+        transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+    }
+    
+    .metric-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+    }
+    
+    .status-indicator {
+        position: relative;
+        display: inline-block;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        margin-right: 8px;
+    }
+    
+    .status-online {
+        background-color: #10b981;
+        box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.3);
+    }
+    
+    .status-offline {
+        background-color: #ef4444;
+        box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.3);
+    }
+    
+    .status-disabled {
+        background-color: #6b7280;
+        box-shadow: 0 0 0 2px rgba(107, 114, 128, 0.3);
+    }
+    
+    .status-online::before {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 100%;
+        height: 100%;
+        border-radius: 50%;
+        background-color: inherit;
+        transform: translate(-50%, -50%);
+        animation: pulse 2s infinite;
+    }
+    
+    @keyframes pulse {
+        0% {
+            transform: translate(-50%, -50%) scale(1);
+            opacity: 1;
+        }
+        100% {
+            transform: translate(-50%, -50%) scale(1.5);
+            opacity: 0;
+        }
+    }
+    
+    .progress-bar {
+        transition: width 0.5s ease-in-out;
+    }
+    
+    .over-capacity {
+        background-color: #fef2f2;
+        border-color: #fecaca;
+    }
+    
+    .chart-container {
+        position: relative;
+        height: 300px;
+        width: 100%;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-50">
+    <!-- Navigation Sidebar -->
+    <div class="flex">
+        <!-- Sidebar -->
+        <div class="w-64 bg-white shadow-sm border-r border-gray-200 min-h-screen">
+            <div class="p-6">
+                <div class="flex items-center space-x-3 mb-8">
+                    <div class="h-10 w-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+                        <svg class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h2 class="text-lg font-semibold text-gray-900">Cross Counting</h2>
+                        <p class="text-sm text-gray-500">Management System</p>
+                    </div>
+                </div>
+                
+                <!-- Navigation Menu -->
+                <nav class="space-y-2">
+                    <a href="{% url 'cross_counting:dashboard' %}" 
+                       class="{% if request.resolver_match.url_name == 'dashboard' %}bg-blue-50 border-blue-500 text-blue-700{% else %}border-transparent text-gray-600 hover:bg-gray-50 hover:text-gray-900{% endif %} group flex items-center px-4 py-3 text-sm font-medium border-l-4 transition-colors">
+                        <svg class="{% if request.resolver_match.url_name == 'dashboard' %}text-blue-500{% else %}text-gray-400 group-hover:text-gray-500{% endif %} mr-3 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2v0a2 2 0 012-2h10"/>
+                        </svg>
+                        Dashboard
+                    </a>
+                    
+                    <a href="{% url 'cross_counting:reports' %}" 
+                       class="{% if request.resolver_match.url_name == 'reports' %}bg-blue-50 border-blue-500 text-blue-700{% else %}border-transparent text-gray-600 hover:bg-gray-50 hover:text-gray-900{% endif %} group flex items-center px-4 py-3 text-sm font-medium border-l-4 transition-colors">
+                        <svg class="{% if request.resolver_match.url_name == 'reports' %}text-blue-500{% else %}text-gray-400 group-hover:text-gray-500{% endif %} mr-3 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                        </svg>
+                        Reports
+                    </a>
+                    
+                    <!-- Config section -->
+                    <div x-data="{ open: {% if 'config' in request.resolver_match.url_name or request.resolver_match.url_name in 'tag_list,tag_create,tag_update,tag_delete,camera_list,camera_create,camera_update,camera_delete' %}true{% else %}false{% endif %} }">
+                        <button @click="open = !open" 
+                                class="{% if 'config' in request.resolver_match.url_name or request.resolver_match.url_name in 'tag_list,tag_create,tag_update,tag_delete,camera_list,camera_create,camera_update,camera_delete' %}bg-blue-50 border-blue-500 text-blue-700{% else %}border-transparent text-gray-600 hover:bg-gray-50 hover:text-gray-900{% endif %} group w-full flex items-center justify-between px-4 py-3 text-sm font-medium border-l-4 transition-colors">
+                            <div class="flex items-center">
+                                <svg class="{% if 'config' in request.resolver_match.url_name or request.resolver_match.url_name in 'tag_list,tag_create,tag_update,tag_delete,camera_list,camera_create,camera_update,camera_delete' %}text-blue-500{% else %}text-gray-400 group-hover:text-gray-500{% endif %} mr-3 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                </svg>
+                                Configuration
+                            </div>
+                            <svg class="h-4 w-4 transform transition-transform" :class="{ 'rotate-180': open }" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                            </svg>
+                        </button>
+                        
+                        <div x-show="open" x-transition class="ml-8 mt-2 space-y-1">
+                            <a href="{% url 'cross_counting:config' %}" 
+                               class="{% if request.resolver_match.url_name == 'config' %}bg-blue-50 text-blue-700{% else %}text-gray-600 hover:text-gray-900 hover:bg-gray-50{% endif %} group flex items-center px-4 py-2 text-sm font-medium rounded-md transition-colors">
+                                Overview
+                            </a>
+                            <a href="{% url 'cross_counting:tag_list' %}" 
+                               class="{% if 'tag' in request.resolver_match.url_name %}bg-blue-50 text-blue-700{% else %}text-gray-600 hover:text-gray-900 hover:bg-gray-50{% endif %} group flex items-center px-4 py-2 text-sm font-medium rounded-md transition-colors">
+                                Tag Management
+                            </a>
+                            <a href="{% url 'cross_counting:camera_list' %}" 
+                               class="{% if 'camera' in request.resolver_match.url_name %}bg-blue-50 text-blue-700{% else %}text-gray-600 hover:text-gray-900 hover:bg-gray-50{% endif %} group flex items-center px-4 py-2 text-sm font-medium rounded-md transition-colors">
+                                Camera Management
+                            </a>
+                        </div>
+                    </div>
+                </nav>
+            </div>
+        </div>
+        
+        <!-- Main Content -->
+        <div class="flex-1 overflow-hidden">
+            <!-- Page Header -->
+            <div class="bg-white shadow-sm border-b border-gray-200">
+                <div class="px-6 py-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h1 class="text-2xl font-bold text-gray-900">{% block page_title %}Dashboard{% endblock %}</h1>
+                            <p class="text-sm text-gray-600 mt-1">{% block page_description %}Real-time occupancy monitoring and management{% endblock %}</p>
+                        </div>
+                        <div class="flex items-center space-x-3">
+                            {% block page_actions %}
+                            <!-- Last updated indicator -->
+                            <div class="flex items-center text-sm text-gray-500">
+                                <svg class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                                <span id="last-updated">Last updated: {{ "now"|date:"H:i:s" }}</span>
+                            </div>
+                            {% endblock %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Page Content -->
+            <div class="flex-1 overflow-y-auto p-6">
+                {% block dashboard_content %}
+                {% endblock %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Real-time updates
+    function updateLastUpdated() {
+        const now = new Date();
+        const timeString = now.toLocaleTimeString();
+        const lastUpdatedElement = document.getElementById('last-updated');
+        if (lastUpdatedElement) {
+            lastUpdatedElement.textContent = `Last updated: ${timeString}`;
+        }
+    }
+
+    // Auto-refresh data every 30 seconds
+    setInterval(() => {
+        updateLastUpdated();
+        // Trigger custom refresh event
+        window.dispatchEvent(new CustomEvent('dashboard-refresh'));
+    }, 30000);
+
+    // Utility functions for charts and real-time updates
+    window.DashboardUtils = {
+        formatNumber: function(num) {
+            if (num >= 1000000) {
+                return (num / 1000000).toFixed(1) + 'M';
+            } else if (num >= 1000) {
+                return (num / 1000).toFixed(1) + 'K';
+            }
+            return num.toString();
+        },
+        
+        getStatusColor: function(status) {
+            switch (status) {
+                case 'online': return '#10b981';
+                case 'offline': return '#ef4444';
+                case 'disabled': return '#6b7280';
+                default: return '#6b7280';
+            }
+        },
+        
+        animateCounter: function(element, start, end, duration = 1000) {
+            const range = end - start;
+            const increment = range / (duration / 16);
+            let current = start;
+            
+            const timer = setInterval(() => {
+                current += increment;
+                if ((increment > 0 && current >= end) || (increment < 0 && current <= end)) {
+                    current = end;
+                    clearInterval(timer);
+                }
+                element.textContent = Math.round(current);
+            }, 16);
+        }
+    };
+</script>
+{% endblock %}

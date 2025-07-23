@@ -1,0 +1,180 @@
+{% extends 'accounts/base.html' %}
+
+{% block title %}Account Settings - Clarify{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto space-y-6">
+    <!-- Page header -->
+    <div class="bg-white shadow rounded-lg">
+        <div class="px-4 py-5 sm:p-6">
+            <div class="flex items-center space-x-3">
+                <div class="flex-shrink-0">
+                    <svg class="h-8 w-8 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-900">Account Settings</h1>
+                    <p class="text-sm text-gray-600">Manage your account preferences and security settings.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings form -->
+    <div class="bg-white shadow rounded-lg">
+        <form method="post" class="space-y-6" x-data="{ loading: false }" @submit="loading = true">
+            {% csrf_token %}
+            
+            <div class="px-4 py-5 sm:p-6">
+                <!-- Localization Settings -->
+                <div class="space-y-6">
+                    <div>
+                        <h3 class="text-lg leading-6 font-medium text-gray-900">Localization</h3>
+                        <p class="mt-1 text-sm text-gray-500">Configure your regional and language preferences.</p>
+                    </div>
+
+                    <div class="sm:grid sm:grid-cols-3 sm:gap-4 sm:items-start">
+                        <label for="{{ form.timezone.id_for_label }}" class="block text-sm font-medium text-gray-700 sm:mt-px sm:pt-2">
+                            Timezone
+                        </label>
+                        <div class="mt-1 sm:mt-0 sm:col-span-2">
+                            {{ form.timezone }}
+                            {% if form.timezone.errors %}
+                                <p class="mt-1 text-sm text-red-600">{{ form.timezone.errors.0 }}</p>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="sm:grid sm:grid-cols-3 sm:gap-4 sm:items-start">
+                        <label for="{{ form.language.id_for_label }}" class="block text-sm font-medium text-gray-700 sm:mt-px sm:pt-2">
+                            Language
+                        </label>
+                        <div class="mt-1 sm:mt-0 sm:col-span-2">
+                            {{ form.language }}
+                            {% if form.language.errors %}
+                                <p class="mt-1 text-sm text-red-600">{{ form.language.errors.0 }}</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Appearance Settings -->
+                <div class="pt-8 space-y-6">
+                    <div>
+                        <h3 class="text-lg leading-6 font-medium text-gray-900">Appearance</h3>
+                        <p class="mt-1 text-sm text-gray-500">Customize how Clarify looks and feels for you.</p>
+                    </div>
+
+                    <div class="sm:grid sm:grid-cols-3 sm:gap-4 sm:items-start">
+                        <label for="{{ form.theme.id_for_label }}" class="block text-sm font-medium text-gray-700 sm:mt-px sm:pt-2">
+                            Theme
+                        </label>
+                        <div class="mt-1 sm:mt-0 sm:col-span-2">
+                            {{ form.theme }}
+                            {% if form.theme.errors %}
+                                <p class="mt-1 text-sm text-red-600">{{ form.theme.errors.0 }}</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Notification Settings -->
+                <div class="pt-8 space-y-6">
+                    <div>
+                        <h3 class="text-lg leading-6 font-medium text-gray-900">Notifications</h3>
+                        <p class="mt-1 text-sm text-gray-500">Choose what notifications you want to receive.</p>
+                    </div>
+
+                    <div class="space-y-4">
+                        <div class="flex items-start">
+                            <div class="flex items-center h-5">
+                                {{ form.email_notifications }}
+                            </div>
+                            <div class="ml-3 text-sm">
+                                <label for="{{ form.email_notifications.id_for_label }}" class="font-medium text-gray-700">
+                                    Email Notifications
+                                </label>
+                                <p class="text-gray-500">Receive notifications about account activity and updates via email.</p>
+                                {% if form.email_notifications.errors %}
+                                    <p class="text-red-600">{{ form.email_notifications.errors.0 }}</p>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="flex items-start">
+                            <div class="flex items-center h-5">
+                                {{ form.security_alerts }}
+                            </div>
+                            <div class="ml-3 text-sm">
+                                <label for="{{ form.security_alerts.id_for_label }}" class="font-medium text-gray-700">
+                                    Security Alerts
+                                </label>
+                                <p class="text-gray-500">Receive important security notifications and login alerts.</p>
+                                {% if form.security_alerts.errors %}
+                                    <p class="text-red-600">{{ form.security_alerts.errors.0 }}</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Form actions -->
+            <div class="px-4 py-3 bg-gray-50 text-right sm:px-6 rounded-b-lg">
+                <div class="flex justify-between items-center">
+                    <a href="{% url 'accounts:dashboard' %}" class="bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
+                        Cancel
+                    </a>
+                    <button type="submit" 
+                            :disabled="loading"
+                            class="ml-3 inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all">
+                        <span x-show="!loading">Save Settings</span>
+                        <span x-show="loading" class="flex items-center">
+                            <div class="spinner mr-2"></div>
+                            Saving...
+                        </span>
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Security Section -->
+    <div class="bg-white shadow rounded-lg">
+        <div class="px-4 py-5 sm:p-6">
+            <div class="space-y-6">
+                <div>
+                    <h3 class="text-lg leading-6 font-medium text-gray-900">Security</h3>
+                    <p class="mt-1 text-sm text-gray-500">Manage your account security and access.</p>
+                </div>
+
+                <div class="flex items-center justify-between py-4 border-t border-gray-200">
+                    <div class="flex-1">
+                        <h4 class="text-sm font-medium text-gray-900">Password</h4>
+                        <p class="text-sm text-gray-500">Last changed {{ user.last_login|timesince }} ago</p>
+                    </div>
+                    <div>
+                        <a href="{% url 'accounts:change_password' %}" class="bg-white py-2 px-3 border border-gray-300 rounded-md shadow-sm text-sm leading-4 font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
+                            Change Password
+                        </a>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between py-4 border-t border-gray-200">
+                    <div class="flex-1">
+                        <h4 class="text-sm font-medium text-gray-900">Account Activity</h4>
+                        <p class="text-sm text-gray-500">View your account login history and activity</p>
+                    </div>
+                    <div>
+                        <a href="{% url 'accounts:activity' %}" class="bg-white py-2 px-3 border border-gray-300 rounded-md shadow-sm text-sm leading-4 font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
+                            View Activity
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

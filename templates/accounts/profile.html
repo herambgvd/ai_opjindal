@@ -1,0 +1,140 @@
+{% extends 'accounts/base.html' %}
+
+{% block title %}Edit Profile - Clarify{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto space-y-6">
+    <!-- Page header -->
+    <div class="bg-white shadow rounded-lg">
+        <div class="px-4 py-5 sm:p-6">
+            <div class="flex items-center space-x-3">
+                <div class="flex-shrink-0">
+                    <svg class="h-8 w-8 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-900">Edit Profile</h1>
+                    <p class="text-sm text-gray-600">Update your personal information and profile settings.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Profile form -->
+    <div class="bg-white shadow rounded-lg">
+        <form method="post" enctype="multipart/form-data" class="space-y-6" x-data="{ loading: false }" @submit="loading = true">
+            {% csrf_token %}
+            
+            <div class="px-4 py-5 sm:p-6">
+                <!-- Avatar section -->
+                <div class="sm:grid sm:grid-cols-3 sm:gap-4 sm:items-start sm:border-t sm:border-gray-200 sm:pt-5">
+                    <label class="block text-sm font-medium text-gray-700 sm:mt-px sm:pt-2">
+                        Profile Photo
+                    </label>
+                    <div class="mt-1 sm:mt-0 sm:col-span-2">
+                        <div class="flex items-center space-x-5">
+                            <div class="flex-shrink-0">
+                                {% if user.avatar %}
+                                    <img class="h-20 w-20 rounded-full object-cover" src="{{ user.avatar.url }}" alt="{{ user.get_full_name }}">
+                                {% else %}
+                                    <div class="h-20 w-20 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+                                        <span class="text-xl font-bold text-white">{{ user.get_initials }}</span>
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div class="flex flex-col space-y-2">
+                                {{ form.avatar }}
+                                <p class="text-xs text-gray-500">JPG, PNG up to 5MB</p>
+                                {% if form.avatar.errors %}
+                                    <p class="text-sm text-red-600">{{ form.avatar.errors.0 }}</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Personal information -->
+                <div class="sm:grid sm:grid-cols-3 sm:gap-4 sm:items-start sm:border-t sm:border-gray-200 sm:pt-5 mt-6">
+                    <label for="{{ form.first_name.id_for_label }}" class="block text-sm font-medium text-gray-700 sm:mt-px sm:pt-2">
+                        First Name
+                    </label>
+                    <div class="mt-1 sm:mt-0 sm:col-span-2">
+                        {{ form.first_name }}
+                        {% if form.first_name.errors %}
+                            <p class="mt-1 text-sm text-red-600">{{ form.first_name.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="sm:grid sm:grid-cols-3 sm:gap-4 sm:items-start sm:border-t sm:border-gray-200 sm:pt-5">
+                    <label for="{{ form.last_name.id_for_label }}" class="block text-sm font-medium text-gray-700 sm:mt-px sm:pt-2">
+                        Last Name
+                    </label>
+                    <div class="mt-1 sm:mt-0 sm:col-span-2">
+                        {{ form.last_name }}
+                        {% if form.last_name.errors %}
+                            <p class="mt-1 text-sm text-red-600">{{ form.last_name.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="sm:grid sm:grid-cols-3 sm:gap-4 sm:items-start sm:border-t sm:border-gray-200 sm:pt-5">
+                    <label for="{{ form.email.id_for_label }}" class="block text-sm font-medium text-gray-700 sm:mt-px sm:pt-2">
+                        Email Address
+                    </label>
+                    <div class="mt-1 sm:mt-0 sm:col-span-2">
+                        {{ form.email }}
+                        {% if form.email.errors %}
+                            <p class="mt-1 text-sm text-red-600">{{ form.email.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="sm:grid sm:grid-cols-3 sm:gap-4 sm:items-start sm:border-t sm:border-gray-200 sm:pt-5">
+                    <label for="{{ form.phone.id_for_label }}" class="block text-sm font-medium text-gray-700 sm:mt-px sm:pt-2">
+                        Phone Number
+                    </label>
+                    <div class="mt-1 sm:mt-0 sm:col-span-2">
+                        {{ form.phone }}
+                        {% if form.phone.errors %}
+                            <p class="mt-1 text-sm text-red-600">{{ form.phone.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="sm:grid sm:grid-cols-3 sm:gap-4 sm:items-start sm:border-t sm:border-gray-200 sm:pt-5">
+                    <label for="{{ form.bio.id_for_label }}" class="block text-sm font-medium text-gray-700 sm:mt-px sm:pt-2">
+                        Bio
+                    </label>
+                    <div class="mt-1 sm:mt-0 sm:col-span-2">
+                        {{ form.bio }}
+                        <p class="mt-2 text-sm text-gray-500">Brief description about yourself. This will be displayed on your profile.</p>
+                        {% if form.bio.errors %}
+                            <p class="mt-1 text-sm text-red-600">{{ form.bio.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Form actions -->
+            <div class="px-4 py-3 bg-gray-50 text-right sm:px-6 rounded-b-lg">
+                <div class="flex justify-between items-center">
+                    <a href="{% url 'accounts:dashboard' %}" class="bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
+                        Cancel
+                    </a>
+                    <button type="submit" 
+                            :disabled="loading"
+                            class="ml-3 inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all">
+                        <span x-show="!loading">Save Changes</span>
+                        <span x-show="loading" class="flex items-center">
+                            <div class="spinner mr-2"></div>
+                            Saving...
+                        </span>
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
