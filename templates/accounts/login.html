@@ -1,0 +1,28 @@
+{% extends 'accounts/base.html' %}
+{% block title %}Login - Clarify{% endblock %}
+{% block content %}
+<div class="max-w-md mx-auto bg-white p-8 rounded-lg shadow-md">
+    <h2 class="text-2xl font-bold mb-6 text-gray-900">Login to Clarify</h2>
+    <form method="post" class="space-y-6">
+        {% csrf_token %}
+        {% for field in form %}
+            <div>
+                <label for="{{ field.id_for_label }}" class="block text-sm font-medium text-gray-700">{{ field.label }}</label>
+                <div class="mt-1">
+                    {{ field }}
+                </div>
+                {% if field.errors %}
+                    <p class="mt-1 text-sm text-red-600">{{ field.errors.as_text }}</p>
+                {% endif %}
+            </div>
+        {% endfor %}
+        <div>
+            <button type="submit" class="w-full btn-primary text-white px-4 py-2 rounded-md hover:bg-blue-700">Login</button>
+        </div>
+    </form>
+    <div class="mt-4 text-sm text-gray-600">
+        <p>Don't have an account? <a href="{% url 'accounts:register' %}" class="text-blue-600 hover:underline">Register</a></p>
+        <p>Forgot your password? <a href="{% url 'accounts:password_reset' %}" class="text-blue-600 hover:underline">Reset it</a></p>
+    </div>
+</div>
+{% endblock %}
