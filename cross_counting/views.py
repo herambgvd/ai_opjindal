@@ -79,7 +79,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             'capacity_percentage': (total_occupancy / total_capacity * 100) if total_capacity > 0 else 0,
             'total_tags': tags.count(),
         })
-
+        print(context)
         return context
 
 
@@ -166,7 +166,7 @@ class ReportsView(LoginRequiredMixin, TemplateView):
 
 class ConfigView(LoginRequiredMixin, TemplateView):
     """Configuration dashboard"""
-    template_name = 'cross_counting/config.html'
+    template_name = 'cross_counting/config/main.html'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -187,7 +187,7 @@ class ConfigView(LoginRequiredMixin, TemplateView):
 class TagListView(LoginRequiredMixin, ListView):
     model = Tag
     context_object_name = 'tags'
-    template_name = 'cross_counting/tag_list.html'
+    template_name = 'cross_counting/config/tag/tag_list.html'
     paginate_by = 20
 
     def get_context_data(self, **kwargs):
@@ -216,7 +216,7 @@ class TagListView(LoginRequiredMixin, ListView):
 class TagCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
     model = Tag
     form_class = TagForm
-    template_name = 'cross_counting/tag_form.html'
+    template_name = 'cross_counting/config/tag/tag_form.html'
     success_url = reverse_lazy('cross_counting:tag_list')
     success_message = "Tag '%(name)s' created successfully."
 
@@ -224,14 +224,14 @@ class TagCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
 class TagUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
     model = Tag
     form_class = TagForm
-    template_name = 'cross_counting/tag_form.html'
+    template_name = 'cross_counting/config/tag/tag_form.html'
     success_url = reverse_lazy('cross_counting:tag_list')
     success_message = "Tag '%(name)s' updated successfully."
 
 
 class TagDeleteView(LoginRequiredMixin, SuccessMessageMixin, DeleteView):
     model = Tag
-    template_name = 'cross_counting/tag_confirm_delete.html'
+    template_name = 'cross_counting/config/tag/tag_confirm_delete.html'
     success_url = reverse_lazy('cross_counting:tag_list')
     success_message = "Tag deleted successfully."
 
@@ -245,7 +245,7 @@ class TagDeleteView(LoginRequiredMixin, SuccessMessageMixin, DeleteView):
 class CameraListView(LoginRequiredMixin, ListView):
     model = Camera
     context_object_name = 'cameras'
-    template_name = 'cross_counting/camera_list.html'
+    template_name = 'cross_counting/config/camera/camera_list.html'
     paginate_by = 20
 
     def get_context_data(self, **kwargs):
@@ -280,7 +280,7 @@ class CameraListView(LoginRequiredMixin, ListView):
 class CameraCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
     model = Camera
     form_class = CameraForm
-    template_name = 'cross_counting/camera_form.html'
+    template_name = 'cross_counting/config/camera/camera_form.html'
     success_url = reverse_lazy('cross_counting:camera_list')
     success_message = "Camera '%(name)s' created successfully."
 
@@ -288,14 +288,14 @@ class CameraCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
 class CameraUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
     model = Camera
     form_class = CameraForm
-    template_name = 'cross_counting/camera_form.html'
+    template_name = 'cross_counting/config/camera/camera_form.html'
     success_url = reverse_lazy('cross_counting:camera_list')
     success_message = "Camera '%(name)s' updated successfully."
 
 
 class CameraDeleteView(LoginRequiredMixin, SuccessMessageMixin, DeleteView):
     model = Camera
-    template_name = 'cross_counting/camera_confirm_delete.html'
+    template_name = 'cross_counting/config/camera/camera_confirm_delete.html'
     success_url = reverse_lazy('cross_counting:camera_list')
     success_message = "Camera deleted successfully."
 
