@@ -36,7 +36,7 @@ class Tag(models.Model):
 class Camera(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=200, unique=True)
-    rtsp_link = models.URLField(max_length=500)
+    rtsp_link = models.CharField(max_length=500)
     status = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

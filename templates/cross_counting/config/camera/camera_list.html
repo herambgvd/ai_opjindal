@@ -1,10 +1,534 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Title</title>
-</head>
-<body>
+{% extends 'cross_counting/base.html' %}
 
-</body>
-</html>
+{% block title %}Cameras - Clarify{% endblock %}
+
+{% block page_title %}Camera Management{% endblock %}
+
+{% block page_actions %}
+<a href="{% url 'cross_counting:camera_create' %}" 
+   class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+    <svg class="-ml-1 mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+    </svg>
+    Add Camera
+</a>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Search and Filter Bar -->
+    <div class="bg-white shadow rounded-lg">
+        <div class="px-4 py-5 sm:p-6">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0 sm:space-x-4">
+                <div class="flex-1 min-w-0">
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <svg class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                            </svg>
+                        </div>
+                        <input type="text" id="search-cameras" 
+                               class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                               placeholder="Search cameras...">
+                    </div>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <select id="filter-status" class="text-sm border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                        <option value="">All Status</option>
+                        <option value="online">Online</option>
+                        <option value="offline">Offline</option>
+                        <option value="disabled">Disabled</option>
+                    </select>
+                    <select id="filter-tag" class="text-sm border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                        <option value="">All Locations</option>
+                        {% for tag in tags %}
+                            <option value="{{ tag.id }}">{{ tag.name }}</option>
+                        {% endfor %}
+                    </select>
+                    <select id="sort-by" class="text-sm border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                        <option value="name">Sort by Name</option>
+                        <option value="status">Sort by Status</option>
+                        <option value="activity">Sort by Activity</option>
+                        <option value="created">Sort by Created Date</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cameras List -->
+    {% if cameras_with_stats %}
+        <div class="bg-white shadow rounded-lg overflow-hidden">
+            <div class="px-4 py-5 sm:p-6">
+                <div class="space-y-4" id="cameras-list">
+                    {% for camera_stats in cameras_with_stats %}
+                        <div class="border border-gray-200 rounded-lg p-4 camera-card card-hover"
+                             data-name="{{ camera_stats.camera.name|lower }}"
+                             data-status="{{ camera_stats.status }}"
+                             data-tag="{% if camera_stats.camera.tag %}{{ camera_stats.camera.tag.id }}{% endif %}"
+                             data-activity="{% if camera_stats.last_activity %}{{ camera_stats.last_activity|date:'U' }}{% else %}0{% endif %}"
+                             data-created="{{ camera_stats.camera.created_at|date:'U' }}">
+                            
+                            <div class="flex items-center justify-between">
+                                <!-- Camera Info -->
+                                <div class="flex items-center space-x-4">
+                                    <!-- Status Indicator -->
+                                    <div class="flex-shrink-0">
+                                        <div class="h-10 w-10 rounded-lg flex items-center justify-center
+                                                    {% if camera_stats.status == 'online' %}bg-green-100
+                                                    {% elif camera_stats.status == 'offline' %}bg-red-100
+                                                    {% else %}bg-gray-100{% endif %}">
+                                            <svg class="h-6 w-6 
+                                                        {% if camera_stats.status == 'online' %}text-green-600
+                                                        {% elif camera_stats.status == 'offline' %}text-red-600
+                                                        {% else %}text-gray-600{% endif %}" 
+                                                 fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                                            </svg>
+                                        </div>
+                                    </div>
+
+                                    <!-- Camera Details -->
+                                    <div class="min-w-0 flex-1">
+                                        <div class="flex items-center space-x-3">
+                                            <h3 class="text-lg font-medium text-gray-900 truncate">
+                                                {{ camera_stats.camera.name }}
+                                            </h3>
+                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                                                         {% if camera_stats.status == 'online' %}bg-green-100 text-green-800
+                                                         {% elif camera_stats.status == 'offline' %}bg-red-100 text-red-800
+                                                         {% else %}bg-gray-100 text-gray-800{% endif %}">
+                                                {% if camera_stats.status == 'online' %}
+                                                    <div class="h-1.5 w-1.5 bg-green-400 rounded-full mr-1 animate-pulse-custom"></div>
+                                                    Online
+                                                {% elif camera_stats.status == 'offline' %}
+                                                    <div class="h-1.5 w-1.5 bg-red-400 rounded-full mr-1"></div>
+                                                    Offline
+                                                {% else %}
+                                                    <div class="h-1.5 w-1.5 bg-gray-400 rounded-full mr-1"></div>
+                                                    Disabled
+                                                {% endif %}
+                                            </span>
+                                        </div>
+                                        
+                                        <div class="mt-1 flex items-center space-x-4 text-sm text-gray-500">
+                                            {% if camera_stats.camera.tag %}
+                                                <div class="flex items-center">
+                                                    <svg class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
+                                                    </svg>
+                                                    {{ camera_stats.camera.tag.name }}
+                                                </div>
+                                            {% else %}
+                                                <div class="flex items-center text-gray-400">
+                                                    <svg class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
+                                                    </svg>
+                                                    No location assigned
+                                                </div>
+                                            {% endif %}
+                                            
+                                            <div class="flex items-center">
+                                                <svg class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
+                                                </svg>
+                                                <span class="truncate max-w-xs">{{ camera_stats.camera.rtsp_link }}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Camera Stats -->
+                                <div class="flex items-center space-x-6">
+                                    <!-- Current Count -->
+                                    <div class="text-center">
+                                        <div class="text-lg font-semibold text-gray-900">
+                                            {{ camera_stats.current_count }}
+                                        </div>
+                                        <div class="text-xs text-gray-500">Current Count</div>
+                                    </div>
+
+                                    <!-- Last Activity -->
+                                    <div class="text-center min-w-0">
+                                        {% if camera_stats.last_activity %}
+                                            <div class="text-sm font-medium text-gray-900">
+                                                {{ camera_stats.last_activity|timesince }} ago
+                                            </div>
+                                            <div class="text-xs text-gray-500">Last Activity</div>
+                                        {% else %}
+                                            <div class="text-sm font-medium text-gray-400">
+                                                No activity
+                                            </div>
+                                            <div class="text-xs text-gray-500">-</div>
+                                        {% endif %}
+                                    </div>
+
+                                    <!-- Actions -->
+                                    <div class="flex items-center space-x-2">
+                                        <a href="{% url 'cross_counting:camera_update' camera_stats.camera.pk %}" 
+                                           class="inline-flex items-center p-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                                            </svg>
+                                        </a>
+                                        
+                                        <button onclick="testCamera('{{ camera_stats.camera.rtsp_link }}', '{{ camera_stats.camera.name }}')" 
+                                                class="inline-flex items-center p-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1m4 0h1m-6 4h8m-9-4V8a3 3 0 013-3h2.586a1 1 0 01.707.293l2.414 2.414a1 1 0 01.293.707V10M9 14v4a3 3 0 003 3h4a3 3 0 003-3v-4M9 14H6m12 0h3"/>
+                                            </svg>
+                                        </button>
+
+                                        <button onclick="deleteCamera('{{ camera_stats.camera.pk }}', '{{ camera_stats.camera.name }}')" 
+                                                class="inline-flex items-center p-2 border border-red-300 rounded-md shadow-sm text-sm font-medium text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
+                                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Latest Data (if available) -->
+                            {% if camera_stats.latest_data %}
+                                <div class="mt-4 pt-4 border-t border-gray-200">
+                                    <div class="grid grid-cols-3 gap-4 text-sm">
+                                        <div class="text-center">
+                                            <div class="font-medium text-green-600">{{ camera_stats.latest_data.cc_in_count }}</div>
+                                            <div class="text-gray-500">Entries</div>
+                                        </div>
+                                        <div class="text-center">
+                                            <div class="font-medium text-red-600">{{ camera_stats.latest_data.cc_out_count }}</div>
+                                            <div class="text-gray-500">Exits</div>
+                                        </div>
+                                        <div class="text-center">
+                                            <div class="font-medium text-blue-600">{{ camera_stats.latest_data.cc_total_count }}</div>
+                                            <div class="text-gray-500">Net Count</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                </div>
+
+                <!-- Pagination -->
+                {% if is_paginated %}
+                    <div class="mt-6 px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+                        <div class="flex-1 flex justify-between sm:hidden">
+                            {% if page_obj.has_previous %}
+                                <a href="?page={{ page_obj.previous_page_number }}" 
+                                   class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                                    Previous
+                                </a>
+                            {% endif %}
+                            {% if page_obj.has_next %}
+                                <a href="?page={{ page_obj.next_page_number }}" 
+                                   class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                                    Next
+                                </a>
+                            {% endif %}
+                        </div>
+                        <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                            <div>
+                                <p class="text-sm text-gray-700">
+                                    Showing
+                                    <span class="font-medium">{{ page_obj.start_index }}</span>
+                                    to
+                                    <span class="font-medium">{{ page_obj.end_index }}</span>
+                                    of
+                                    <span class="font-medium">{{ page_obj.paginator.count }}</span>
+                                    results
+                                </p>
+                            </div>
+                            <div>
+                                <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
+                                    {% if page_obj.has_previous %}
+                                        <a href="?page={{ page_obj.previous_page_number }}" 
+                                           class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                                            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                                            </svg>
+                                        </a>
+                                    {% endif %}
+                                    
+                                    {% for num in page_obj.paginator.page_range %}
+                                        {% if page_obj.number == num %}
+                                            <span class="relative inline-flex items-center px-4 py-2 border border-blue-500 bg-blue-50 text-sm font-medium text-blue-600">
+                                                {{ num }}
+                                            </span>
+                                        {% else %}
+                                            <a href="?page={{ num }}" 
+                                               class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50">
+                                                {{ num }}
+                                            </a>
+                                        {% endif %}
+                                    {% endfor %}
+                                    
+                                    {% if page_obj.has_next %}
+                                        <a href="?page={{ page_obj.next_page_number }}" 
+                                           class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                                            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                                            </svg>
+                                        </a>
+                                    {% endif %}
+                                </nav>
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+    {% else %}
+        <!-- Empty State -->
+        <div class="bg-white shadow rounded-lg">
+            <div class="text-center py-12">
+                <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                </svg>
+                <h3 class="mt-2 text-sm font-medium text-gray-900">No cameras configured</h3>
+                <p class="mt-1 text-sm text-gray-500">Get started by adding your first camera to monitor occupancy.</p>
+                <div class="mt-6">
+                    <a href="{% url 'cross_counting:camera_create' %}" 
+                       class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        <svg class="-ml-1 mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                        </svg>
+                        Add First Camera
+                    </a>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div id="delete-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
+    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <div class="mt-3 text-center">
+            <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
+                <svg class="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"/>
+                </svg>
+            </div>
+            <h3 class="text-lg font-medium text-gray-900 mt-2">Delete Camera</h3>
+            <div class="mt-2 px-7 py-3">
+                <p class="text-sm text-gray-500">
+                    Are you sure you want to delete camera "<span id="delete-camera-name" class="font-medium"></span>"? 
+                    This action cannot be undone and all associated data will be lost.
+                </p>
+            </div>
+            <div class="items-center px-4 py-3">
+                <button id="delete-confirm" 
+                        class="px-4 py-2 bg-red-500 text-white text-base font-medium rounded-md w-24 mr-2 hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-300">
+                    Delete
+                </button>
+                <button id="delete-cancel" 
+                        class="px-4 py-2 bg-gray-500 text-white text-base font-medium rounded-md w-24 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-300">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Test Camera Modal -->
+<div id="test-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
+    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <div class="mt-3 text-center">
+            <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-blue-100">
+                <svg class="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                </svg>
+            </div>
+            <h3 class="text-lg font-medium text-gray-900 mt-2">Test Camera Connection</h3>
+            <div class="mt-2 px-7 py-3">
+                <p class="text-sm text-gray-500 mb-3">
+                    Testing connection to "<span id="test-camera-name" class="font-medium"></span>"
+                </p>
+                <div class="text-xs text-gray-400 mb-3">
+                    RTSP URL: <span id="test-camera-url" class="font-mono"></span>
+                </div>
+                <div id="test-status" class="text-sm">
+                    <div class="flex items-center justify-center">
+                        <div class="spinner mr-2"></div>
+                        Testing connection...
+                    </div>
+                </div>
+            </div>
+            <div class="items-center px-4 py-3">
+                <button id="test-close" 
+                        class="px-4 py-2 bg-gray-500 text-white text-base font-medium rounded-md w-24 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-300">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let deleteCameraId = null;
+
+    // Search functionality
+    document.getElementById('search-cameras').addEventListener('input', function() {
+        filterCameras();
+    });
+
+    // Filter functionality
+    document.getElementById('filter-status').addEventListener('change', function() {
+        filterCameras();
+    });
+
+    document.getElementById('filter-tag').addEventListener('change', function() {
+        filterCameras();
+    });
+
+    // Sort functionality
+    document.getElementById('sort-by').addEventListener('change', function() {
+        sortCameras();
+    });
+
+    function filterCameras() {
+        const searchTerm = document.getElementById('search-cameras').value.toLowerCase();
+        const statusFilter = document.getElementById('filter-status').value;
+        const tagFilter = document.getElementById('filter-tag').value;
+        const cameraCards = document.querySelectorAll('.camera-card');
+
+        cameraCards.forEach(card => {
+            const name = card.dataset.name;
+            const status = card.dataset.status;
+            const tag = card.dataset.tag;
+            
+            const matchesSearch = name.includes(searchTerm);
+            const matchesStatus = !statusFilter || status === statusFilter;
+            const matchesTag = !tagFilter || tag === tagFilter;
+            
+            if (matchesSearch && matchesStatus && matchesTag) {
+                card.style.display = 'block';
+            } else {
+                card.style.display = 'none';
+            }
+        });
+    }
+
+    function sortCameras() {
+        const sortBy = document.getElementById('sort-by').value;
+        const camerasList = document.getElementById('cameras-list');
+        const cameraCards = Array.from(document.querySelectorAll('.camera-card'));
+
+        cameraCards.sort((a, b) => {
+            switch (sortBy) {
+                case 'name':
+                    return a.dataset.name.localeCompare(b.dataset.name);
+                case 'status':
+                    const statusOrder = { 'online': 3, 'offline': 2, 'disabled': 1 };
+                    return (statusOrder[b.dataset.status] || 0) - (statusOrder[a.dataset.status] || 0);
+                case 'activity':
+                    return parseInt(b.dataset.activity) - parseInt(a.dataset.activity);
+                case 'created':
+                    return parseInt(b.dataset.created) - parseInt(a.dataset.created);
+                default:
+                    return 0;
+            }
+        });
+
+        // Re-append sorted cards
+        cameraCards.forEach(card => camerasList.appendChild(card));
+    }
+
+    function deleteCamera(cameraId, cameraName) {
+        deleteCameraId = cameraId;
+        document.getElementById('delete-camera-name').textContent = cameraName;
+        document.getElementById('delete-modal').classList.remove('hidden');
+    }
+
+    function testCamera(rtspUrl, cameraName) {
+        document.getElementById('test-camera-name').textContent = cameraName;
+        document.getElementById('test-camera-url').textContent = rtspUrl;
+        document.getElementById('test-modal').classList.remove('hidden');
+        
+        // Reset status
+        const statusDiv = document.getElementById('test-status');
+        statusDiv.innerHTML = `
+            <div class="flex items-center justify-center">
+                <div class="spinner mr-2"></div>
+                Testing connection...
+            </div>
+        `;
+        
+        // Simulate camera test (replace with actual RTSP test)
+        setTimeout(() => {
+            const success = Math.random() > 0.3; // Simulate 70% success rate
+            if (success) {
+                statusDiv.innerHTML = `
+                    <div class="flex items-center justify-center text-green-600">
+                        <svg class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        Connection successful!
+                    </div>
+                `;
+            } else {
+                statusDiv.innerHTML = `
+                    <div class="flex items-center justify-center text-red-600">
+                        <svg class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        Connection failed!
+                    </div>
+                    <div class="text-xs text-gray-500 mt-2">
+                        Check RTSP URL and network connectivity
+                    </div>
+                `;
+            }
+        }, 2000);
+    }
+
+    // Modal event listeners
+    document.getElementById('delete-cancel').addEventListener('click', function() {
+        document.getElementById('delete-modal').classList.add('hidden');
+        deleteCameraId = null;
+    });
+
+    document.getElementById('delete-confirm').addEventListener('click', function() {
+        if (deleteCameraId) {
+            // Create and submit delete form
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = `/cross_counting/config/cameras/${deleteCameraId}/delete/`;
+            
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
+            const csrfInput = document.createElement('input');
+            csrfInput.type = 'hidden';
+            csrfInput.name = 'csrfmiddlewaretoken';
+            csrfInput.value = csrfToken;
+            form.appendChild(csrfInput);
+            
+            document.body.appendChild(form);
+            form.submit();
+        }
+    });
+
+    document.getElementById('test-close').addEventListener('click', function() {
+        document.getElementById('test-modal').classList.add('hidden');
+    });
+
+    // Close modals when clicking outside
+    document.getElementById('delete-modal').addEventListener('click', function(e) {
+        if (e.target === this) {
+            this.classList.add('hidden');
+            deleteCameraId = null;
+        }
+    });
+
+    document.getElementById('test-modal').addEventListener('click', function(e) {
+        if (e.target === this) {
+            this.classList.add('hidden');
+        }
+    });
+</script>
+{% endblock %}

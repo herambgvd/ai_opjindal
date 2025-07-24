@@ -84,84 +84,148 @@ class DashboardView(LoginRequiredMixin, TemplateView):
 
 
 class ReportsView(LoginRequiredMixin, TemplateView):
-    """Reports and analytics dashboard"""
+    """Enhanced Reports with Today's Analytics Dashboard"""
     template_name = 'cross_counting/reports.html'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
 
-        # Date range for reports (default: last 7 days)
-        end_date = timezone.now()
-        start_date = end_date - timedelta(days=7)
+        # Today's date
+        today = timezone.now().date()
 
-        # Get date range from query params if provided
-        date_from = self.request.GET.get('date_from')
-        date_to = self.request.GET.get('date_to')
+        # Get today's analytics data
+        today_data = self.get_today_analytics()
 
-        if date_from:
-            start_date = datetime.strptime(date_from, '%Y-%m-%d').replace(tzinfo=timezone.get_current_timezone())
-        if date_to:
-            end_date = datetime.strptime(date_to, '%Y-%m-%d').replace(tzinfo=timezone.get_current_timezone())
+        # Get hourly data for today
+        hourly_data = self.get_hourly_data(today)
 
-        # Analytics data
-        data_queryset = CrossCountingData.objects.filter(
-            created_at__range=[start_date, end_date]
-        )
-
-        # Summary statistics
-        summary_stats = {
-            'total_entries': data_queryset.aggregate(
-                total_in=Count('cc_in_count'),
-                total_out=Count('cc_out_count'),
-                avg_occupancy=Avg('cc_total_count'),
-                max_occupancy=Max('cc_total_count'),
-                min_occupancy=Min('cc_total_count')
-            )
-        }
-
-        # Daily trends
-        daily_data = []
-        current_date = start_date.date()
-        while current_date <= end_date.date():
-            day_data = data_queryset.filter(created_at__date=current_date).aggregate(
-                avg_occupancy=Avg('cc_total_count'),
-                max_occupancy=Max('cc_total_count'),
-                total_entries=Count('id')
-            )
-            daily_data.append({
-                'date': current_date,
-                'avg_occupancy': day_data['avg_occupancy'] or 0,
-                'max_occupancy': day_data['max_occupancy'] or 0,
-                'total_entries': day_data['total_entries']
-            })
-            current_date += timedelta(days=1)
-
-        # Tag-wise analytics
-        tag_analytics = []
-        for tag in Tag.objects.all():
-            tag_data = data_queryset.filter(camera__tag=tag).aggregate(
-                avg_occupancy=Avg('cc_total_count'),
-                max_occupancy=Max('cc_total_count'),
-                total_entries=Count('id')
-            )
-            tag_analytics.append({
-                'tag': tag,
-                'avg_occupancy': tag_data['avg_occupancy'] or 0,
-                'max_occupancy': tag_data['max_occupancy'] or 0,
-                'total_entries': tag_data['total_entries'],
-                'utilization_rate': (tag_data['avg_occupancy'] / tag.occupancy * 100) if tag.occupancy > 0 and tag_data[
-                    'avg_occupancy'] else 0
-            })
+        # Get location-wise data for today
+        location_data = self.get_location_data(today)
 
         context.update({
-            'summary_stats': summary_stats,
-            'daily_data': daily_data,
-            'tag_analytics': tag_analytics,
-            'date_from': start_date.date(),
-            'date_to': end_date.date(),
+            'today': today,
+            'today_stats': today_data,
+            'hourly_data': hourly_data,
+            'location_data': location_data,
         })
 
         return context
+
+    def get_today_analytics(self):
+        """Get today's summary statistics"""
+        today = timezone.now().date()
+
+        today_queryset = CrossCountingData.objects.filter(
+            created_at__date=today
+        )
+
+        if not today_queryset.exists():
+            return {
+                'current_occupancy': 0,
+                'peak_occupancy': 0,
+                'total_entries': 0,
+                'total_exits': 0
+            }
+
+        # Get current occupancy (latest total count across all cameras)
+        current_occupancy = 0
+        for camera in Camera.objects.filter(status=True):
+            latest_data = camera.cross_counting_data.filter(
+                created_at__date=today
+            ).order_by('-created_at').first()
+            if latest_data:
+                current_occupancy += latest_data.cc_total_count
+
+        stats = today_queryset.aggregate(
+            peak_occupancy=Max('cc_total_count'),
+            total_entries=Sum('cc_in_count'),
+            total_exits=Sum('cc_out_count')
+        )
+
+        return {
+            'current_occupancy': current_occupancy,
+            'peak_occupancy': stats['peak_occupancy'] or 0,
+            'total_entries': stats['total_entries'] or 0,
+            'total_exits': stats['total_exits'] or 0
+        }
+
+    def get_hourly_data(self, target_date):
+        """Get hourly breakdown for a specific date"""
+        hourly_data = []
+
+        for hour in range(24):
+            hour_data = CrossCountingData.objects.filter(
+                created_at__date=target_date,
+                created_at__hour=hour
+            ).aggregate(
+                avg_occupancy=Avg('cc_total_count'),
+                entries=Sum('cc_in_count'),
+                exits=Sum('cc_out_count')
+            )
+
+            hourly_data.append({
+                'hour': hour,
+                'avg_occupancy': hour_data['avg_occupancy'] or 0,
+                'entries': hour_data['entries'] or 0,
+                'exits': hour_data['exits'] or 0
+            })
+
+        return hourly_data
+
+    def get_location_data(self, target_date):
+        """Get location-wise data for a specific date"""
+        location_data = []
+
+        for tag in Tag.objects.all():
+            cameras = tag.cameras.filter(status=True)
+            if not cameras.exists():
+                continue
+
+            # Get today's data for this tag's cameras
+            tag_data = CrossCountingData.objects.filter(
+                camera__in=cameras,
+                created_at__date=target_date
+            )
+
+            if not tag_data.exists():
+                location_data.append({
+                    'tag': tag,
+                    'current_occupancy': 0,
+                    'entries_today': 0,
+                    'exits_today': 0,
+                    'peak_today': 0,
+                    'utilization_percentage': 0
+                })
+                continue
+
+            # Calculate current occupancy (latest total for each camera)
+            current_occupancy = 0
+            for camera in cameras:
+                latest_data = camera.cross_counting_data.filter(
+                    created_at__date=target_date
+                ).order_by('-created_at').first()
+                if latest_data:
+                    current_occupancy += latest_data.cc_total_count
+
+            # Get aggregated data
+            stats = tag_data.aggregate(
+                entries_today=Sum('cc_in_count'),
+                exits_today=Sum('cc_out_count'),
+                peak_today=Max('cc_total_count')
+            )
+
+            utilization_percentage = (current_occupancy / tag.occupancy * 100) if tag.occupancy > 0 else 0
+
+            location_data.append({
+                'tag': tag,
+                'current_occupancy': current_occupancy,
+                'entries_today': stats['entries_today'] or 0,
+                'exits_today': stats['exits_today'] or 0,
+                'peak_today': stats['peak_today'] or 0,
+                'utilization_percentage': utilization_percentage
+            })
+
+        return location_data
 
 
 class ConfigView(LoginRequiredMixin, TemplateView):

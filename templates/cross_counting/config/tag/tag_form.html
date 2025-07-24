@@ -1,10 +1,353 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Title</title>
-</head>
-<body>
+{% extends 'cross_counting/base.html' %}
 
-</body>
-</html>
+{% block title %}
+    {% if object %}Edit Location Tag{% else %}Create Location Tag{% endif %} - Clarify
+{% endblock %}
+
+{% block page_title %}
+    {% if object %}Edit Location Tag{% else %}Create Location Tag{% endif %}
+{% endblock %}
+
+{% block page_actions %}
+<a href="{% url 'cross_counting:tag_list' %}" 
+   class="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+    <svg class="-ml-1 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+    </svg>
+    Back to Tags
+</a>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto space-y-6">
+    <!-- Form Card -->
+    <div class="bg-white shadow rounded-lg">
+        <form method="post" class="space-y-6" x-data="tagForm()" @submit="handleSubmit">
+            {% csrf_token %}
+            
+            <!-- Form Header -->
+            <div class="px-4 py-5 sm:p-6 border-b border-gray-200">
+                <div class="flex items-center space-x-3">
+                    <div class="h-10 w-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                        <svg class="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-medium text-gray-900">Location Tag Details</h3>
+                        <p class="text-sm text-gray-500">
+                            {% if object %}
+                                Update the details for this location tag.
+                            {% else %}
+                                Create a new location tag to organize your cameras and monitor occupancy.
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Form Fields -->
+            <div class="px-4 py-5 sm:p-6 space-y-6">
+                <!-- Tag Name -->
+                <div>
+                    <label for="{{ form.name.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                        Location Name *
+                    </label>
+                    <div class="relative">
+                        {{ form.name }}
+                        <div class="absolute inset-y-0 right-0 pr-3 flex items-center">
+                            <svg class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
+                            </svg>
+                        </div>
+                    </div>
+                    {% if form.name.errors %}
+                        <p class="mt-1 text-sm text-red-600">{{ form.name.errors.0 }}</p>
+                    {% else %}
+                        <p class="mt-1 text-sm text-gray-500">
+                            Enter a descriptive name for this location (e.g., "Main Entrance", "Conference Room A", "Lobby").
+                        </p>
+                    {% endif %}
+                </div>
+
+                <!-- Maximum Occupancy -->
+                <div>
+                    <label for="{{ form.occupancy.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                        Maximum Occupancy *
+                    </label>
+                    <div class="relative">
+                        {{ form.occupancy }}
+                        <div class="absolute inset-y-0 right-0 pr-3 flex items-center">
+                            <svg class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+                            </svg>
+                        </div>
+                    </div>
+                    {% if form.occupancy.errors %}
+                        <p class="mt-1 text-sm text-red-600">{{ form.occupancy.errors.0 }}</p>
+                    {% else %}
+                        <p class="mt-1 text-sm text-gray-500">
+                            Set the maximum number of people allowed in this location. You'll receive alerts when this limit is exceeded.
+                        </p>
+                    {% endif %}
+                </div>
+
+                <!-- Occupancy Preview -->
+                <div x-show="occupancy > 0" class="bg-gray-50 p-4 rounded-lg">
+                    <h4 class="text-sm font-medium text-gray-900 mb-3">Occupancy Levels Preview</h4>
+                    <div class="space-y-2">
+                        <div class="flex items-center justify-between text-sm">
+                            <span class="text-green-700">Normal (0-75%)</span>
+                            <span class="font-medium" x-text="'0 - ' + Math.floor(occupancy * 0.75)"></span>
+                        </div>
+                        <div class="flex items-center justify-between text-sm">
+                            <span class="text-yellow-700">Warning (75-100%)</span>
+                            <span class="font-medium" x-text="Math.floor(occupancy * 0.75 + 1) + ' - ' + occupancy"></span>
+                        </div>
+                        <div class="flex items-center justify-between text-sm">
+                            <span class="text-red-700">Over Capacity (>100%)</span>
+                            <span class="font-medium" x-text="(occupancy + 1) + '+'"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Form Errors -->
+                {% if form.non_field_errors %}
+                    <div class="rounded-md bg-red-50 p-4">
+                        <div class="flex">
+                            <div class="flex-shrink-0">
+                                <svg class="h-5 w-5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+                                </svg>
+                            </div>
+                            <div class="ml-3">
+                                <h3 class="text-sm font-medium text-red-800">Please correct the following errors:</h3>
+                                <div class="mt-2 text-sm text-red-700">
+                                    {{ form.non_field_errors.0 }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- Form Actions -->
+            <div class="px-4 py-3 bg-gray-50 text-right sm:px-6 rounded-b-lg">
+                <div class="flex justify-between items-center">
+                    <div class="flex items-center space-x-4">
+                        {% if object %}
+                            <a href="{% url 'cross_counting:tag_delete' object.pk %}" 
+                               class="inline-flex items-center px-3 py-2 border border-red-300 shadow-sm text-sm leading-4 font-medium rounded-md text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
+                                <svg class="-ml-1 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                </svg>
+                                Delete Tag
+                            </a>
+                        {% endif %}
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        <a href="{% url 'cross_counting:tag_list' %}" 
+                           class="bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
+                            Cancel
+                        </a>
+                        <button type="submit" 
+                                :disabled="loading"
+                                class="ml-3 inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all">
+                            <span x-show="!loading">
+                                {% if object %}Update Tag{% else %}Create Tag{% endif %}
+                            </span>
+                            <span x-show="loading" class="flex items-center">
+                                <div class="spinner mr-2"></div>
+                                {% if object %}Updating...{% else %}Creating...{% endif %}
+                            </span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Help Information -->
+    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div class="flex">
+            <div class="flex-shrink-0">
+                <svg class="h-5 w-5 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+                </svg>
+            </div>
+            <div class="ml-3">
+                <h3 class="text-sm font-medium text-blue-800">
+                    About Location Tags
+                </h3>
+                <div class="mt-2 text-sm text-blue-700">
+                    <ul class="list-disc list-inside space-y-1">
+                        <li>Location tags help organize your cameras by physical location or area</li>
+                        <li>Set maximum occupancy limits to receive alerts when exceeded</li>
+                        <li>Each camera can be assigned to one location tag</li>
+                        <li>Use descriptive names that match your physical locations</li>
+                        {% if not object %}
+                            <li>After creating the tag, you can assign cameras to it from the camera management page</li>
+                        {% endif %}
+                    </ul>
+                </div>
+                {% if object %}
+                    <div class="mt-3">
+                        <a href="{% url 'cross_counting:camera_list' %}?tag={{ object.pk }}" 
+                           class="text-sm font-medium text-blue-800 hover:text-blue-900">
+                            View cameras assigned to this tag →
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Preview Card (for new tags) -->
+    {% if not object %}
+        <div x-show="name && occupancy > 0" class="bg-white shadow rounded-lg">
+            <div class="px-4 py-5 sm:p-6">
+                <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Preview</h3>
+                <div class="bg-gray-50 rounded-lg p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center space-x-3">
+                            <div class="h-10 w-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                                <span class="text-sm font-bold text-blue-800" x-text="name.slice(0, 2).toUpperCase()"></span>
+                            </div>
+                            <div>
+                                <h4 class="text-lg font-medium text-gray-900" x-text="name"></h4>
+                                <p class="text-sm text-gray-500">0 cameras (0 active)</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <div class="h-3 w-3 bg-gray-400 rounded-full"></div>
+                            <span class="text-xs font-medium text-gray-600">No Cameras</span>
+                        </div>
+                    </div>
+
+                    <div class="space-y-4">
+                        <div>
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="text-sm font-medium text-gray-700">Current Occupancy</span>
+                                <span class="text-2xl font-bold text-gray-900">0</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-2.5 mb-1">
+                                <div class="h-2.5 rounded-full bg-green-500" style="width: 0%"></div>
+                            </div>
+                            <div class="flex justify-between text-xs text-gray-500">
+                                <span>0</span>
+                                <span>0% utilized</span>
+                                <span x-text="occupancy"></span>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4 pt-4 border-t border-gray-200">
+                            <div class="text-center">
+                                <div class="text-lg font-semibold text-gray-900" x-text="occupancy"></div>
+                                <div class="text-xs text-gray-500">Max Capacity</div>
+                            </div>
+                            <div class="text-center">
+                                <div class="text-lg font-semibold text-gray-900">0</div>
+                                <div class="text-xs text-gray-500">Active Cameras</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function tagForm() {
+        return {
+            loading: false,
+            name: '{{ object.name|default:"" }}',
+            occupancy: {{ object.occupancy|default:0 }},
+            
+            handleSubmit(event) {
+                this.loading = true;
+                // Let the form submit normally
+            },
+            
+            init() {
+                // Watch for input changes
+                this.$watch('name', (value) => {
+                    document.getElementById('{{ form.name.id_for_label }}').value = value;
+                });
+                
+                this.$watch('occupancy', (value) => {
+                    document.getElementById('{{ form.occupancy.id_for_label }}').value = value;
+                });
+
+                // Initialize from form values
+                const nameField = document.getElementById('{{ form.name.id_for_label }}');
+                const occupancyField = document.getElementById('{{ form.occupancy.id_for_label }}');
+                
+                if (nameField) {
+                    this.name = nameField.value;
+                    nameField.addEventListener('input', (e) => {
+                        this.name = e.target.value;
+                    });
+                }
+                
+                if (occupancyField) {
+                    this.occupancy = parseInt(occupancyField.value) || 0;
+                    occupancyField.addEventListener('input', (e) => {
+                        this.occupancy = parseInt(e.target.value) || 0;
+                    });
+                }
+            }
+        }
+    }
+
+    // Form validation
+    document.addEventListener('DOMContentLoaded', function() {
+        const form = document.querySelector('form');
+        const nameField = document.getElementById('{{ form.name.id_for_label }}');
+        const occupancyField = document.getElementById('{{ form.occupancy.id_for_label }}');
+
+        // Real-time validation
+        if (nameField) {
+            nameField.addEventListener('blur', function() {
+                if (this.value.trim().length < 2) {
+                    this.setCustomValidity('Location name must be at least 2 characters long');
+                } else {
+                    this.setCustomValidity('');
+                }
+            });
+        }
+
+        if (occupancyField) {
+            occupancyField.addEventListener('input', function() {
+                const value = parseInt(this.value);
+                if (value < 1) {
+                    this.setCustomValidity('Maximum occupancy must be at least 1');
+                } else if (value > 10000) {
+                    this.setCustomValidity('Maximum occupancy cannot exceed 10,000');
+                } else {
+                    this.setCustomValidity('');
+                }
+            });
+        }
+
+        // Form submission validation
+        form.addEventListener('submit', function(e) {
+            if (!nameField.value.trim()) {
+                e.preventDefault();
+                nameField.focus();
+                alert('Please enter a location name');
+                return false;
+            }
+
+            if (!occupancyField.value || parseInt(occupancyField.value) < 1) {
+                e.preventDefault();
+                occupancyField.focus();
+                alert('Please enter a valid maximum occupancy');
+                return false;
+            }
+        });
+    });
+</script>
+{% endblock %}

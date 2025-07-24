@@ -1,10 +1,385 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Title</title>
-</head>
-<body>
+{% extends 'cross_counting/base.html' %}
 
-</body>
-</html>
+{% block title %}Location Tags - Clarify{% endblock %}
+
+{% block page_title %}Location Tags{% endblock %}
+
+{% block page_actions %}
+<a href="{% url 'cross_counting:tag_create' %}" 
+   class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+    <svg class="-ml-1 mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+    </svg>
+    Add Location Tag
+</a>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Search and Filter Bar -->
+    <div class="bg-white shadow rounded-lg">
+        <div class="px-4 py-5 sm:p-6">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0 sm:space-x-4">
+                <div class="flex-1 min-w-0">
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <svg class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                            </svg>
+                        </div>
+                        <input type="text" id="search-tags" 
+                               class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                               placeholder="Search location tags...">
+                    </div>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <select id="filter-status" class="text-sm border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                        <option value="">All Status</option>
+                        <option value="normal">Normal</option>
+                        <option value="over-capacity">Over Capacity</option>
+                        <option value="no-cameras">No Cameras</option>
+                    </select>
+                    <select id="sort-by" class="text-sm border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                        <option value="name">Sort by Name</option>
+                        <option value="occupancy">Sort by Occupancy</option>
+                        <option value="capacity">Sort by Capacity</option>
+                        <option value="created">Sort by Created Date</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tags Grid -->
+    {% if tags_with_stats %}
+        <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3" id="tags-grid">
+            {% for tag_stats in tags_with_stats %}
+                <div class="bg-white shadow rounded-lg card-hover tag-card" 
+                     data-name="{{ tag_stats.tag.name|lower }}" 
+                     data-status="{% if tag_stats.is_over_capacity %}over-capacity{% elif tag_stats.camera_count == 0 %}no-cameras{% else %}normal{% endif %}"
+                     data-occupancy="{{ tag_stats.current_occupancy }}"
+                     data-capacity="{{ tag_stats.tag.occupancy }}"
+                     data-created="{{ tag_stats.tag.created_at|date:'Y-m-d' }}">
+                    
+                    <!-- Tag Header -->
+                    <div class="px-6 py-4 border-b border-gray-200">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-3">
+                                <div class="h-10 w-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                                    <span class="text-sm font-bold text-blue-800">
+                                        {{ tag_stats.tag.name|slice:":2"|upper }}
+                                    </span>
+                                </div>
+                                <div>
+                                    <h3 class="text-lg font-medium text-gray-900">{{ tag_stats.tag.name }}</h3>
+                                    <p class="text-sm text-gray-500">
+                                        {{ tag_stats.camera_count }} camera{{ tag_stats.camera_count|pluralize }}
+                                        ({{ tag_stats.active_cameras }} active)
+                                    </p>
+                                </div>
+                            </div>
+                            
+                            <!-- Status Indicator -->
+                            <div class="flex items-center space-x-2">
+                                {% if tag_stats.is_over_capacity %}
+                                    <div class="h-3 w-3 bg-red-500 rounded-full status-warning"></div>
+                                    <span class="text-xs font-medium text-red-600">Over Capacity</span>
+                                {% elif tag_stats.camera_count == 0 %}
+                                    <div class="h-3 w-3 bg-gray-400 rounded-full"></div>
+                                    <span class="text-xs font-medium text-gray-600">No Cameras</span>
+                                {% else %}
+                                    <div class="h-3 w-3 bg-green-500 rounded-full status-online"></div>
+                                    <span class="text-xs font-medium text-green-600">Normal</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Occupancy Stats -->
+                    <div class="px-6 py-4">
+                        <div class="space-y-4">
+                            <!-- Current Occupancy -->
+                            <div>
+                                <div class="flex justify-between items-center mb-2">
+                                    <span class="text-sm font-medium text-gray-700">Current Occupancy</span>
+                                    <span class="text-2xl font-bold {% if tag_stats.is_over_capacity %}text-red-600{% else %}text-gray-900{% endif %}">
+                                        {{ tag_stats.current_occupancy }}
+                                    </span>
+                                </div>
+                                
+                                <!-- Progress Bar -->
+                                <div class="w-full bg-gray-200 rounded-full h-2.5 mb-1">
+                                    <div class="h-2.5 rounded-full transition-all duration-500 
+                                                {% if tag_stats.is_over_capacity %}bg-red-500
+                                                {% elif tag_stats.utilization_rate > 75 %}bg-yellow-500
+                                                {% else %}bg-green-500{% endif %}"
+                                         style="width: {% if tag_stats.utilization_rate > 100 %}100{% else %}{{ tag_stats.utilization_rate|floatformat:0 }}{% endif %}%"></div>
+                                </div>
+                                
+                                <div class="flex justify-between text-xs text-gray-500">
+                                    <span>0</span>
+                                    <span>{{ tag_stats.utilization_rate|floatformat:1 }}% utilized</span>
+                                    <span>{{ tag_stats.tag.occupancy }}</span>
+                                </div>
+                            </div>
+
+                            <!-- Quick Stats -->
+                            <div class="grid grid-cols-2 gap-4 pt-4 border-t border-gray-100">
+                                <div class="text-center">
+                                    <div class="text-lg font-semibold text-gray-900">{{ tag_stats.tag.occupancy }}</div>
+                                    <div class="text-xs text-gray-500">Max Capacity</div>
+                                </div>
+                                <div class="text-center">
+                                    <div class="text-lg font-semibold text-gray-900">{{ tag_stats.active_cameras }}</div>
+                                    <div class="text-xs text-gray-500">Active Cameras</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-between items-center">
+                        <div class="text-xs text-gray-500">
+                            Created {{ tag_stats.tag.created_at|date:"M j, Y" }}
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <a href="{% url 'cross_counting:tag_update' tag_stats.tag.pk %}" 
+                               class="text-blue-600 hover:text-blue-900 text-sm font-medium">
+                                Edit
+                            </a>
+                            <span class="text-gray-300">|</span>
+                            <button onclick="deleteTag({{ tag_stats.tag.pk }}, '{{ tag_stats.tag.name }}')" 
+                                    class="text-red-600 hover:text-red-900 text-sm font-medium">
+                                Delete
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+
+        <!-- Pagination -->
+        {% if is_paginated %}
+            <div class="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6 rounded-lg shadow">
+                <div class="flex-1 flex justify-between sm:hidden">
+                    {% if page_obj.has_previous %}
+                        <a href="?page={{ page_obj.previous_page_number }}" 
+                           class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                            Previous
+                        </a>
+                    {% endif %}
+                    {% if page_obj.has_next %}
+                        <a href="?page={{ page_obj.next_page_number }}" 
+                           class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                            Next
+                        </a>
+                    {% endif %}
+                </div>
+                <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                    <div>
+                        <p class="text-sm text-gray-700">
+                            Showing
+                            <span class="font-medium">{{ page_obj.start_index }}</span>
+                            to
+                            <span class="font-medium">{{ page_obj.end_index }}</span>
+                            of
+                            <span class="font-medium">{{ page_obj.paginator.count }}</span>
+                            results
+                        </p>
+                    </div>
+                    <div>
+                        <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
+                            {% if page_obj.has_previous %}
+                                <a href="?page={{ page_obj.previous_page_number }}" 
+                                   class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                                    </svg>
+                                </a>
+                            {% endif %}
+                            
+                            {% for num in page_obj.paginator.page_range %}
+                                {% if page_obj.number == num %}
+                                    <span class="relative inline-flex items-center px-4 py-2 border border-blue-500 bg-blue-50 text-sm font-medium text-blue-600">
+                                        {{ num }}
+                                    </span>
+                                {% else %}
+                                    <a href="?page={{ num }}" 
+                                       class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50">
+                                        {{ num }}
+                                    </a>
+                                {% endif %}
+                            {% endfor %}
+                            
+                            {% if page_obj.has_next %}
+                                <a href="?page={{ page_obj.next_page_number }}" 
+                                   class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                                    </svg>
+                                </a>
+                            {% endif %}
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+
+    {% else %}
+        <!-- Empty State -->
+        <div class="bg-white shadow rounded-lg">
+            <div class="text-center py-12">
+                <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
+                </svg>
+                <h3 class="mt-2 text-sm font-medium text-gray-900">No location tags</h3>
+                <p class="mt-1 text-sm text-gray-500">Get started by creating your first location tag to monitor occupancy.</p>
+                <div class="mt-6">
+                    <a href="{% url 'cross_counting:tag_create' %}" 
+                       class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        <svg class="-ml-1 mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                        </svg>
+                        Create Location Tag
+                    </a>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div id="delete-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
+    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <div class="mt-3 text-center">
+            <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
+                <svg class="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"/>
+                </svg>
+            </div>
+            <h3 class="text-lg font-medium text-gray-900 mt-2">Delete Location Tag</h3>
+            <div class="mt-2 px-7 py-3">
+                <p class="text-sm text-gray-500">
+                    Are you sure you want to delete "<span id="delete-tag-name" class="font-medium"></span>"? 
+                    This action cannot be undone.
+                </p>
+            </div>
+            <div class="items-center px-4 py-3">
+                <button id="delete-confirm" 
+                        class="px-4 py-2 bg-red-500 text-white text-base font-medium rounded-md w-24 mr-2 hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-300">
+                    Delete
+                </button>
+                <button id="delete-cancel" 
+                        class="px-4 py-2 bg-gray-500 text-white text-base font-medium rounded-md w-24 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-300">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let deleteTagId = null;
+
+    // Search functionality
+    document.getElementById('search-tags').addEventListener('input', function() {
+        const searchTerm = this.value.toLowerCase();
+        filterTags();
+    });
+
+    // Filter functionality
+    document.getElementById('filter-status').addEventListener('change', function() {
+        filterTags();
+    });
+
+    // Sort functionality
+    document.getElementById('sort-by').addEventListener('change', function() {
+        sortTags();
+    });
+
+    function filterTags() {
+        const searchTerm = document.getElementById('search-tags').value.toLowerCase();
+        const statusFilter = document.getElementById('filter-status').value;
+        const tagCards = document.querySelectorAll('.tag-card');
+
+        tagCards.forEach(card => {
+            const name = card.dataset.name;
+            const status = card.dataset.status;
+            
+            const matchesSearch = name.includes(searchTerm);
+            const matchesStatus = !statusFilter || status === statusFilter;
+            
+            if (matchesSearch && matchesStatus) {
+                card.style.display = 'block';
+            } else {
+                card.style.display = 'none';
+            }
+        });
+    }
+
+    function sortTags() {
+        const sortBy = document.getElementById('sort-by').value;
+        const tagsGrid = document.getElementById('tags-grid');
+        const tagCards = Array.from(document.querySelectorAll('.tag-card'));
+
+        tagCards.sort((a, b) => {
+            switch (sortBy) {
+                case 'name':
+                    return a.dataset.name.localeCompare(b.dataset.name);
+                case 'occupancy':
+                    return parseInt(b.dataset.occupancy) - parseInt(a.dataset.occupancy);
+                case 'capacity':
+                    return parseInt(b.dataset.capacity) - parseInt(a.dataset.capacity);
+                case 'created':
+                    return new Date(b.dataset.created) - new Date(a.dataset.created);
+                default:
+                    return 0;
+            }
+        });
+
+        // Re-append sorted cards
+        tagCards.forEach(card => tagsGrid.appendChild(card));
+    }
+
+    function deleteTag(tagId, tagName) {
+        deleteTagId = tagId;
+        document.getElementById('delete-tag-name').textContent = tagName;
+        document.getElementById('delete-modal').classList.remove('hidden');
+    }
+
+    // Modal event listeners
+    document.getElementById('delete-cancel').addEventListener('click', function() {
+        document.getElementById('delete-modal').classList.add('hidden');
+        deleteTagId = null;
+    });
+
+    document.getElementById('delete-confirm').addEventListener('click', function() {
+        if (deleteTagId) {
+            // Create and submit delete form
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = `/cross_counting/config/tags/${deleteTagId}/delete/`;
+            
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+            const csrfInput = document.createElement('input');
+            csrfInput.type = 'hidden';
+            csrfInput.name = 'csrfmiddlewaretoken';
+            csrfInput.value = csrfToken;
+            form.appendChild(csrfInput);
+            
+            document.body.appendChild(form);
+            form.submit();
+        }
+    });
+
+    // Close modal when clicking outside
+    document.getElementById('delete-modal').addEventListener('click', function(e) {
+        if (e.target === this) {
+            this.classList.add('hidden');
+            deleteTagId = null;
+        }
+    });
+</script>
+{% endblock %}

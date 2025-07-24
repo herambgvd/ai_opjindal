@@ -1,3 +1,4 @@
+
 from django.urls import path
 from . import views
 
@@ -7,8 +8,11 @@ urlpatterns = [
     # Main Dashboard
     path('dashboard/', views.DashboardView.as_view(), name='dashboard'),
 
-    # Reports
+    # Reports and Analytics
     path('reports/', views.ReportsView.as_view(), name='reports'),
+    # path('reports/daily-analysis/', views.DailyAnalysisView.as_view(), name='daily_analysis'),
+    # path('reports/comparative-analysis/', views.ComparativeAnalysisView.as_view(), name='comparative_analysis'),
+    # path('reports/comprehensive-analysis/', views.ComprehensiveAnalysisView.as_view(), name='comprehensive_analysis'),
 
     # Configuration
     path('config/', views.ConfigView.as_view(), name='config'),
@@ -28,4 +32,11 @@ urlpatterns = [
     # API Endpoints
     path('api/dashboard/', views.dashboard_api, name='dashboard_api'),
     path('api/reports/', views.reports_api, name='reports_api'),
+    # path('api/today-analytics/', views.today_analytics_api, name='today_analytics_api'),
+
+    # Export Endpoints
+    # path('export/today-report/', views.export_today_report, name='export_today_report'),
+    # path('export/daily-analysis/', views.export_daily_analysis, name='export_daily_analysis'),
+    # path('export/comparative-analysis/', views.export_comparative_analysis, name='export_comparative_analysis'),
+    # path('export/comprehensive-analysis/', views.export_comprehensive_analysis, name='export_comprehensive_analysis'),
 ]

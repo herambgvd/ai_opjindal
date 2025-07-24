@@ -1,10 +1,450 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Title</title>
-</head>
-<body>
+{% extends 'cross_counting/base.html' %}
 
-</body>
-</html>
+{% block title %}Configuration - Clarify{% endblock %}
+
+{% block page_title %}System Configuration{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Overview Cards -->
+    <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        <!-- Total Tags -->
+        <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="p-5">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <div class="h-8 w-8 bg-blue-500 rounded-md flex items-center justify-center">
+                            <svg class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="ml-5 w-0 flex-1">
+                        <dl>
+                            <dt class="text-sm font-medium text-gray-500 truncate">Location Tags</dt>
+                            <dd class="text-lg font-medium text-gray-900">{{ total_tags }}</dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gray-50 px-5 py-3">
+                <div class="text-sm">
+                    <a href="{% url 'cross_counting:tag_list' %}" class="font-medium text-blue-600 hover:text-blue-500">
+                        Manage tags
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Total Cameras -->
+        <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="p-5">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <div class="h-8 w-8 bg-green-500 rounded-md flex items-center justify-center">
+                            <svg class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="ml-5 w-0 flex-1">
+                        <dl>
+                            <dt class="text-sm font-medium text-gray-500 truncate">Total Cameras</dt>
+                            <dd class="text-lg font-medium text-gray-900">{{ total_cameras }}</dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gray-50 px-5 py-3">
+                <div class="text-sm">
+                    <a href="{% url 'cross_counting:camera_list' %}" class="font-medium text-blue-600 hover:text-blue-500">
+                        Manage cameras
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Active Cameras -->
+        <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="p-5">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <div class="h-8 w-8 bg-purple-500 rounded-md flex items-center justify-center">
+                            <svg class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="ml-5 w-0 flex-1">
+                        <dl>
+                            <dt class="text-sm font-medium text-gray-500 truncate">Active Cameras</dt>
+                            <dd class="flex items-baseline">
+                                <div class="text-lg font-medium text-gray-900">{{ active_cameras }}</div>
+                                <div class="ml-2 flex items-baseline text-sm font-semibold text-green-600">
+                                    {% if total_cameras > 0 %}
+                                        {{ active_cameras|floatformat:0 }}/{{ total_cameras }}
+                                    {% else %}
+                                        0/0
+                                    {% endif %}
+                                </div>
+                            </dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gray-50 px-5 py-3">
+                <div class="text-sm">
+                    <span class="text-gray-500">
+                        {% if total_cameras > 0 %}
+                            {{ active_cameras|mul:100|div:total_cameras|floatformat:0 }}% enabled
+                        {% else %}
+                            No cameras configured
+                        {% endif %}
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- System Status -->
+        <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="p-5">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <div class="h-8 w-8 bg-indigo-500 rounded-md flex items-center justify-center">
+                            <svg class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="ml-5 w-0 flex-1">
+                        <dl>
+                            <dt class="text-sm font-medium text-gray-500 truncate">System Status</dt>
+                            <dd class="text-lg font-medium text-green-600">Operational</dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gray-50 px-5 py-3">
+                <div class="text-sm">
+                    <span class="text-gray-500">All systems running</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="bg-white shadow rounded-lg">
+        <div class="px-4 py-5 sm:p-6">
+            <h3 class="text-lg leading-6 font-medium text-gray-900 mb-6">Quick Setup</h3>
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <a href="{% url 'cross_counting:tag_create' %}" 
+                   class="relative group bg-white p-6 focus-within:ring-2 focus-within:ring-inset focus-within:ring-blue-500 rounded-lg border border-gray-300 hover:border-blue-500 card-hover">
+                    <div>
+                        <span class="rounded-lg inline-flex p-3 bg-blue-50 text-blue-700 ring-4 ring-white">
+                            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
+                            </svg>
+                        </span>
+                    </div>
+                    <div class="mt-8">
+                        <h3 class="text-lg font-medium">
+                            <span class="absolute inset-0" aria-hidden="true"></span>
+                            Create Location Tag
+                        </h3>
+                        <p class="mt-2 text-sm text-gray-500">
+                            Define physical locations and set occupancy limits for monitoring.
+                        </p>
+                    </div>
+                    <span class="pointer-events-none absolute top-6 right-6 text-gray-300 group-hover:text-gray-400" aria-hidden="true">
+                        <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                        </svg>
+                    </span>
+                </a>
+
+                <a href="{% url 'cross_counting:camera_create' %}" 
+                   class="relative group bg-white p-6 focus-within:ring-2 focus-within:ring-inset focus-within:ring-blue-500 rounded-lg border border-gray-300 hover:border-blue-500 card-hover">
+                    <div>
+                        <span class="rounded-lg inline-flex p-3 bg-green-50 text-green-700 ring-4 ring-white">
+                            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                            </svg>
+                        </span>
+                    </div>
+                    <div class="mt-8">
+                        <h3 class="text-lg font-medium">
+                            <span class="absolute inset-0" aria-hidden="true"></span>
+                            Add Camera
+                        </h3>
+                        <p class="mt-2 text-sm text-gray-500">
+                            Connect IP cameras via RTSP for real-time cross counting data.
+                        </p>
+                    </div>
+                    <span class="pointer-events-none absolute top-6 right-6 text-gray-300 group-hover:text-gray-400" aria-hidden="true">
+                        <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                        </svg>
+                    </span>
+                </a>
+
+                <a href="{% url 'cross_counting:reports' %}" 
+                   class="relative group bg-white p-6 focus-within:ring-2 focus-within:ring-inset focus-within:ring-blue-500 rounded-lg border border-gray-300 hover:border-blue-500 card-hover">
+                    <div>
+                        <span class="rounded-lg inline-flex p-3 bg-purple-50 text-purple-700 ring-4 ring-white">
+                            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                            </svg>
+                        </span>
+                    </div>
+                    <div class="mt-8">
+                        <h3 class="text-lg font-medium">
+                            <span class="absolute inset-0" aria-hidden="true"></span>
+                            View Reports
+                        </h3>
+                        <p class="mt-2 text-sm text-gray-500">
+                            Access analytics and detailed reports for your monitoring data.
+                        </p>
+                    </div>
+                    <span class="pointer-events-none absolute top-6 right-6 text-gray-300 group-hover:text-gray-400" aria-hidden="true">
+                        <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                        </svg>
+                    </span>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Items -->
+    <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <!-- Recent Tags -->
+        <div class="bg-white shadow rounded-lg">
+            <div class="px-4 py-5 sm:p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900">Recent Location Tags</h3>
+                    <a href="{% url 'cross_counting:tag_list' %}" class="text-sm text-blue-600 hover:text-blue-500">
+                        View all
+                    </a>
+                </div>
+
+                {% if recent_tags %}
+                    <div class="space-y-3">
+                        {% for tag in recent_tags %}
+                            <div class="flex items-center justify-between py-2 border-b border-gray-100 last:border-b-0">
+                                <div class="flex items-center space-x-3">
+                                    <div class="h-8 w-8 bg-blue-100 rounded-md flex items-center justify-center">
+                                        <span class="text-xs font-bold text-blue-800">
+                                            {{ tag.name|slice:":2"|upper }}
+                                        </span>
+                                    </div>
+                                    <div>
+                                        <p class="text-sm font-medium text-gray-900">{{ tag.name }}</p>
+                                        <p class="text-xs text-gray-500">
+                                            Capacity: {{ tag.occupancy }} | Created {{ tag.created_at|timesince }} ago
+                                        </p>
+                                    </div>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <a href="{% url 'cross_counting:tag_update' tag.pk %}" 
+                                       class="text-blue-600 hover:text-blue-900 text-sm">
+                                        Edit
+                                    </a>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center py-6">
+                        <svg class="mx-auto h-8 w-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
+                        </svg>
+                        <p class="mt-2 text-sm text-gray-500">No location tags created yet</p>
+                        <a href="{% url 'cross_counting:tag_create' %}" 
+                           class="mt-2 text-sm text-blue-600 hover:text-blue-500">
+                            Create your first tag
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Recent Cameras -->
+        <div class="bg-white shadow rounded-lg">
+            <div class="px-4 py-5 sm:p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900">Recent Cameras</h3>
+                    <a href="{% url 'cross_counting:camera_list' %}" class="text-sm text-blue-600 hover:text-blue-500">
+                        View all
+                    </a>
+                </div>
+
+                {% if recent_cameras %}
+                    <div class="space-y-3">
+                        {% for camera in recent_cameras %}
+                            <div class="flex items-center justify-between py-2 border-b border-gray-100 last:border-b-0">
+                                <div class="flex items-center space-x-3">
+                                    <div class="h-8 w-8 rounded-md flex items-center justify-center
+                                                {% if camera.status %}bg-green-100{% else %}bg-gray-100{% endif %}">
+                                        <svg class="h-5 w-5 {% if camera.status %}text-green-600{% else %}text-gray-600{% endif %}" 
+                                             fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <p class="text-sm font-medium text-gray-900">{{ camera.name }}</p>
+                                        <p class="text-xs text-gray-500">
+                                            {% if camera.tag %}{{ camera.tag.name }}{% else %}No location{% endif %} | 
+                                            {% if camera.status %}Enabled{% else %}Disabled{% endif %} | 
+                                            Created {{ camera.created_at|timesince }} ago
+                                        </p>
+                                    </div>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <a href="{% url 'cross_counting:camera_update' camera.pk %}" 
+                                       class="text-blue-600 hover:text-blue-900 text-sm">
+                                        Edit
+                                    </a>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center py-6">
+                        <svg class="mx-auto h-8 w-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                        </svg>
+                        <p class="mt-2 text-sm text-gray-500">No cameras configured yet</p>
+                        <a href="{% url 'cross_counting:camera_create' %}" 
+                           class="mt-2 text-sm text-blue-600 hover:text-blue-500">
+                            Add your first camera
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- System Information -->
+    <div class="bg-white shadow rounded-lg">
+        <div class="px-4 py-5 sm:p-6">
+            <h3 class="text-lg leading-6 font-medium text-gray-900 mb-6">System Information</h3>
+            
+            <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+                <!-- Version Info -->
+                <div class="text-center">
+                    <div class="text-2xl font-semibold text-gray-900">v1.0.0</div>
+                    <div class="text-sm text-gray-500">System Version</div>
+                </div>
+
+                <!-- Uptime -->
+                <div class="text-center">
+                    <div class="text-2xl font-semibold text-gray-900">99.9%</div>
+                    <div class="text-sm text-gray-500">Uptime</div>
+                </div>
+
+                <!-- Data Points -->
+                <div class="text-center">
+                    <div class="text-2xl font-semibold text-gray-900">24/7</div>
+                    <div class="text-sm text-gray-500">Monitoring</div>
+                </div>
+
+                <!-- Support -->
+                <div class="text-center">
+                    <div class="text-2xl font-semibold text-gray-900">🚀</div>
+                    <div class="text-sm text-gray-500">Ready to Scale</div>
+                </div>
+            </div>
+
+            <!-- System Health -->
+            <div class="mt-6 pt-6 border-t border-gray-200">
+                <h4 class="text-sm font-medium text-gray-900 mb-3">System Health</h4>
+                <div class="space-y-3">
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm text-gray-600">Database Connection</span>
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            <div class="h-1.5 w-1.5 bg-green-400 rounded-full mr-1"></div>
+                            Connected
+                        </span>
+                    </div>
+                    
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm text-gray-600">MQTT Service</span>
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            <div class="h-1.5 w-1.5 bg-green-400 rounded-full mr-1"></div>
+                            Running
+                        </span>
+                    </div>
+                    
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm text-gray-600">Event Server</span>
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            <div class="h-1.5 w-1.5 bg-green-400 rounded-full mr-1"></div>
+                            Active
+                        </span>
+                    </div>
+                    
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm text-gray-600">Storage Space</span>
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                            85% Available
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Getting Started Guide -->
+    {% if total_tags == 0 and total_cameras == 0 %}
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-6">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <svg class="h-5 w-5 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+                    </svg>
+                </div>
+                <div class="ml-3">
+                    <h3 class="text-sm font-medium text-blue-800 mb-3">Getting Started with Clarify</h3>
+                    <div class="text-sm text-blue-700 space-y-3">
+                        <div>
+                            <h4 class="font-medium">Step 1: Create Location Tags</h4>
+                            <p class="mt-1">Define the physical areas you want to monitor (lobbies, entrances, conference rooms, etc.) and set occupancy limits.</p>
+                            <a href="{% url 'cross_counting:tag_create' %}" 
+                               class="inline-flex items-center mt-2 text-sm font-medium text-blue-800 hover:text-blue-900">
+                                Create your first location tag
+                                <svg class="ml-1 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                                </svg>
+                            </a>
+                        </div>
+                        
+                        <div>
+                            <h4 class="font-medium">Step 2: Add Cameras</h4>
+                            <p class="mt-1">Connect your IP cameras using RTSP URLs and assign them to location tags for organized monitoring.</p>
+                            <a href="{% url 'cross_counting:camera_create' %}" 
+                               class="inline-flex items-center mt-2 text-sm font-medium text-blue-800 hover:text-blue-900">
+                                Add your first camera
+                                <svg class="ml-1 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                                </svg>
+                            </a>
+                        </div>
+                        
+                        <div>
+                            <h4 class="font-medium">Step 3: Monitor & Analyze</h4>
+                            <p class="mt-1">View real-time occupancy data on your dashboard and analyze trends with detailed reports.</p>
+                            <a href="{% url 'cross_counting:dashboard' %}" 
+                               class="inline-flex items-center mt-2 text-sm font-medium text-blue-800 hover:text-blue-900">
+                                Go to dashboard
+                                <svg class="ml-1 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                                </svg>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

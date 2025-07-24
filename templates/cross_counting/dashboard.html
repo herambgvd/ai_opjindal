@@ -1,10 +1,426 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>Title</title>
-</head>
-<body>
+{% extends 'cross_counting/base.html' %}
 
-</body>
-</html>
+{% block title %}Real-time Dashboard - Clarify{% endblock %}
+
+{% block page_title %}Live Occupancy Dashboard{% endblock %}
+
+{% block page_actions %}
+<div class="flex items-center space-x-2">
+    <div class="flex items-center space-x-2 text-sm text-gray-500">
+        <div class="h-2 w-2 bg-green-400 rounded-full animate-pulse-custom"></div>
+        <span>Live Updates</span>
+    </div>
+    <span class="text-gray-300">|</span>
+    <div class="text-sm text-gray-500" id="last-updated">
+        Last updated: <span id="update-time">{{ now|date:"H:i:s" }}</span>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6" x-data="dashboard()" x-init="init()">
+    <!-- Overview Stats -->
+    <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        <!-- Total Occupancy -->
+        <div class="bg-white overflow-hidden shadow rounded-lg card-hover">
+            <div class="p-5">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <div class="h-8 w-8 bg-blue-500 rounded-md flex items-center justify-center">
+                            <svg class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="ml-5 w-0 flex-1">
+                        <dl>
+                            <dt class="text-sm font-medium text-gray-500 truncate">Current Occupancy</dt>
+                            <dd class="flex items-baseline">
+                                <div class="text-2xl font-semibold text-gray-900" x-text="stats.totalOccupancy">
+                                    {{ total_occupancy }}
+                                </div>
+                                <div class="ml-2 flex items-baseline text-sm font-semibold" 
+                                     :class="stats.capacityPercentage > 90 ? 'text-red-600' : stats.capacityPercentage > 75 ? 'text-yellow-600' : 'text-green-600'">
+                                    <span x-text="Math.round(stats.capacityPercentage) + '%'">{{ capacity_percentage|floatformat:0 }}%</span>
+                                </div>
+                            </dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gray-50 px-5 py-3">
+                <div class="text-sm">
+                    <span class="text-gray-500">Total Capacity:</span>
+                    <span class="font-medium text-gray-900" x-text="stats.totalCapacity">{{ total_capacity }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Active Cameras -->
+        <div class="bg-white overflow-hidden shadow rounded-lg card-hover">
+            <div class="p-5">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <div class="h-8 w-8 bg-green-500 rounded-md flex items-center justify-center">
+                            <svg class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="ml-5 w-0 flex-1">
+                        <dl>
+                            <dt class="text-sm font-medium text-gray-500 truncate">Active Cameras</dt>
+                            <dd class="flex items-baseline">
+                                <div class="text-2xl font-semibold text-gray-900" x-text="stats.activeCameras">
+                                    {{ active_cameras }}
+                                </div>
+                                <div class="ml-2 flex items-baseline text-sm font-semibold text-green-600">
+                                    <svg class="self-center flex-shrink-0 h-4 w-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                                    </svg>
+                                    <span class="ml-1">Online</span>
+                                </div>
+                            </dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gray-50 px-5 py-3">
+                <div class="text-sm">
+                    <a href="{% url 'cross_counting:camera_list' %}" class="font-medium text-blue-600 hover:text-blue-500">
+                        View all cameras
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Alerts -->
+        <div class="bg-white overflow-hidden shadow rounded-lg card-hover">
+            <div class="p-5">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <div class="h-8 w-8 rounded-md flex items-center justify-center"
+                             :class="stats.alertsCount > 0 ? 'bg-red-500' : 'bg-gray-400'">
+                            <svg class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"/>
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="ml-5 w-0 flex-1">
+                        <dl>
+                            <dt class="text-sm font-medium text-gray-500 truncate">Active Alerts</dt>
+                            <dd class="flex items-baseline">
+                                <div class="text-2xl font-semibold" 
+                                     :class="stats.alertsCount > 0 ? 'text-red-600' : 'text-gray-900'"
+                                     x-text="stats.alertsCount">
+                                    {{ alerts_count }}
+                                </div>
+                                <div class="ml-2 flex items-baseline text-sm font-semibold"
+                                     :class="stats.alertsCount > 0 ? 'text-red-600' : 'text-gray-400'">
+                                    <span x-text="stats.alertsCount > 0 ? 'Over Capacity' : 'Normal'">
+                                        {% if alerts_count > 0 %}Over Capacity{% else %}Normal{% endif %}
+                                    </span>
+                                </div>
+                            </dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gray-50 px-5 py-3">
+                <div class="text-sm">
+                    <span class="text-gray-500">Monitoring</span>
+                    <span class="font-medium text-gray-900" x-text="stats.totalTags">{{ total_tags }}</span>
+                    <span class="text-gray-500">locations</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- System Status -->
+        <div class="bg-white overflow-hidden shadow rounded-lg card-hover">
+            <div class="p-5">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <div class="h-8 w-8 bg-purple-500 rounded-md flex items-center justify-center">
+                            <svg class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="ml-5 w-0 flex-1">
+                        <dl>
+                            <dt class="text-sm font-medium text-gray-500 truncate">System Status</dt>
+                            <dd class="flex items-baseline">
+                                <div class="text-2xl font-semibold text-green-600">Healthy</div>
+                                <div class="ml-2 flex items-baseline text-sm font-semibold text-green-600">
+                                    <div class="h-2 w-2 bg-green-400 rounded-full animate-pulse-custom"></div>
+                                    <span class="ml-1">Running</span>
+                                </div>
+                            </dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gray-50 px-5 py-3">
+                <div class="text-sm">
+                    <span class="text-gray-500">Uptime: </span>
+                    <span class="font-medium text-gray-900">99.9%</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tag Status Grid -->
+    <div class="bg-white shadow rounded-lg">
+        <div class="px-4 py-5 sm:p-6">
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="text-lg leading-6 font-medium text-gray-900">Location Status</h3>
+                <div class="flex items-center space-x-2">
+                    <button @click="refreshData()" 
+                            :disabled="loading"
+                            class="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50">
+                        <svg class="h-4 w-4 mr-2" :class="{'animate-spin': loading}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                        </svg>
+                        Refresh
+                    </button>
+                </div>
+            </div>
+
+            {% if tag_data %}
+                <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                    {% for tag_info in tag_data %}
+                        <div class="bg-gray-50 rounded-lg p-6 card-hover">
+                            <div class="flex items-center justify-between mb-4">
+                                <h4 class="text-lg font-medium text-gray-900">{{ tag_info.tag.name }}</h4>
+                                <div class="flex items-center space-x-2">
+                                    {% if tag_info.is_over_capacity %}
+                                        <div class="h-3 w-3 bg-red-500 rounded-full status-warning"></div>
+                                        <span class="text-sm font-medium text-red-600">Over Capacity</span>
+                                    {% else %}
+                                        <div class="h-3 w-3 bg-green-500 rounded-full status-online"></div>
+                                        <span class="text-sm font-medium text-green-600">Normal</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <!-- Occupancy Progress Bar -->
+                            <div class="mb-4">
+                                <div class="flex justify-between text-sm text-gray-600 mb-1">
+                                    <span>Occupancy</span>
+                                    <span>{{ tag_info.current_occupancy }} / {{ tag_info.max_occupancy }}</span>
+                                </div>
+                                <div class="w-full bg-gray-200 rounded-full h-2">
+                                    <div class="h-2 rounded-full transition-all duration-500 
+                                                {% if tag_info.is_over_capacity %}bg-red-500
+                                                {% elif tag_info.occupancy_percentage > 75 %}bg-yellow-500
+                                                {% else %}bg-green-500{% endif %}"
+                                         style="width: {{ tag_info.occupancy_percentage|floatformat:0 }}%"></div>
+                                </div>
+                                <div class="text-right text-xs text-gray-500 mt-1">
+                                    {{ tag_info.occupancy_percentage|floatformat:1 }}% capacity
+                                </div>
+                            </div>
+
+                            <!-- Camera Status -->
+                            <div class="space-y-2">
+                                <h5 class="text-sm font-medium text-gray-700">Cameras ({{ tag_info.cameras|length }})</h5>
+                                {% for camera_info in tag_info.cameras %}
+                                    <div class="flex items-center justify-between py-1">
+                                        <div class="flex items-center space-x-2">
+                                            <div class="h-2 w-2 rounded-full 
+                                                        {% if camera_info.status == 'online' %}bg-green-400
+                                                        {% elif camera_info.status == 'offline' %}bg-red-400
+                                                        {% else %}bg-gray-400{% endif %}"></div>
+                                            <span class="text-sm text-gray-600">{{ camera_info.camera.name }}</span>
+                                        </div>
+                                        <div class="text-sm text-gray-500">
+                                            {% if camera_info.latest_total_count %}
+                                                {{ camera_info.latest_total_count }} count
+                                            {% else %}
+                                                No data
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                {% empty %}
+                                    <p class="text-sm text-gray-500 italic">No cameras configured</p>
+                                {% endfor %}
+                            </div>
+
+                            <!-- Last Update -->
+                            {% if tag_info.cameras %}
+                                {% with tag_info.cameras.0 as latest_camera %}
+                                    {% if latest_camera.last_updated %}
+                                        <div class="mt-4 pt-4 border-t border-gray-200">
+                                            <p class="text-xs text-gray-500">
+                                                Last updated: {{ latest_camera.last_updated|timesince }} ago
+                                            </p>
+                                        </div>
+                                    {% endif %}
+                                {% endwith %}
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <!-- Empty State -->
+                <div class="text-center py-12">
+                    <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
+                    </svg>
+                    <h3 class="mt-2 text-sm font-medium text-gray-900">No locations configured</h3>
+                    <p class="mt-1 text-sm text-gray-500">Get started by creating your first location tag.</p>
+                    <div class="mt-6">
+                        <a href="{% url 'cross_counting:tag_create' %}" 
+                           class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                            <svg class="-ml-1 mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                            </svg>
+                            Create Location Tag
+                        </a>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="bg-white shadow rounded-lg">
+        <div class="px-4 py-5 sm:p-6">
+            <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Quick Actions</h3>
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <a href="{% url 'cross_counting:tag_create' %}" 
+                   class="inline-flex items-center justify-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 card-hover">
+                    <svg class="-ml-1 mr-2 h-5 w-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
+                    </svg>
+                    Add Location
+                </a>
+                
+                <a href="{% url 'cross_counting:camera_create' %}" 
+                   class="inline-flex items-center justify-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 card-hover">
+                    <svg class="-ml-1 mr-2 h-5 w-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                    </svg>
+                    Add Camera
+                </a>
+                
+                <a href="{% url 'cross_counting:reports' %}" 
+                   class="inline-flex items-center justify-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 card-hover">
+                    <svg class="-ml-1 mr-2 h-5 w-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                    </svg>
+                    View Reports
+                </a>
+                
+                <a href="{% url 'cross_counting:config' %}" 
+                   class="inline-flex items-center justify-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 card-hover">
+                    <svg class="-ml-1 mr-2 h-5 w-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                    </svg>
+                    Configuration
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function dashboard() {
+        return {
+            loading: false,
+            stats: {
+                totalOccupancy: {{ total_occupancy }},
+                totalCapacity: {{ total_capacity }},
+                activeCameras: {{ active_cameras }},
+                alertsCount: {{ alerts_count }},
+                totalTags: {{ total_tags }},
+                capacityPercentage: {{ capacity_percentage|floatformat:1 }}
+            },
+            
+            init() {
+                // Update timestamp
+                this.updateTimestamp();
+                
+                // Auto-refresh every 30 seconds
+                setInterval(() => {
+                    this.refreshData();
+                }, 30000);
+            },
+            
+            async refreshData() {
+                if (this.loading) return;
+                
+                this.loading = true;
+                try {
+                    const response = await fetch('{% url "cross_counting:dashboard_api" %}');
+                    const data = await response.json();
+                    
+                    // Update stats
+                    this.updateStats(data);
+                    
+                    // Update timestamp
+                    this.updateTimestamp();
+                    
+                    console.log('Dashboard data refreshed');
+                } catch (error) {
+                    console.error('Error refreshing dashboard:', error);
+                } finally {
+                    this.loading = false;
+                }
+            },
+            
+            updateStats(data) {
+                // Calculate totals from tag data
+                let totalOccupancy = 0;
+                let totalCapacity = 0;
+                let alertsCount = 0;
+                let activeCameras = 0;
+                
+                data.tags.forEach(tag => {
+                    totalOccupancy += tag.current_occupancy;
+                    totalCapacity += tag.max_occupancy;
+                    if (tag.is_over_capacity) alertsCount++;
+                    activeCameras += tag.cameras.length;
+                });
+                
+                this.stats = {
+                    totalOccupancy,
+                    totalCapacity,
+                    activeCameras,
+                    alertsCount,
+                    totalTags: data.tags.length,
+                    capacityPercentage: totalCapacity > 0 ? (totalOccupancy / totalCapacity * 100) : 0
+                };
+            },
+            
+            updateTimestamp() {
+                const now = new Date();
+                const timeString = now.toLocaleTimeString('en-US', { 
+                    hour12: false,
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                });
+                
+                const timeElement = document.getElementById('update-time');
+                if (timeElement) {
+                    timeElement.textContent = timeString;
+                }
+            }
+        }
+    }
+
+    // Global function for updating dashboard data
+    function updateDashboardData(data) {
+        // This function is called from the base template's auto-refresh
+        const dashboardComponent = document.querySelector('[x-data]').__x.$data;
+        if (dashboardComponent && dashboardComponent.updateStats) {
+            dashboardComponent.updateStats(data);
+            dashboardComponent.updateTimestamp();
+        }
+    }
+</script>
+{% endblock %}
