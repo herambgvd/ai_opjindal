@@ -159,21 +159,21 @@
                     
                     <div class="row mt-4">
                         <div class="col-12">
-                            <h6>Comparison Chart</h6>
+                            <h6>Camera-wise Total Count Comparison</h6>
                             <div id="comparison_chart"></div>
                         </div>
                     </div>
-                    
+
                     <div class="row mt-4">
                         <div class="col-12">
-                            <h6>Hourly In/Out Comparison</h6>
+                            <h6>Hourly In/Out Comparison (24-Hour Timeline)</h6>
                             <div id="hourly_comparison_chart"></div>
                         </div>
                     </div>
-                    
+
                     <div class="row mt-4">
                         <div class="col-12">
-                            <h6>Individual Camera Comparison</h6>
+                            <h6>Individual Camera Hourly Comparison</h6>
                             <div id="individual_camera_comparison_chart"></div>
                         </div>
                     </div>
@@ -187,31 +187,33 @@
     <script>
         {% if analysis_data.comparison %}
             var comparisonData = {{ analysis_data.comparison|safe }};
-            
+
             if (comparisonData && comparisonData.length > 0) {
                 var categories = comparisonData.map(function(item) {
                     return item.camera_name;
                 });
-                
+
                 var baseSeries = comparisonData.map(function(item) {
                     return item.base_total;
                 });
-                
+
                 var compareSeries = comparisonData.map(function(item) {
                     return item.compare_total;
                 });
-                
+
                 var options = {
                     series: [{
                         name: '{{ analysis_data.base_date }}',
-                        data: baseSeries
+                        data: baseSeries,
+                        color: '#007bff'
                     }, {
                         name: '{{ analysis_data.compare_date }}',
-                        data: compareSeries
+                        data: compareSeries,
+                        color: '#28a745'
                     }],
                     chart: {
                         type: 'bar',
-                        height: 350,
+                        height: 400,
                         toolbar: { show: true }
                     },
                     plotOptions: {
@@ -222,7 +224,10 @@
                         },
                     },
                     dataLabels: {
-                        enabled: false
+                        enabled: true,
+                        style: {
+                            fontSize: '12px'
+                        }
                     },
                     stroke: {
                         show: true,
@@ -231,10 +236,22 @@
                     },
                     xaxis: {
                         categories: categories,
-                        title: { text: 'Cameras' }
+                        title: {
+                            text: 'Cameras',
+                            style: {
+                                fontSize: '14px',
+                                fontWeight: 600
+                            }
+                        }
                     },
                     yaxis: {
-                        title: { text: 'Total Count' }
+                        title: {
+                            text: 'Total Count',
+                            style: {
+                                fontSize: '14px',
+                                fontWeight: 600
+                            }
+                        }
                     },
                     fill: {
                         opacity: 1
@@ -247,49 +264,49 @@
                         }
                     },
                     title: {
-                        text: 'Camera-wise Comparison',
-                        align: 'center'
+                        text: 'Camera-wise Total Count Comparison',
+                        align: 'center',
+                        style: {
+                            fontSize: '16px',
+                            fontWeight: 600
+                        }
+                    },
+                    legend: {
+                        position: 'top',
+                        horizontalAlign: 'center'
                     }
                 };
-                
+
                 var chart = new ApexCharts(document.querySelector("#comparison_chart"), options);
                 chart.render();
             }
         {% endif %}
-        
+
         {% if analysis_data.base_hourly_aggregates.hourly_data and analysis_data.compare_hourly_aggregates.hourly_data %}
             var baseHourlyData = {{ analysis_data.base_hourly_aggregates.hourly_data|safe }};
             var compareHourlyData = {{ analysis_data.compare_hourly_aggregates.hourly_data|safe }};
-            
+
             if (baseHourlyData.length > 0 || compareHourlyData.length > 0) {
-                var baseInData = baseHourlyData.map(function(item) {
-                    return {
-                        x: new Date(item.hour).getHours(),
-                        y: item.total_in_count
-                    };
-                });
-                
-                var baseOutData = baseHourlyData.map(function(item) {
-                    return {
-                        x: new Date(item.hour).getHours(),
-                        y: item.total_out_count
-                    };
-                });
-                
-                var compareInData = compareHourlyData.map(function(item) {
-                    return {
-                        x: new Date(item.hour).getHours(),
-                        y: item.total_in_count
-                    };
-                });
-                
-                var compareOutData = compareHourlyData.map(function(item) {
-                    return {
-                        x: new Date(item.hour).getHours(),
-                        y: item.total_out_count
-                    };
-                });
-                
+                // Prepare data for 24-hour timeline
+                var baseInData = [];
+                var baseOutData = [];
+                var compareInData = [];
+                var compareOutData = [];
+
+                for (var hour = 0; hour < 24; hour++) {
+                    var baseFound = baseHourlyData.find(function(item) {
+                        return item.hour === hour;
+                    });
+                    var compareFound = compareHourlyData.find(function(item) {
+                        return item.hour === hour;
+                    });
+
+                    baseInData.push(baseFound ? baseFound.total_in_count : 0);
+                    baseOutData.push(baseFound ? baseFound.total_out_count : 0);
+                    compareInData.push(compareFound ? compareFound.total_in_count : 0);
+                    compareOutData.push(compareFound ? compareFound.total_out_count : 0);
+                }
+
                 var hourlyComparisonOptions = {
                     series: [{
                         name: '{{ analysis_data.base_date }} - In',
@@ -310,93 +327,149 @@
                     }],
                     chart: {
                         type: 'line',
-                        height: 400,
-                        toolbar: { show: true }
-                    },
-                    xaxis: {
-                        type: 'category',
-                        categories: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23],
-                        title: { text: 'Hour (24-hour format)' }
-                    },
-                    yaxis: {
-                        title: { text: 'Cumulative Count' }
-                    },
-                    title: {
-                        text: 'Hourly In/Out Count Comparison',
-                        align: 'center'
-                    },
-                    stroke: {
-                        curve: 'smooth',
-                        width: 2
-                    },
-                    markers: {
-                        size: 4
-                    },
-                    legend: {
-                        position: 'top'
-                    }
-                };
-                
-                var hourlyCompChart = new ApexCharts(document.querySelector("#hourly_comparison_chart"), hourlyComparisonOptions);
-                hourlyCompChart.render();
-            }
-        {% endif %}
-        
-        {% if analysis_data.base_hourly_aggregates.individual_camera_data and analysis_data.compare_hourly_aggregates.individual_camera_data %}
-            var baseCameraData = {{ analysis_data.base_hourly_aggregates.individual_camera_data|safe }};
-            var compareCameraData = {{ analysis_data.compare_hourly_aggregates.individual_camera_data|safe }};
-            
-            if (baseCameraData.length > 0 || compareCameraData.length > 0) {
-                var comparisonSeries = [];
-                
-                baseCameraData.forEach(function(camera) {
-                    var inData = camera.hourly_data.map(function(item) {
-                        return {
-                            x: new Date(item.hour).getHours(),
-                            y: item.cc_in_count
-                        };
-                    });
-                    
-                    comparisonSeries.push({
-                        name: camera.camera_name + ' ({{ analysis_data.base_date }}) - In',
-                        data: inData,
-                        color: '#007bff'
-                    });
-                });
-                
-                compareCameraData.forEach(function(camera) {
-                    var inData = camera.hourly_data.map(function(item) {
-                        return {
-                            x: new Date(item.hour).getHours(),
-                            y: item.cc_in_count
-                        };
-                    });
-                    
-                    comparisonSeries.push({
-                        name: camera.camera_name + ' ({{ analysis_data.compare_date }}) - In',
-                        data: inData,
-                        color: '#28a745'
-                    });
-                });
-                
-                var individualComparisonOptions = {
-                    series: comparisonSeries,
-                    chart: {
-                        type: 'line',
                         height: 450,
                         toolbar: { show: true }
                     },
                     xaxis: {
-                        type: 'category',
-                        categories: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23],
-                        title: { text: 'Hour (24-hour format)' }
+                        categories: ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21', '22', '23'],
+                        title: {
+                            text: 'Hour (24-hour format)',
+                            style: {
+                                fontSize: '14px',
+                                fontWeight: 600
+                            }
+                        }
                     },
                     yaxis: {
-                        title: { text: 'Cumulative In Count' }
+                        title: {
+                            text: 'Cumulative Count',
+                            style: {
+                                fontSize: '14px',
+                                fontWeight: 600
+                            }
+                        }
                     },
                     title: {
-                        text: 'Individual Camera In Count Comparison',
-                        align: 'center'
+                        text: 'Hourly In/Out Count Comparison (24-Hour Timeline)',
+                        align: 'center',
+                        style: {
+                            fontSize: '16px',
+                            fontWeight: 600
+                        }
+                    },
+                    stroke: {
+                        curve: 'smooth',
+                        width: 3
+                    },
+                    markers: {
+                        size: 4,
+                        strokeWidth: 2
+                    },
+                    legend: {
+                        position: 'top',
+                        horizontalAlign: 'center'
+                    },
+                    grid: {
+                        borderColor: '#e7e7e7',
+                        strokeDashArray: 3
+                    },
+                    tooltip: {
+                        y: {
+                            formatter: function (val) {
+                                return val + " count"
+                            }
+                        }
+                    }
+                };
+
+                var hourlyCompChart = new ApexCharts(document.querySelector("#hourly_comparison_chart"), hourlyComparisonOptions);
+                hourlyCompChart.render();
+            }
+        {% endif %}
+
+        {% if analysis_data.base_hourly_aggregates.individual_camera_data and analysis_data.compare_hourly_aggregates.individual_camera_data %}
+            var baseCameraData = {{ analysis_data.base_hourly_aggregates.individual_camera_data|safe }};
+            var compareCameraData = {{ analysis_data.compare_hourly_aggregates.individual_camera_data|safe }};
+
+            if (baseCameraData.length > 0 || compareCameraData.length > 0) {
+                var comparisonSeries = [];
+                var colors = ['#007bff', '#28a745', '#dc3545', '#ffc107', '#17a2b8', '#6f42c1'];
+                var colorIndex = 0;
+
+                // Add base date camera data
+                baseCameraData.forEach(function(camera) {
+                    var inData = [];
+
+                    for (var hour = 0; hour < 24; hour++) {
+                        var foundHour = camera.hourly_data.find(function(item) {
+                            return item.hour === hour;
+                        });
+                        inData.push(foundHour ? foundHour.cc_in_count : 0);
+                    }
+
+                    comparisonSeries.push({
+                        name: camera.camera_name + ' ({{ analysis_data.base_date }}) - In',
+                        data: inData,
+                        color: colors[colorIndex % colors.length]
+                    });
+                    colorIndex++;
+                });
+
+                // Add compare date camera data
+                compareCameraData.forEach(function(camera) {
+                    var inData = [];
+
+                    for (var hour = 0; hour < 24; hour++) {
+                        var foundHour = camera.hourly_data.find(function(item) {
+                            return item.hour === hour;
+                        });
+                        inData.push(foundHour ? foundHour.cc_in_count : 0);
+                    }
+
+                    comparisonSeries.push({
+                        name: camera.camera_name + ' ({{ analysis_data.compare_date }}) - In',
+                        data: inData,
+                        color: colors[colorIndex % colors.length],
+                        stroke: {
+                            dashArray: 5
+                        }
+                    });
+                    colorIndex++;
+                });
+
+                var individualComparisonOptions = {
+                    series: comparisonSeries,
+                    chart: {
+                        type: 'line',
+                        height: 500,
+                        toolbar: { show: true }
+                    },
+                    xaxis: {
+                        categories: ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21', '22', '23'],
+                        title: {
+                            text: 'Hour (24-hour format)',
+                            style: {
+                                fontSize: '14px',
+                                fontWeight: 600
+                            }
+                        }
+                    },
+                    yaxis: {
+                        title: {
+                            text: 'Cumulative In Count',
+                            style: {
+                                fontSize: '14px',
+                                fontWeight: 600
+                            }
+                        }
+                    },
+                    title: {
+                        text: 'Individual Camera In Count Comparison (24-Hour Timeline)',
+                        align: 'center',
+                        style: {
+                            fontSize: '16px',
+                            fontWeight: 600
+                        }
                     },
                     stroke: {
                         curve: 'smooth',
@@ -407,10 +480,22 @@
                     },
                     legend: {
                         position: 'top',
-                        horizontalAlign: 'center'
+                        horizontalAlign: 'center',
+                        fontSize: '12px'
+                    },
+                    grid: {
+                        borderColor: '#e7e7e7',
+                        strokeDashArray: 3
+                    },
+                    tooltip: {
+                        y: {
+                            formatter: function (val) {
+                                return val + " count"
+                            }
+                        }
                     }
                 };
-                
+
                 var individualComparisonChart = new ApexCharts(document.querySelector("#individual_camera_comparison_chart"), individualComparisonOptions);
                 individualComparisonChart.render();
             }
