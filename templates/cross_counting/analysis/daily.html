@@ -206,7 +206,7 @@
             }
         {% endif %}
         
-        {% if analysis_data.region_hourly_aggregates.hourly_data %}
+        {% if analysis_data.region_hourly_aggregates and analysis_data.region_hourly_aggregates.hourly_data %}
             var regionHourlyData = {{ analysis_data.region_hourly_aggregates.hourly_data|safe }};
             
             if (regionHourlyData && regionHourlyData.length > 0) {
