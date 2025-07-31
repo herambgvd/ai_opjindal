@@ -281,15 +281,18 @@ class TablePartitioningManager:
         total_peak_out = 0
         total_peak_total = 0
 
-        # Use created_at for accurate daily peak calculations
+        # Use created_at for accurate daily peak calculations with proper timezone handling
+        from datetime import timedelta
         start_datetime = timezone.make_aware(datetime.combine(date, datetime.min.time()))
-        end_datetime = timezone.make_aware(datetime.combine(date, datetime.max.time()))
+        next_day = date + timedelta(days=1)
+        end_datetime = timezone.make_aware(datetime.combine(next_day, datetime.min.time()))
 
         for camera in cameras:
             # Get daily peaks using created_at
             peaks = CrossCountingData.objects.filter(
                 camera=camera,
-                created_at__range=[start_datetime, end_datetime]
+                created_at__gte=start_datetime,
+                created_at__lt=end_datetime
             ).aggregate(
                 peak_in_count=Max('cc_in_count'),
                 peak_out_count=Max('cc_out_count'),
@@ -368,9 +371,11 @@ class TablePartitioningManager:
 
         daily_trends = []
 
-        # Use created_at for comprehensive analysis
+        # Use created_at for comprehensive analysis with proper timezone handling
+        from datetime import timedelta
         start_datetime = timezone.make_aware(datetime.combine(from_date, datetime.min.time()))
-        end_datetime = timezone.make_aware(datetime.combine(to_date, datetime.max.time()))
+        next_day = to_date + timedelta(days=1)
+        end_datetime = timezone.make_aware(datetime.combine(next_day, datetime.min.time()))
 
         for camera in cameras:
             # Get daily peaks using created_at and TruncDate
@@ -594,7 +599,8 @@ class TablePartitioningManager:
         # Get all data for the time range using created_at for accurate timing
         all_data = CrossCountingData.objects.filter(
             camera_id__in=camera_ids,
-            created_at__range=[start_time, end_time]
+            created_at__gte=start_time,
+            created_at__lt=end_time
         ).values(
             'camera_id', 'cc_in_count', 'cc_out_count', 'created_at'
         ).order_by('camera_id', 'created_at')
