@@ -452,3 +452,69 @@ class TablePartitioningManager:
                 "regions_data": occupancy_data
             }
         }
+
+    @staticmethod
+    def get_enhanced_dashboard_data() -> List[Dict[str, Any]]:
+        """Get region cards data with cameras and their latest counts for enhanced dashboard"""
+        from .models import Region, Camera, CrossCountingData
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        regions = Region.objects.prefetch_related('cameras').all()
+        enhanced_data = []
+        
+        recent_time = timezone.now() - timedelta(minutes=5)
+        
+        for region in regions:
+            cameras = Camera.objects.filter(region=region, status=True)
+            camera_data = []
+            region_total_in = 0
+            region_total_out = 0
+            region_current_occupancy = 0
+            
+            for camera in cameras:
+                latest_data = CrossCountingData.objects.filter(
+                    camera=camera,
+                    time__gte=recent_time
+                ).order_by('-time').first()
+                
+                if latest_data:
+                    camera_occupancy = max(0, latest_data.cc_in_count - latest_data.cc_out_count)
+                    camera_info = {
+                        'name': camera.name,
+                        'latest_in_count': latest_data.cc_in_count,
+                        'latest_out_count': latest_data.cc_out_count,
+                        'current_occupancy': camera_occupancy,
+                        'last_updated': latest_data.time,
+                        'status': 'active'
+                    }
+                    region_total_in += latest_data.cc_in_count
+                    region_total_out += latest_data.cc_out_count
+                    region_current_occupancy += camera_occupancy
+                else:
+                    camera_info = {
+                        'name': camera.name,
+                        'latest_in_count': 0,
+                        'latest_out_count': 0,
+                        'current_occupancy': 0,
+                        'last_updated': None,
+                        'status': 'no_data'
+                    }
+                
+                camera_data.append(camera_info)
+            
+            occupancy_percentage = (region_current_occupancy / region.occupancy * 100) if region.occupancy > 0 else 0.0
+            
+            enhanced_data.append({
+                'region_name': region.name,
+                'region_id': region.id,
+                'max_occupancy': region.occupancy,
+                'current_occupancy': region_current_occupancy,
+                'occupancy_percentage': round(occupancy_percentage, 1),
+                'total_in_count': region_total_in,
+                'total_out_count': region_total_out,
+                'cameras': camera_data,
+                'camera_count': len(camera_data)
+            })
+        
+        return enhanced_data
