@@ -66,7 +66,7 @@ class Command(BaseCommand):
                     channel_alarms = alarm.get("channel_alarm", [])
 
                     for channel_alarm in channel_alarms:
-                        channel = channel_alarm.get("channel", channel_name)
+                        channel = channel_name
                         int_alarm = channel_alarm.get("int_alarm", {})
                         
                         if int_alarm.get("int_subtype") == "cc":
@@ -88,7 +88,7 @@ class Command(BaseCommand):
                                     device_ip=device_ip,
                                     device_mac=device_mac,
                                     device_phy=device_phy,
-                                    channel=channel,
+                                    channel=channel,  # Now uses ChannelName from dev_net_info
                                     channel_alias=channel_alarm.get("chn_alias", ""),
                                     cc_in_count=cc_in_count,
                                     cc_out_count=cc_out_count,
@@ -103,9 +103,9 @@ class Command(BaseCommand):
                                     time=alarm_time,  # Set TimescaleDB time field for hypertable partitioning
                                     camera=camera
                                 )
-                                self.stdout.write(f"Saved Cross Counting data for device: {device_name}, channel: {channel}, counts: in={cc_in_count}, out={cc_out_count}, total={cc_total_count}")
+                                self.stdout.write(f"Saved Cross Counting data for device: {device_name}, channel: {channel} (ChannelName: {channel_name}), counts: in={cc_in_count}, out={cc_out_count}, total={cc_total_count}")
                             except Exception as e:
-                                self.stderr.write(f"Failed to process or save alarm for channel: {channel}, Error: {e}")
+                                self.stderr.write(f"Failed to process or save alarm for channel: {channel} (ChannelName: {channel_name}), Error: {e}")
 
             except json.JSONDecodeError as e:
                 self.stderr.write(f"Failed to decode message payload: {e}")
