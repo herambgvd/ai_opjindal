@@ -100,7 +100,7 @@ class Command(BaseCommand):
                                     subscribe_id=subscribe_id,
                                     data_pos=data_pos,
                                     alarm_time=alarm_time,
-                                    time=alarm_time,  # Set TimescaleDB time field for hypertable partitioning
+                                    time=None,  # Let save method set this to created_at for timezone consistency
                                     camera=camera
                                 )
                                 self.stdout.write(f"Saved Cross Counting data for device: {device_name}, channel: {channel} (ChannelName: {channel_name}), counts: in={cc_in_count}, out={cc_out_count}, total={cc_total_count}")
