@@ -60,31 +60,15 @@ class Migration(migrations.Migration):
             model_name='crosscountingdata',
             name='ts_device_time_status_idx',
         ),
-        migrations.RenameIndex(
-            model_name='crosscountingdata',
-            new_name='ts_alarm_time_camera_idx',
-            old_name='ts_time_camera_idx',
-        ),
-        migrations.RenameIndex(
-            model_name='crosscountingdata',
-            new_name='ts_alarm_time_camera_idx',
-            old_name='ts_time_camera_idx',
-        ),
-        migrations.RenameIndex(
-            model_name='crosscountingdata',
-            new_name='ts_alarm_time_status_idx',
-            old_name='ts_time_status_idx',
-        ),
-        migrations.RenameIndex(
-            model_name='crosscountingdata',
-            new_name='ts_alarm_time_status_idx',
-            old_name='ts_time_status_idx',
-        ),
         migrations.AddField(
             model_name='crosscountingdata',
             name='time',
             field=timescale.db.models.fields.TimescaleDateTimeField(db_index=True, default=django.utils.timezone.now, interval='1 day'),
-            preserve_default=False,
+            preserve_default=True,
+        ),
+        migrations.RunSQL(
+            sql="UPDATE cross_counting_data_timeseries SET time = alarm_time;",
+            reverse_sql="UPDATE cross_counting_data_timeseries SET time = alarm_time;",
         ),
         migrations.AddIndex(
             model_name='crosscountingdata',
