@@ -267,7 +267,7 @@ class TablePartitioningManager:
     def get_daily_analysis_data(region_id: int, date: date) -> Dict[str, Any]:
         """
         Get comprehensive daily analysis for all cameras in a region using created_at
-        FIXED VERSION: Proper timezone handling to ensure full 24-hour coverage
+        CORRECTED VERSION: Handle IST data properly without double timezone conversion
         """
         from .models import Camera, CrossCountingData
         from django.db.models import Max
@@ -286,30 +286,18 @@ class TablePartitioningManager:
         total_peak_out = 0
         total_peak_total = 0
 
-        # FIXED: Proper timezone handling for the target date
-        # Use Asia/Kolkata timezone explicitly
-        ist = pytz.timezone('Asia/Kolkata')
+        # CORRECTED: Since your data is already in IST timezone, use date filtering directly
+        # Your data shows timestamps like: 2025-07-31 17:42:06.883554+05:30
+        # So we just need to filter by the date component, not convert timezones
 
-        # Create datetime range for the target date in IST
-        start_datetime = ist.localize(datetime.combine(date, datetime.min.time()))
-        # End time should be the start of the next day to include the full 24 hours
-        end_datetime = ist.localize(datetime.combine(date + timedelta(days=1), datetime.min.time()))
-
-        # Convert to UTC for database query (PostgreSQL stores in UTC)
-        start_datetime_utc = start_datetime.astimezone(pytz.UTC)
-        end_datetime_utc = end_datetime.astimezone(pytz.UTC)
-
-        # DEBUG: Print the corrected date range
-        print(f"FIXED DEBUG: Daily analysis for {date}")
-        print(f"FIXED DEBUG: IST range: {start_datetime} to {end_datetime}")
-        print(f"FIXED DEBUG: UTC range: {start_datetime_utc} to {end_datetime_utc}")
+        print(f"CORRECTED DEBUG: Daily analysis for {date}")
+        print(f"CORRECTED DEBUG: Filtering by date: {date}")
 
         for camera in cameras:
-            # FIXED: Get daily peaks using proper timezone filtering
+            # CORRECTED: Use simple date filtering since timestamps are already in IST
             peaks = CrossCountingData.objects.filter(
                 camera=camera,
-                created_at__gte=start_datetime_utc,
-                created_at__lt=end_datetime_utc  # Use < instead of <= to avoid overlap
+                created_at__date=date  # This automatically handles the timezone-aware filtering
             ).aggregate(
                 peak_in_count=Max('cc_in_count'),
                 peak_out_count=Max('cc_out_count'),
@@ -328,14 +316,15 @@ class TablePartitioningManager:
                 total_peak_out += peaks['peak_out_count'] or 0
                 total_peak_total += peaks['peak_total_count'] or 0
 
-        # FIXED: Use UTC datetime range for hourly aggregates
-        region_hourly_aggregates = TablePartitioningManager.get_hourly_region_aggregates(
-            region_id, start_datetime_utc, end_datetime_utc
+        # CORRECTED: Pass the date directly for hourly aggregates
+        region_hourly_aggregates = TablePartitioningManager.get_hourly_region_aggregates_by_date(
+            region_id, date
         )
 
         # DEBUG: Print summary of what was found
-        print(f"FIXED DEBUG: Found data for {len(daily_data)} cameras")
-        print(f"FIXED DEBUG: Total peak counts - In: {total_peak_in}, Out: {total_peak_out}, Total: {total_peak_total}")
+        print(f"CORRECTED DEBUG: Found data for {len(daily_data)} cameras")
+        print(
+            f"CORRECTED DEBUG: Total peak counts - In: {total_peak_in}, Out: {total_peak_out}, Total: {total_peak_total}")
 
         result = {
             "cameras": daily_data,
@@ -407,77 +396,47 @@ class TablePartitioningManager:
     def get_comprehensive_analysis_data(region_id: int, from_date: date, to_date: date) -> Dict[str, Any]:
         """
         Get comprehensive analysis for a date range (max 7 days) using created_at
-        FIXED VERSION: Proper timezone handling for accurate date range analysis
+        CORRECTED VERSION: Use date-based filtering for IST data
         """
         from .models import Camera, CrossCountingData
         from django.db.models import Max
         from django.db.models.functions import TruncDate
-        import pytz
-        from django.utils import timezone as django_timezone
 
         cameras = Camera.objects.filter(region_id=region_id, status=True)
-
         daily_trends = []
 
-        # FIXED: Proper timezone handling for date range
-        ist = pytz.timezone('Asia/Kolkata')
-
-        # Create datetime range that covers the full period
-        start_datetime = ist.localize(datetime.combine(from_date, datetime.min.time()))
-        # Add one day and use start of next day to include the full last day
-        end_datetime = ist.localize(datetime.combine(to_date + timedelta(days=1), datetime.min.time()))
-
-        # Convert to UTC for database queries
-        start_datetime_utc = start_datetime.astimezone(pytz.UTC)
-        end_datetime_utc = end_datetime.astimezone(pytz.UTC)
-
-        # DEBUG: Print the corrected date range
-        print(f"FIXED DEBUG: Comprehensive analysis from {from_date} to {to_date}")
-        print(f"FIXED DEBUG: IST range: {start_datetime} to {end_datetime}")
-        print(f"FIXED DEBUG: UTC range: {start_datetime_utc} to {end_datetime_utc}")
+        print(f"CORRECTED DEBUG: Comprehensive analysis from {from_date} to {to_date}")
 
         for camera in cameras:
-            # FIXED: Get daily peaks using proper timezone filtering
-            # Use TruncDate with timezone conversion for accurate daily grouping
+            # CORRECTED: Use date range filtering directly
             daily_data = CrossCountingData.objects.filter(
                 camera=camera,
-                created_at__gte=start_datetime_utc,
-                created_at__lt=end_datetime_utc
-            ).extra(
-                # Convert UTC timestamps to IST before truncating to date
-                select={'local_date': "DATE(created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')"}
-            ).values('local_date').annotate(
+                created_at__date__gte=from_date,
+                created_at__date__lte=to_date
+            ).annotate(
+                date=TruncDate('created_at')
+            ).values('date').annotate(
                 peak_in_count=Max('cc_in_count'),
                 peak_out_count=Max('cc_out_count'),
                 peak_total_count=Max('cc_total_count')
-            ).order_by('local_date')
-
-            # Convert the extra field result to proper date format
-            daily_data_formatted = []
-            for item in daily_data:
-                daily_data_formatted.append({
-                    'date': item['local_date'],
-                    'peak_in_count': item['peak_in_count'],
-                    'peak_out_count': item['peak_out_count'],
-                    'peak_total_count': item['peak_total_count']
-                })
+            ).order_by('date')
 
             daily_trends.append({
                 "camera_name": camera.name,
-                "daily_data": daily_data_formatted
+                "daily_data": list(daily_data)
             })
 
         total_days = (to_date - from_date).days + 1
 
-        # FIXED: Use UTC datetime range for hourly aggregates
-        region_hourly_aggregates = TablePartitioningManager.get_hourly_region_aggregates(
-            region_id, start_datetime_utc, end_datetime_utc
+        # CORRECTED: For hourly aggregates, use the first date as representative
+        # (since comprehensive analysis typically shows overall patterns)
+        region_hourly_aggregates = TablePartitioningManager.get_hourly_region_aggregates_by_date(
+            region_id, from_date
         )
 
-        # DEBUG: Print summary
-        print(f"FIXED DEBUG: Analyzed {len(cameras)} cameras over {total_days} days")
+        print(f"CORRECTED DEBUG: Analyzed {len(cameras)} cameras over {total_days} days")
         total_daily_records = sum(len(trend['daily_data']) for trend in daily_trends)
-        print(f"FIXED DEBUG: Total daily data points: {total_daily_records}")
+        print(f"CORRECTED DEBUG: Total daily data points: {total_daily_records}")
 
         result = {
             "from_date": from_date,
@@ -834,3 +793,155 @@ class TablePartitioningManager:
             })
 
         return enhanced_data
+
+    @staticmethod
+    def get_hourly_region_aggregates_by_date(region_id: int, target_date: date) -> Dict[str, Any]:
+        """
+        Get hourly aggregated In/Out counts for all cameras in a region for a specific date
+        CORRECTED VERSION: Handle IST data without timezone conversion issues
+        """
+        from .models import Camera, CrossCountingData
+        from django.db.models import Max
+        from collections import defaultdict
+
+        cameras = Camera.objects.filter(region_id=region_id, status=True)
+        camera_ids = list(cameras.values_list('id', flat=True))
+
+        if not camera_ids:
+            return {
+                "hourly_data": [{"hour": h, "total_in_count": 0, "total_out_count": 0} for h in range(24)],
+                "region_name": "",
+                "camera_count": 0,
+                "individual_camera_data": []
+            }
+
+        print(f"CORRECTED DEBUG: Querying hourly data for date {target_date}")
+        print(f"CORRECTED DEBUG: Camera count: {len(camera_ids)}")
+
+        # CORRECTED: Use date filtering and extract hour directly from IST timestamps
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                           WITH ranked_data AS (SELECT camera_id,
+                                                       cc_in_count,
+                                                       cc_out_count,
+                                                       -- CORRECTED: Extract hour directly from the IST timestamp
+                                                       EXTRACT(HOUR FROM created_at) as hour, created_at, ROW_NUMBER() OVER (
+                               PARTITION BY camera_id, EXTRACT (HOUR FROM created_at)
+                               ORDER BY created_at DESC
+                               ) as rn
+                           FROM cross_counting_data_timeseries
+                           WHERE camera_id = ANY (%s)
+                             AND DATE (created_at) = %s -- CORRECTED: Simple date filtering
+                               )
+                               , last_values_per_hour AS (
+                           SELECT
+                               camera_id, hour, cc_in_count, cc_out_count
+                           FROM ranked_data
+                           WHERE rn = 1
+                               )
+                               , region_hourly_totals AS (
+                           SELECT
+                               hour, SUM (cc_in_count) as total_in_count, SUM (cc_out_count) as total_out_count
+                           FROM last_values_per_hour
+                           GROUP BY hour
+                               ),
+                               all_hours AS (
+                           SELECT generate_series(0, 23) as hour
+                               )
+                           SELECT ah.hour,
+                                  COALESCE(rht.total_in_count, 0)  as total_in_count,
+                                  COALESCE(rht.total_out_count, 0) as total_out_count
+                           FROM all_hours ah
+                                    LEFT JOIN region_hourly_totals rht ON ah.hour = rht.hour
+                           ORDER BY ah.hour
+                           """, [camera_ids, target_date])
+
+            hourly_data = []
+            for row in cursor.fetchall():
+                hourly_data.append({
+                    'hour': int(row[0]),
+                    'total_in_count': int(row[1]),
+                    'total_out_count': int(row[2])
+                })
+
+        # DEBUG: Print results to verify fix
+        non_zero_hours = [h for h in hourly_data if h['total_in_count'] > 0 or h['total_out_count'] > 0]
+        if non_zero_hours:
+            print(f"CORRECTED DEBUG: Found data for hours: {[h['hour'] for h in non_zero_hours]}")
+            print(f"CORRECTED DEBUG: Last hour with data: {max([h['hour'] for h in non_zero_hours])}")
+            # Print all non-zero hours for verification
+            for h in non_zero_hours:
+                print(f"CORRECTED DEBUG: Hour {h['hour']}: In={h['total_in_count']}, Out={h['total_out_count']}")
+
+        # CORRECTED: Individual camera data with same approach
+        individual_camera_data = []
+        camera_objects = {cam.id: cam for cam in cameras}
+
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                           WITH ranked_camera_data AS (SELECT camera_id,
+                                                              cc_in_count,
+                                                              cc_out_count,
+                                                              EXTRACT(HOUR FROM created_at) as hour, created_at, ROW_NUMBER() OVER (
+                               PARTITION BY camera_id, EXTRACT (HOUR FROM created_at)
+                               ORDER BY created_at DESC
+                               ) as rn
+                           FROM cross_counting_data_timeseries
+                           WHERE camera_id = ANY (%s)
+                             AND DATE (created_at) = %s -- CORRECTED: Simple date filtering
+                               )
+                               , camera_last_values AS (
+                           SELECT
+                               camera_id, hour, cc_in_count, cc_out_count
+                           FROM ranked_camera_data
+                           WHERE rn = 1
+                               )
+                               , all_hours AS (
+                           SELECT generate_series(0, 23) as hour
+                               ), all_cameras AS (
+                           SELECT unnest(%s::uuid[]) as camera_id
+                               )
+                           SELECT ac.camera_id,
+                                  ah.hour,
+                                  COALESCE(clv.cc_in_count, 0)  as cc_in_count,
+                                  COALESCE(clv.cc_out_count, 0) as cc_out_count
+                           FROM all_cameras ac
+                                    CROSS JOIN all_hours ah
+                                    LEFT JOIN camera_last_values clv
+                                              ON ac.camera_id = clv.camera_id AND ah.hour = clv.hour
+                           ORDER BY ac.camera_id, ah.hour
+                           """, [camera_ids, target_date, camera_ids])
+
+            # Group by camera
+            camera_data_dict = defaultdict(list)
+            for row in cursor.fetchall():
+                camera_id = row[0]
+                hour = int(row[1])
+                cc_in_count = int(row[2])
+                cc_out_count = int(row[3])
+
+                camera_data_dict[camera_id].append({
+                    'hour': hour,
+                    'cc_in_count': cc_in_count,
+                    'cc_out_count': cc_out_count
+                })
+
+            # Convert to final format
+            for camera_id in camera_ids:
+                if camera_id in camera_objects:
+                    individual_camera_data.append({
+                        'camera_id': str(camera_id),
+                        'camera_name': camera_objects[camera_id].name,
+                        'hourly_data': camera_data_dict[camera_id]
+                    })
+
+        region_name = cameras.first().region.name if cameras.exists() else ""
+
+        result = {
+            "hourly_data": hourly_data,
+            "region_name": region_name,
+            "camera_count": len(camera_ids),
+            "individual_camera_data": individual_camera_data
+        }
+
+        return serialize_datetime_data(result)

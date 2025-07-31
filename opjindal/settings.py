@@ -148,20 +148,19 @@ ACCOUNT_EMAIL_VERIFICATION = "optional"
 
 # Email behavior
 ACCOUNT_EMAIL_SUBJECT_PREFIX = ""
-ACCOUNT_EMAIL_UNKNOWN_ACCOUNTS = False        # Don't send forgot password emails to unknown users
-ACCOUNT_CONFIRM_EMAIL_ON_GET = True           # Confirm email immediately when clicked
-ACCOUNT_UNIQUE_EMAIL = True                   # Disallow duplicate emails
+ACCOUNT_EMAIL_UNKNOWN_ACCOUNTS = False  # Don't send forgot password emails to unknown users
+ACCOUNT_CONFIRM_EMAIL_ON_GET = True  # Confirm email immediately when clicked
+ACCOUNT_UNIQUE_EMAIL = True  # Disallow duplicate emails
 
 # Session behavior
-ACCOUNT_SESSION_REMEMBER = True               # Keep users logged in
-ACCOUNT_LOGOUT_ON_GET = True                  # Logout without POST
+ACCOUNT_SESSION_REMEMBER = True  # Keep users logged in
+ACCOUNT_LOGOUT_ON_GET = True  # Logout without POST
 
 # Automatically login after email confirmation
 ACCOUNT_LOGIN_ON_EMAIL_CONFIRMATION = True
 
 # Enable code-based login (magic links or verification codes)
 ACCOUNT_LOGIN_BY_CODE_ENABLED = True
-
 
 ACCOUNT_FORMS = {
     "signup": "apps.users.forms.TeamSignupForm",
@@ -266,32 +265,28 @@ LOGGING = {
     },
 }
 
-
 # Date and Time Formatting for Indian locale
 DATETIME_FORMAT = 'd/m/Y H:i:s'  # DD/MM/YYYY HH:MM:SS
 DATE_FORMAT = 'd/m/Y'  # DD/MM/YYYY
 TIME_FORMAT = 'H:i:s'  # HH:MM:SS
 
-# Optional: Set locale for number formatting
-LANGUAGE_CODE = 'en-in'  # English (India)
-
 # For admin interface datetime display
 DATETIME_INPUT_FORMATS = [
-    '%d/%m/%Y %H:%M:%S',     # 25/12/2023 14:30:45
-    '%d/%m/%Y %H:%M',        # 25/12/2023 14:30
-    '%d-%m-%Y %H:%M:%S',     # 25-12-2023 14:30:45
-    '%d-%m-%Y %H:%M',        # 25-12-2023 14:30
-    '%Y-%m-%d %H:%M:%S',     # 2023-12-25 14:30:45 (ISO format)
-    '%Y-%m-%d %H:%M',        # 2023-12-25 14:30
+    '%d/%m/%Y %H:%M:%S',  # 25/12/2023 14:30:45
+    '%d/%m/%Y %H:%M',  # 25/12/2023 14:30
+    '%d-%m-%Y %H:%M:%S',  # 25-12-2023 14:30:45
+    '%d-%m-%Y %H:%M',  # 25-12-2023 14:30
+    '%Y-%m-%d %H:%M:%S',  # 2023-12-25 14:30:45 (ISO format)
+    '%Y-%m-%d %H:%M',  # 2023-12-25 14:30
 ]
 
 DATE_INPUT_FORMATS = [
-    '%d/%m/%Y',    # 25/12/2023
-    '%d-%m-%Y',    # 25-12-2023
-    '%Y-%m-%d',    # 2023-12-25 (ISO format)
+    '%d/%m/%Y',  # 25/12/2023
+    '%d-%m-%Y',  # 25-12-2023
+    '%Y-%m-%d',  # 2023-12-25 (ISO format)
 ]
 
 TIME_INPUT_FORMATS = [
-    '%H:%M:%S',    # 14:30:45
-    '%H:%M',       # 14:30
+    '%H:%M:%S',  # 14:30:45
+    '%H:%M',  # 14:30
 ]
