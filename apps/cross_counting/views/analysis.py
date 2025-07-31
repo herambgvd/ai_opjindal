@@ -10,6 +10,7 @@ from django.http import HttpResponse
 from django.shortcuts import render, get_object_or_404, redirect
 from django.utils import timezone
 from django.core.serializers.json import DjangoJSONEncoder
+from django.utils.safestring import mark_safe
 
 from ..forms import DailyAnalysisForm, ComparativeAnalysisForm, ComprehensiveAnalysisForm
 from ..models import Region
@@ -29,6 +30,18 @@ class CustomJSONEncoder(DjangoJSONEncoder):
         elif isinstance(obj, (datetime, date)):
             return obj.isoformat()
         return super().default(obj)
+
+
+def safe_json_for_template(data):
+    """
+    Convert data to a safe JSON string for template use
+    """
+    try:
+        json_string = json.dumps(data, cls=CustomJSONEncoder, ensure_ascii=False)
+        return mark_safe(json_string)
+    except (TypeError, ValueError) as e:
+        logger.error(f"Error serializing data to JSON: {e}")
+        return mark_safe('{}')
 
 
 def serialize_for_json(data):
@@ -56,7 +69,48 @@ def daily_analysis(request):
             # Serialize the data properly for JavaScript consumption
             analysis_data = serialize_for_json(raw_analysis_data)
             analysis_data['region'] = region
+
+            # Add safe JSON strings for template use
+            if 'daily_trends' in analysis_data:
+                analysis_data['daily_trends_json'] = safe_json_for_template(analysis_data['daily_trends'])
+
+            if 'region_hourly_aggregates' in analysis_data and analysis_data['region_hourly_aggregates']:
+                analysis_data['region_hourly_json'] = safe_json_for_template(
+                    analysis_data['region_hourly_aggregates'].get('hourly_data', [])
+                )
+                analysis_data['individual_camera_json'] = safe_json_for_template(
+                    analysis_data['region_hourly_aggregates'].get('individual_camera_data', [])
+                )
+
+            # Add safe JSON strings for template use
+            if 'base_hourly_aggregates' in analysis_data and analysis_data['base_hourly_aggregates']:
+                analysis_data['base_hourly_json'] = safe_json_for_template(
+                    analysis_data['base_hourly_aggregates'].get('hourly_data', [])
+                )
+                analysis_data['base_individual_camera_json'] = safe_json_for_template(
+                    analysis_data['base_hourly_aggregates'].get('individual_camera_data', [])
+                )
+
+            if 'compare_hourly_aggregates' in analysis_data and analysis_data['compare_hourly_aggregates']:
+                analysis_data['compare_hourly_json'] = safe_json_for_template(
+                    analysis_data['compare_hourly_aggregates'].get('hourly_data', [])
+                )
+                analysis_data['compare_individual_camera_json'] = safe_json_for_template(
+                    analysis_data['compare_hourly_aggregates'].get('individual_camera_data', [])
+                )
+
+            if 'comparison' in analysis_data:
+                analysis_data['comparison_json'] = safe_json_for_template(analysis_data['comparison'])
             analysis_data['date'] = date
+
+            # Add safe JSON strings for template use
+            if 'region_hourly_aggregates' in analysis_data and analysis_data['region_hourly_aggregates']:
+                analysis_data['region_hourly_json'] = safe_json_for_template(
+                    analysis_data['region_hourly_aggregates'].get('hourly_data', [])
+                )
+                analysis_data['individual_camera_json'] = safe_json_for_template(
+                    analysis_data['region_hourly_aggregates'].get('individual_camera_data', [])
+                )
 
             logger.info(f"Daily analysis generated for region {region.name} on {date}")
 

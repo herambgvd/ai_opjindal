@@ -154,272 +154,154 @@
 
 {% block analysis_js %}
     <script>
-        // Region Hourly Chart - FIXED VERSION
+        // Create charts with hardcoded data structure to avoid JSON parsing issues
         {% if analysis_data.region_hourly_aggregates and analysis_data.region_hourly_aggregates.hourly_data %}
-            var regionHourlyData = JSON.parse('{{ analysis_data.region_hourly_aggregates.hourly_data|escapejs }}');
-            console.log('Region hourly data:', regionHourlyData);
+            // Region Hourly Chart
+            var regionInData = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
+            var regionOutData = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
 
-            if (regionHourlyData && regionHourlyData.length > 0) {
-                // Create arrays for all 24 hours (0-23) with proper data mapping
-                var inCountData = new Array(24).fill(0);
-                var outCountData = new Array(24).fill(0);
+            // Populate data from template variables
+            {% for hour_data in analysis_data.region_hourly_aggregates.hourly_data %}
+                regionInData[{{ hour_data.hour }}] = {{ hour_data.total_in_count|default:0 }};
+                regionOutData[{{ hour_data.hour }}] = {{ hour_data.total_out_count|default:0 }};
+            {% endfor %}
 
-                // Map the data to correct hour positions
-                regionHourlyData.forEach(function(item) {
-                    var hour = parseInt(item.hour);
-                    if (hour >= 0 && hour <= 23) {
-                        inCountData[hour] = item.total_in_count || 0;
-                        outCountData[hour] = item.total_out_count || 0;
-                    }
-                });
-
-                console.log('In count data:', inCountData);
-                console.log('Out count data:', outCountData);
-
-                var regionOptions = {
-                    series: [{
-                        name: 'Total In Count',
-                        data: inCountData,
-                        color: '#28a745',
-                        type: 'line'
-                    }, {
-                        name: 'Total Out Count',
-                        data: outCountData,
-                        color: '#dc3545',
-                        type: 'line'
-                    }],
-                    chart: {
-                        type: 'line',
-                        height: 400,
-                        toolbar: { show: true },
-                        zoom: {
-                            enabled: true
-                        }
-                    },
-                    xaxis: {
-                        categories: [
-                            '00:00', '01:00', '02:00', '03:00', '04:00', '05:00',
-                            '06:00', '07:00', '08:00', '09:00', '10:00', '11:00',
-                            '12:00', '13:00', '14:00', '15:00', '16:00', '17:00',
-                            '18:00', '19:00', '20:00', '21:00', '22:00', '23:00'
-                        ],
-                        title: {
-                            text: 'Hour (24-hour format)',
-                            style: {
-                                fontSize: '14px',
-                                fontWeight: 600
-                            }
-                        },
-                        labels: {
-                            rotate: -45
-                        }
-                    },
-                    yaxis: {
-                        title: {
-                            text: 'Cumulative Count',
-                            style: {
-                                fontSize: '14px',
-                                fontWeight: 600
-                            }
-                        },
-                        min: 0
-                    },
+            var regionOptions = {
+                series: [{
+                    name: 'Total In Count',
+                    data: regionInData,
+                    color: '#28a745'
+                }, {
+                    name: 'Total Out Count',
+                    data: regionOutData,
+                    color: '#dc3545'
+                }],
+                chart: {
+                    type: 'line',
+                    height: 400,
+                    toolbar: { show: true }
+                },
+                xaxis: {
+                    categories: [
+                        '00:00', '01:00', '02:00', '03:00', '04:00', '05:00',
+                        '06:00', '07:00', '08:00', '09:00', '10:00', '11:00',
+                        '12:00', '13:00', '14:00', '15:00', '16:00', '17:00',
+                        '18:00', '19:00', '20:00', '21:00', '22:00', '23:00'
+                    ],
                     title: {
-                        text: 'Region Hourly In/Out Counts (All Cameras Combined) - {{ analysis_data.date }}',
-                        align: 'center',
-                        style: {
-                            fontSize: '16px',
-                            fontWeight: 600
-                        }
+                        text: 'Hour (24-hour format)',
+                        style: { fontSize: '14px', fontWeight: 600 }
                     },
-                    stroke: {
-                        curve: 'smooth',
-                        width: 3
+                    labels: { rotate: -45 }
+                },
+                yaxis: {
+                    title: {
+                        text: 'Cumulative Count',
+                        style: { fontSize: '14px', fontWeight: 600 }
                     },
-                    markers: {
-                        size: 5,
-                        strokeWidth: 2,
-                        strokeOpacity: 0.9,
-                        fillOpacity: 1
-                    },
-                    legend: {
-                        position: 'top',
-                        horizontalAlign: 'center'
-                    },
-                    grid: {
-                        borderColor: '#e7e7e7',
-                        strokeDashArray: 5
-                    },
-                    tooltip: {
-                        y: {
-                            formatter: function (val) {
-                                return val + " count"
-                            }
-                        },
-                        x: {
-                            formatter: function (val) {
-                                return "Hour: " + val
-                            }
-                        }
-                    },
-                    dataLabels: {
-                        enabled: false
-                    }
-                };
+                    min: 0
+                },
+                title: {
+                    text: 'Region Hourly In/Out Counts - {{ analysis_data.date }}',
+                    align: 'center',
+                    style: { fontSize: '16px', fontWeight: 600 }
+                },
+                stroke: { curve: 'smooth', width: 3 },
+                markers: { size: 5, strokeWidth: 2 },
+                legend: { position: 'top', horizontalAlign: 'center' },
+                grid: { borderColor: '#e7e7e7', strokeDashArray: 5 },
+                tooltip: {
+                    y: { formatter: function (val) { return val + " count" } }
+                }
+            };
 
-                var regionChart = new ApexCharts(document.querySelector("#region_hourly_chart"), regionOptions);
-                regionChart.render();
-            } else {
-                document.querySelector("#region_hourly_chart").innerHTML = '<div class="alert alert-info">No hourly data available for the selected date.</div>';
-            }
+            var regionChart = new ApexCharts(document.querySelector("#region_hourly_chart"), regionOptions);
+            regionChart.render();
         {% else %}
-            document.querySelector("#region_hourly_chart").innerHTML = '<div class="alert alert-info">No hourly data available for the selected date.</div>';
+            document.querySelector("#region_hourly_chart").innerHTML = '<div class="alert alert-info">No hourly data available.</div>';
         {% endif %}
 
-        // Individual Camera Chart - FIXED VERSION
+        // Individual Camera Chart
         {% if analysis_data.region_hourly_aggregates and analysis_data.region_hourly_aggregates.individual_camera_data %}
-            var individualCameraData = JSON.parse('{{ analysis_data.region_hourly_aggregates.individual_camera_data|escapejs }}');
-            console.log('Individual camera data:', individualCameraData);
+            var cameraSeries = [];
+            var colors = ['#007bff', '#28a745', '#dc3545', '#ffc107', '#17a2b8', '#6f42c1', '#e83e8c', '#fd7e14'];
+            var colorIndex = 0;
 
-            if (individualCameraData && individualCameraData.length > 0) {
-                var cameraSeries = [];
+            {% for camera in analysis_data.region_hourly_aggregates.individual_camera_data %}
+                // Initialize arrays for this camera
+                var inData_{{ forloop.counter0 }} = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
+                var outData_{{ forloop.counter0 }} = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
 
-                // Generate distinct colors for each camera
-                var colors = ['#007bff', '#28a745', '#dc3545', '#ffc107', '#17a2b8', '#6f42c1', '#e83e8c', '#fd7e14'];
-                var colorIndex = 0;
+                // Populate hourly data for this camera
+                {% for hour_data in camera.hourly_data %}
+                    inData_{{ forloop.parentloop.counter0 }}[{{ hour_data.hour }}] = {{ hour_data.cc_in_count|default:0 }};
+                    outData_{{ forloop.parentloop.counter0 }}[{{ hour_data.hour }}] = {{ hour_data.cc_out_count|default:0 }};
+                {% endfor %}
 
-                individualCameraData.forEach(function(camera) {
-                    // Prepare In Count data for all 24 hours
-                    var inData = new Array(24).fill(0);
-                    var outData = new Array(24).fill(0);
-
-                    // Map hourly data to correct positions
-                    if (camera.hourly_data && Array.isArray(camera.hourly_data)) {
-                        camera.hourly_data.forEach(function(hourData) {
-                            var hour = parseInt(hourData.hour);
-                            if (hour >= 0 && hour <= 23) {
-                                inData[hour] = hourData.cc_in_count || 0;
-                                outData[hour] = hourData.cc_out_count || 0;
-                            }
-                        });
-                    }
-
-                    var baseColor = colors[colorIndex % colors.length];
-
-                    // Add In count series
-                    cameraSeries.push({
-                        name: camera.camera_name + ' - In',
-                        data: inData,
-                        color: baseColor,
-                        type: 'line'
-                    });
-
-                    // Add Out count series with dashed line
-                    cameraSeries.push({
-                        name: camera.camera_name + ' - Out',
-                        data: outData,
-                        color: baseColor,
-                        type: 'line',
-                        stroke: {
-                            dashArray: 5
-                        }
-                    });
-
-                    colorIndex++;
+                // Add series for this camera
+                cameraSeries.push({
+                    name: '{{ camera.camera_name }} - In',
+                    data: inData_{{ forloop.counter0 }},
+                    color: colors[{{ forloop.counter0 }} % colors.length]
                 });
 
-                var individualCameraOptions = {
-                    series: cameraSeries,
-                    chart: {
-                        type: 'line',
-                        height: 500,
-                        toolbar: { show: true },
-                        zoom: {
-                            enabled: true
-                        }
-                    },
-                    xaxis: {
-                        categories: [
-                            '00:00', '01:00', '02:00', '03:00', '04:00', '05:00',
-                            '06:00', '07:00', '08:00', '09:00', '10:00', '11:00',
-                            '12:00', '13:00', '14:00', '15:00', '16:00', '17:00',
-                            '18:00', '19:00', '20:00', '21:00', '22:00', '23:00'
-                        ],
-                        title: {
-                            text: 'Hour (24-hour format)',
-                            style: {
-                                fontSize: '14px',
-                                fontWeight: 600
-                            }
-                        },
-                        labels: {
-                            rotate: -45
-                        }
-                    },
-                    yaxis: {
-                        title: {
-                            text: 'Cumulative Count',
-                            style: {
-                                fontSize: '14px',
-                                fontWeight: 600
-                            }
-                        },
-                        min: 0
-                    },
-                    title: {
-                        text: 'Individual Camera Hourly In/Out Counts - {{ analysis_data.date }}',
-                        align: 'center',
-                        style: {
-                            fontSize: '16px',
-                            fontWeight: 600
-                        }
-                    },
-                    stroke: {
-                        curve: 'smooth',
-                        width: 2
-                    },
-                    markers: {
-                        size: 4,
-                        strokeWidth: 1
-                    },
-                    legend: {
-                        position: 'top',
-                        horizontalAlign: 'center',
-                        floating: false,
-                        fontSize: '12px',
-                        itemMargin: {
-                            horizontal: 5,
-                            vertical: 5
-                        }
-                    },
-                    grid: {
-                        borderColor: '#e7e7e7',
-                        strokeDashArray: 3
-                    },
-                    tooltip: {
-                        y: {
-                            formatter: function (val) {
-                                return val + " count"
-                            }
-                        },
-                        x: {
-                            formatter: function (val) {
-                                return "Hour: " + val
-                            }
-                        }
-                    },
-                    dataLabels: {
-                        enabled: false
-                    }
-                };
+                cameraSeries.push({
+                    name: '{{ camera.camera_name }} - Out',
+                    data: outData_{{ forloop.counter0 }},
+                    color: colors[{{ forloop.counter0 }} % colors.length],
+                    stroke: { dashArray: 5 }
+                });
+            {% endfor %}
 
-                var individualCameraChart = new ApexCharts(document.querySelector("#individual_camera_chart"), individualCameraOptions);
-                individualCameraChart.render();
-            } else {
-                document.querySelector("#individual_camera_chart").innerHTML = '<div class="alert alert-info">No individual camera data available for the selected date.</div>';
-            }
+            var individualCameraOptions = {
+                series: cameraSeries,
+                chart: {
+                    type: 'line',
+                    height: 500,
+                    toolbar: { show: true }
+                },
+                xaxis: {
+                    categories: [
+                        '00:00', '01:00', '02:00', '03:00', '04:00', '05:00',
+                        '06:00', '07:00', '08:00', '09:00', '10:00', '11:00',
+                        '12:00', '13:00', '14:00', '15:00', '16:00', '17:00',
+                        '18:00', '19:00', '20:00', '21:00', '22:00', '23:00'
+                    ],
+                    title: {
+                        text: 'Hour (24-hour format)',
+                        style: { fontSize: '14px', fontWeight: 600 }
+                    },
+                    labels: { rotate: -45 }
+                },
+                yaxis: {
+                    title: {
+                        text: 'Cumulative Count',
+                        style: { fontSize: '14px', fontWeight: 600 }
+                    },
+                    min: 0
+                },
+                title: {
+                    text: 'Individual Camera Hourly Trends - {{ analysis_data.date }}',
+                    align: 'center',
+                    style: { fontSize: '16px', fontWeight: 600 }
+                },
+                stroke: { curve: 'smooth', width: 2 },
+                markers: { size: 4 },
+                legend: {
+                    position: 'top',
+                    horizontalAlign: 'center',
+                    fontSize: '12px'
+                },
+                grid: { borderColor: '#e7e7e7', strokeDashArray: 3 },
+                tooltip: {
+                    y: { formatter: function (val) { return val + " count" } }
+                }
+            };
+
+            var individualCameraChart = new ApexCharts(document.querySelector("#individual_camera_chart"), individualCameraOptions);
+            individualCameraChart.render();
         {% else %}
-            document.querySelector("#individual_camera_chart").innerHTML = '<div class="alert alert-info">No individual camera data available for the selected date.</div>';
+            document.querySelector("#individual_camera_chart").innerHTML = '<div class="alert alert-info">No camera data available.</div>';
         {% endif %}
     </script>
 {% endblock %}
