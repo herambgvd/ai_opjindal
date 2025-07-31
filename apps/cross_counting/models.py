@@ -100,7 +100,7 @@ class CrossCountingData(models.Model):
     timescale = TimescaleManager()
 
     class Meta:
-        ordering = ['-time', '-alarm_time']
+        ordering = ['-created_at', '-time']
         db_table = 'cross_counting_data_timeseries'
         
         indexes = [
@@ -122,12 +122,14 @@ class CrossCountingData(models.Model):
             
             models.Index(fields=['device_name', 'time', 'alarm_status'], name='ts_device_time_status_idx'),
             models.Index(fields=['created_at'], name='ts_created_idx'),
+            models.Index(fields=['created_at', 'camera'], name='ts_created_camera_idx'),
+            models.Index(fields=['camera', 'created_at', 'cc_total_count'], name='ts_camera_created_total_idx'),
         ]
         
 
     def save(self, *args, **kwargs):
         if not self.time:
-            self.time = self.alarm_time
+            self.time = self.created_at
         super().save(*args, **kwargs)
 
     def __str__(self):
@@ -136,7 +138,7 @@ class CrossCountingData(models.Model):
     @classmethod
     def get_latest_counts_by_camera(cls, camera_id, limit=100):
         """Get latest cross-counting data for a specific camera - optimized query"""
-        return cls.objects.filter(camera_id=camera_id).order_by('-alarm_time')[:limit]
+        return cls.objects.filter(camera_id=camera_id).order_by('-created_at')[:limit]
     
     @classmethod
     def get_hourly_aggregates(cls, camera_id, start_time, end_time):
@@ -149,9 +151,9 @@ class CrossCountingData(models.Model):
         
         return cls.objects.filter(
             camera_id=camera_id,
-            alarm_time__range=[start_time, end_time]
+            created_at__range=[start_time, end_time]
         ).annotate(
-            hour=TruncHour('alarm_time')
+            hour=TruncHour('created_at')
         ).values('hour').annotate(
             max_in_count=Max('cc_in_count'),
             max_out_count=Max('cc_out_count'),
@@ -174,9 +176,9 @@ class CrossCountingData(models.Model):
         
         return cls.objects.filter(
             camera_id=camera_id,
-            alarm_time__date__range=[start_date, end_date]
+            created_at__date__range=[start_date, end_date]
         ).annotate(
-            date=TruncDate('alarm_time')
+            date=TruncDate('created_at')
         ).values('date').annotate(
             peak_in_count=Max('cc_in_count'),
             peak_out_count=Max('cc_out_count'),
@@ -200,8 +202,8 @@ class CrossCountingData(models.Model):
         since = timezone.now() - timedelta(minutes=minutes)
         
         return queryset.filter(
-            alarm_time__gte=since
-        ).order_by('-alarm_time')[:1000]  # Limit for performance
+            created_at__gte=since
+        ).order_by('-created_at')[:1000]  # Limit for performance
 
 
 class HourlyAggregateView(models.Model):

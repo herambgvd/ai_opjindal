@@ -201,12 +201,12 @@ class CameraAdmin(admin.ModelAdmin):
 
 @admin.register(CrossCountingData)
 class CrossCountingDataAdmin(admin.ModelAdmin):
-    list_display = ['device_name', 'channel', 'camera', 'cc_total_count', 'cc_in_count', 'cc_out_count', 'alarm_time', 'created_at']
-    list_filter = ['device_name', 'camera', 'channel', 'alarm_status', 'alarm_subtype', 'alarm_time', 'created_at']
+    list_display = ['device_name', 'channel', 'camera', 'cc_total_count', 'cc_in_count', 'cc_out_count', 'created_at', 'alarm_time']
+    list_filter = ['device_name', 'camera', 'channel', 'alarm_status', 'alarm_subtype', 'created_at', 'alarm_time']
     search_fields = ['device_name', 'channel', 'camera__name', 'device_ip']
-    ordering = ['-alarm_time', '-created_at']
+    ordering = ['-created_at', '-alarm_time']
     readonly_fields = ['id', 'created_at', 'updated_at']
-    date_hierarchy = 'alarm_time'
+    date_hierarchy = 'created_at'
     list_per_page = 50
     
     fieldsets = (
