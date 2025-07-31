@@ -266,13 +266,11 @@ class TablePartitioningManager:
     @staticmethod
     def get_daily_analysis_data(region_id: int, date: date) -> Dict[str, Any]:
         """
-        Get comprehensive daily analysis for all cameras in a region using created_at
-        CORRECTED VERSION: Handle IST data properly without double timezone conversion
+        Get comprehensive daily analysis for all cameras in a region
+        TRAFFIC FLOW VERSION: Calculate actual daily traffic, not just peak cumulative counts
         """
         from .models import Camera, CrossCountingData
-        from django.db.models import Max
-        import pytz
-        from django.utils import timezone as django_timezone
+        from django.db.models import Max, Min
 
         cameras = Camera.objects.filter(region_id=region_id, status=True)
         camera_ids = list(cameras.values_list('id', flat=True))
@@ -282,59 +280,82 @@ class TablePartitioningManager:
                     "region_hourly_aggregates": {"hourly_data": [], "individual_camera_data": []}}
 
         daily_data = []
-        total_peak_in = 0
-        total_peak_out = 0
-        total_peak_total = 0
+        total_daily_in = 0
+        total_daily_out = 0
+        total_peak_occupancy = 0
 
-        # CORRECTED: Since your data is already in IST timezone, use date filtering directly
-        # Your data shows timestamps like: 2025-07-31 17:42:06.883554+05:30
-        # So we just need to filter by the date component, not convert timezones
-
-        print(f"CORRECTED DEBUG: Daily analysis for {date}")
-        print(f"CORRECTED DEBUG: Filtering by date: {date}")
+        print(f"TRAFFIC FLOW DEBUG: Daily analysis for {date}")
+        print(f"TRAFFIC FLOW DEBUG: Calculating daily traffic flow for {len(cameras)} cameras")
 
         for camera in cameras:
-            # CORRECTED: Use simple date filtering since timestamps are already in IST
-            peaks = CrossCountingData.objects.filter(
+            # FIXED: Calculate actual daily traffic flow
+            daily_stats = CrossCountingData.objects.filter(
                 camera=camera,
-                created_at__date=date  # This automatically handles the timezone-aware filtering
+                created_at__date=date
             ).aggregate(
-                peak_in_count=Max('cc_in_count'),
-                peak_out_count=Max('cc_out_count'),
-                peak_total_count=Max('cc_total_count')
+                day_start_in=Min('cc_in_count'),
+                day_end_in=Max('cc_in_count'),
+                day_start_out=Min('cc_out_count'),
+                day_end_out=Max('cc_out_count'),
+                peak_cumulative_in=Max('cc_in_count'),
+                peak_cumulative_out=Max('cc_out_count')
             )
 
-            if peaks['peak_in_count'] is not None:
+            if daily_stats['day_start_in'] is not None:
+                # Calculate actual daily traffic
+                daily_entries = max(0, daily_stats['day_end_in'] - daily_stats['day_start_in'])
+                daily_exits = max(0, daily_stats['day_end_out'] - daily_stats['day_start_out'])
+                peak_occupancy = max(0, daily_stats['peak_cumulative_in'] - daily_stats['peak_cumulative_out'])
+
                 camera_data = {
                     "camera_name": camera.name,
-                    "peak_in": peaks['peak_in_count'],
-                    "peak_out": peaks['peak_out_count'],
-                    "peak_total": peaks['peak_total_count']
+                    "daily_entries": daily_entries,  # NEW: Actual entries for the day
+                    "daily_exits": daily_exits,  # NEW: Actual exits for the day
+                    "net_daily_change": daily_entries - daily_exits,  # NEW: Net change
+                    "peak_occupancy": peak_occupancy,  # NEW: Peak occupancy level
+                    "peak_cumulative_in": daily_stats['peak_cumulative_in'],  # OLD: For reference
+                    "peak_cumulative_out": daily_stats['peak_cumulative_out'],  # OLD: For reference
+                    # Keep old fields for backward compatibility
+                    "peak_in": daily_stats['peak_cumulative_in'],
+                    "peak_out": daily_stats['peak_cumulative_out'],
+                    "peak_total": daily_stats['peak_cumulative_in'] + daily_stats['peak_cumulative_out']
                 }
                 daily_data.append(camera_data)
-                total_peak_in += peaks['peak_in_count'] or 0
-                total_peak_out += peaks['peak_out_count'] or 0
-                total_peak_total += peaks['peak_total_count'] or 0
+                total_daily_in += daily_entries
+                total_daily_out += daily_exits
+                total_peak_occupancy += peak_occupancy
 
-        # CORRECTED: Pass the date directly for hourly aggregates
+        # Get hourly traffic flow data
         region_hourly_aggregates = TablePartitioningManager.get_hourly_region_aggregates_by_date(
             region_id, date
         )
 
-        # DEBUG: Print summary of what was found
-        print(f"CORRECTED DEBUG: Found data for {len(daily_data)} cameras")
+        # Calculate summary statistics
+        total_cameras = len(daily_data)
+        avg_occupancy = total_peak_occupancy / total_cameras if total_cameras > 0 else 0
+
         print(
-            f"CORRECTED DEBUG: Total peak counts - In: {total_peak_in}, Out: {total_peak_out}, Total: {total_peak_total}")
+            f"TRAFFIC FLOW DEBUG: Daily totals - Entries: {total_daily_in}, Exits: {total_daily_out}, Net: {total_daily_in - total_daily_out}")
+        print(f"TRAFFIC FLOW DEBUG: Peak occupancy: {total_peak_occupancy}, Average per camera: {avg_occupancy:.1f}")
 
         result = {
             "cameras": daily_data,
             "summary": {
-                "total_peak_in": total_peak_in,
-                "total_peak_out": total_peak_out,
-                "total_peak_total": total_peak_total,
-                "active_cameras": len(daily_data)
+                # NEW: Traffic flow summary
+                "total_daily_entries": total_daily_in,
+                "total_daily_exits": total_daily_out,
+                "net_daily_change": total_daily_in - total_daily_out,
+                "total_peak_occupancy": total_peak_occupancy,
+                "average_peak_occupancy": round(avg_occupancy, 1),
+
+                # OLD: Keep for backward compatibility
+                "total_peak_in": sum(cam.get('peak_in', 0) for cam in daily_data),
+                "total_peak_out": sum(cam.get('peak_out', 0) for cam in daily_data),
+                "total_peak_total": sum(cam.get('peak_total', 0) for cam in daily_data),
+                "active_cameras": total_cameras
             },
-            "region_hourly_aggregates": region_hourly_aggregates
+            "region_hourly_aggregates": region_hourly_aggregates,
+            "data_type": "traffic_flow"
         }
 
         return serialize_datetime_data(result)
@@ -798,10 +819,10 @@ class TablePartitioningManager:
     def get_hourly_region_aggregates_by_date(region_id: int, target_date: date) -> Dict[str, Any]:
         """
         Get hourly aggregated In/Out counts for all cameras in a region for a specific date
-        CORRECTED VERSION: Handle IST data without timezone conversion issues
+        TRAFFIC FLOW VERSION: Calculate actual entries/exits, not cumulative counts
         """
         from .models import Camera, CrossCountingData
-        from django.db.models import Max
+        from django.db.models import Max, Min
         from collections import defaultdict
 
         cameras = Camera.objects.filter(region_id=region_id, status=True)
@@ -815,100 +836,118 @@ class TablePartitioningManager:
                 "individual_camera_data": []
             }
 
-        print(f"CORRECTED DEBUG: Querying hourly data for date {target_date}")
-        print(f"CORRECTED DEBUG: Camera count: {len(camera_ids)}")
+        print(f"TRAFFIC FLOW DEBUG: Calculating traffic flow for date {target_date}")
+        print(f"TRAFFIC FLOW DEBUG: Camera count: {len(camera_ids)}")
 
-        # CORRECTED: Use date filtering and extract hour directly from IST timestamps
+        # FIXED: Calculate actual traffic flow by getting hourly differences
         with connection.cursor() as cursor:
             cursor.execute("""
-                           WITH ranked_data AS (SELECT camera_id,
-                                                       cc_in_count,
-                                                       cc_out_count,
-                                                       -- CORRECTED: Extract hour directly from the IST timestamp
-                                                       EXTRACT(HOUR FROM created_at) as hour, created_at, ROW_NUMBER() OVER (
-                               PARTITION BY camera_id, EXTRACT (HOUR FROM created_at)
-                               ORDER BY created_at DESC
-                               ) as rn
+                           WITH hourly_camera_data AS (SELECT camera_id,
+                                                              EXTRACT(HOUR FROM created_at) as hour, MIN (cc_in_count) as hour_start_in, MAX (cc_in_count) as hour_end_in, MIN (cc_out_count) as hour_start_out, MAX (cc_out_count) as hour_end_out, MIN (created_at) as first_time, MAX (created_at) as last_time
                            FROM cross_counting_data_timeseries
                            WHERE camera_id = ANY (%s)
-                             AND DATE (created_at) = %s -- CORRECTED: Simple date filtering
-                               )
-                               , last_values_per_hour AS (
+                             AND DATE (created_at) = %s
+                           GROUP BY camera_id, EXTRACT (HOUR FROM created_at)
+                               ),
+                               hourly_traffic_flow AS (
                            SELECT
-                               camera_id, hour, cc_in_count, cc_out_count
-                           FROM ranked_data
-                           WHERE rn = 1
-                               )
-                               , region_hourly_totals AS (
+                               camera_id, hour,
+                               -- Calculate actual entries/exits in this hour
+                               GREATEST(0, hour_end_in - hour_start_in) as hourly_entries, GREATEST(0, hour_end_out - hour_start_out) as hourly_exits,
+                               -- Also keep the final cumulative count for occupancy calculation
+                               hour_end_in as cumulative_in, hour_end_out as cumulative_out
+                           FROM hourly_camera_data
+                               ), region_hourly_totals AS (
                            SELECT
-                               hour, SUM (cc_in_count) as total_in_count, SUM (cc_out_count) as total_out_count
-                           FROM last_values_per_hour
+                               hour, SUM (hourly_entries) as total_hourly_in, SUM (hourly_exits) as total_hourly_out, SUM (cumulative_in) as total_cumulative_in, SUM (cumulative_out) as total_cumulative_out
+                           FROM hourly_traffic_flow
                            GROUP BY hour
                                ),
                                all_hours AS (
                            SELECT generate_series(0, 23) as hour
                                )
                            SELECT ah.hour,
-                                  COALESCE(rht.total_in_count, 0)  as total_in_count,
-                                  COALESCE(rht.total_out_count, 0) as total_out_count
+                                  COALESCE(rht.total_hourly_in, 0)      as hourly_in_flow,
+                                  COALESCE(rht.total_hourly_out, 0)     as hourly_out_flow,
+                                  COALESCE(rht.total_cumulative_in, 0)  as cumulative_in,
+                                  COALESCE(rht.total_cumulative_out, 0) as cumulative_out
                            FROM all_hours ah
                                     LEFT JOIN region_hourly_totals rht ON ah.hour = rht.hour
                            ORDER BY ah.hour
                            """, [camera_ids, target_date])
 
             hourly_data = []
+            cumulative_data = []
+
             for row in cursor.fetchall():
+                hour = int(row[0])
+                hourly_in = int(row[1])
+                hourly_out = int(row[2])
+                cumulative_in = int(row[3])
+                cumulative_out = int(row[4])
+
+                # Traffic flow data (actual entries/exits per hour)
                 hourly_data.append({
-                    'hour': int(row[0]),
-                    'total_in_count': int(row[1]),
-                    'total_out_count': int(row[2])
+                    'hour': hour,
+                    'total_in_count': hourly_in,
+                    'total_out_count': hourly_out,
+                    'net_occupancy_change': hourly_in - hourly_out
                 })
 
-        # DEBUG: Print results to verify fix
-        non_zero_hours = [h for h in hourly_data if h['total_in_count'] > 0 or h['total_out_count'] > 0]
-        if non_zero_hours:
-            print(f"CORRECTED DEBUG: Found data for hours: {[h['hour'] for h in non_zero_hours]}")
-            print(f"CORRECTED DEBUG: Last hour with data: {max([h['hour'] for h in non_zero_hours])}")
-            # Print all non-zero hours for verification
-            for h in non_zero_hours:
-                print(f"CORRECTED DEBUG: Hour {h['hour']}: In={h['total_in_count']}, Out={h['total_out_count']}")
+                # Cumulative data (for occupancy tracking)
+                cumulative_data.append({
+                    'hour': hour,
+                    'cumulative_in': cumulative_in,
+                    'cumulative_out': cumulative_out,
+                    'current_occupancy': max(0, cumulative_in - cumulative_out)
+                })
 
-        # CORRECTED: Individual camera data with same approach
+        # DEBUG: Print both flow and cumulative data
+        non_zero_flow = [h for h in hourly_data if h['total_in_count'] > 0 or h['total_out_count'] > 0]
+        non_zero_cumulative = [h for h in cumulative_data if h['cumulative_in'] > 0 or h['cumulative_out'] > 0]
+
+        if non_zero_flow:
+            print(f"TRAFFIC FLOW DEBUG: Found traffic flow for hours: {[h['hour'] for h in non_zero_flow]}")
+            for h in non_zero_flow:
+                print(
+                    f"TRAFFIC FLOW DEBUG: Hour {h['hour']}: +{h['total_in_count']} in, +{h['total_out_count']} out, net: {h['net_occupancy_change']}")
+
+        if non_zero_cumulative:
+            print(f"CUMULATIVE DEBUG: Found cumulative data for hours: {[h['hour'] for h in non_zero_cumulative]}")
+            for h in non_zero_cumulative[:3]:  # Show first 3 hours
+                print(
+                    f"CUMULATIVE DEBUG: Hour {h['hour']}: Total In={h['cumulative_in']}, Total Out={h['cumulative_out']}, Occupancy={h['current_occupancy']}")
+
+        # FIXED: Individual camera traffic flow data
         individual_camera_data = []
         camera_objects = {cam.id: cam for cam in cameras}
 
         with connection.cursor() as cursor:
             cursor.execute("""
-                           WITH ranked_camera_data AS (SELECT camera_id,
-                                                              cc_in_count,
-                                                              cc_out_count,
-                                                              EXTRACT(HOUR FROM created_at) as hour, created_at, ROW_NUMBER() OVER (
-                               PARTITION BY camera_id, EXTRACT (HOUR FROM created_at)
-                               ORDER BY created_at DESC
-                               ) as rn
+                           WITH camera_hourly_data AS (SELECT camera_id,
+                                                              EXTRACT(HOUR FROM created_at) as hour, MIN (cc_in_count) as hour_start_in, MAX (cc_in_count) as hour_end_in, MIN (cc_out_count) as hour_start_out, MAX (cc_out_count) as hour_end_out
                            FROM cross_counting_data_timeseries
                            WHERE camera_id = ANY (%s)
-                             AND DATE (created_at) = %s -- CORRECTED: Simple date filtering
-                               )
-                               , camera_last_values AS (
+                             AND DATE (created_at) = %s
+                           GROUP BY camera_id, EXTRACT (HOUR FROM created_at)
+                               ),
+                               camera_traffic_flow AS (
                            SELECT
-                               camera_id, hour, cc_in_count, cc_out_count
-                           FROM ranked_camera_data
-                           WHERE rn = 1
-                               )
-                               , all_hours AS (
+                               camera_id, hour, GREATEST(0, hour_end_in - hour_start_in) as hourly_entries, GREATEST(0, hour_end_out - hour_start_out) as hourly_exits
+                           FROM camera_hourly_data
+                               ), all_hours AS (
                            SELECT generate_series(0, 23) as hour
                                ), all_cameras AS (
                            SELECT unnest(%s::uuid[]) as camera_id
                                )
                            SELECT ac.camera_id,
                                   ah.hour,
-                                  COALESCE(clv.cc_in_count, 0)  as cc_in_count,
-                                  COALESCE(clv.cc_out_count, 0) as cc_out_count
+                                  COALESCE(ctf.hourly_entries, 0) as hourly_in,
+                                  COALESCE(ctf.hourly_exits, 0)   as hourly_out
                            FROM all_cameras ac
                                     CROSS JOIN all_hours ah
-                                    LEFT JOIN camera_last_values clv
-                                              ON ac.camera_id = clv.camera_id AND ah.hour = clv.hour
+                                    LEFT JOIN camera_traffic_flow ctf
+                                              ON ac.camera_id = ctf.camera_id AND ah.hour = ctf.hour
                            ORDER BY ac.camera_id, ah.hour
                            """, [camera_ids, target_date, camera_ids])
 
@@ -917,13 +956,14 @@ class TablePartitioningManager:
             for row in cursor.fetchall():
                 camera_id = row[0]
                 hour = int(row[1])
-                cc_in_count = int(row[2])
-                cc_out_count = int(row[3])
+                hourly_in = int(row[2])
+                hourly_out = int(row[3])
 
                 camera_data_dict[camera_id].append({
                     'hour': hour,
-                    'cc_in_count': cc_in_count,
-                    'cc_out_count': cc_out_count
+                    'cc_in_count': hourly_in,  # Now represents hourly entries
+                    'cc_out_count': hourly_out,  # Now represents hourly exits
+                    'net_change': hourly_in - hourly_out
                 })
 
             # Convert to final format
@@ -938,10 +978,12 @@ class TablePartitioningManager:
         region_name = cameras.first().region.name if cameras.exists() else ""
 
         result = {
-            "hourly_data": hourly_data,
+            "hourly_data": hourly_data,  # Traffic flow (entries/exits per hour)
+            "cumulative_data": cumulative_data,  # Cumulative counts and occupancy
             "region_name": region_name,
             "camera_count": len(camera_ids),
-            "individual_camera_data": individual_camera_data
+            "individual_camera_data": individual_camera_data,
+            "data_type": "traffic_flow"  # Indicate this is flow data, not cumulative
         }
 
         return serialize_datetime_data(result)
