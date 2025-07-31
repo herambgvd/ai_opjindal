@@ -114,6 +114,13 @@
                     
                     <div class="row mt-4">
                         <div class="col-12">
+                            <h6>Region Hourly In/Out Trends</h6>
+                            <div id="region_hourly_trends_chart"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-4">
+                        <div class="col-12">
                             <h6>Daily Peak Summary</h6>
                             <div class="table-responsive">
                                 <table class="table table-bordered table-striped" id="daily_summary_table">
@@ -217,6 +224,67 @@
                 var chart = new ApexCharts(document.querySelector("#daily_trends_chart"), options);
                 chart.render();
             }
+            
+            {% if analysis_data.region_hourly_aggregates.hourly_data %}
+                var regionHourlyTrends = {{ analysis_data.region_hourly_aggregates.hourly_data|safe }};
+                
+                if (regionHourlyTrends && regionHourlyTrends.length > 0) {
+                    var inTrendData = regionHourlyTrends.map(function(item) {
+                        return {
+                            x: new Date(item.hour).getTime(),
+                            y: item.total_in_count
+                        };
+                    });
+                    
+                    var outTrendData = regionHourlyTrends.map(function(item) {
+                        return {
+                            x: new Date(item.hour).getTime(),
+                            y: item.total_out_count
+                        };
+                    });
+                    
+                    var regionTrendOptions = {
+                        series: [{
+                            name: 'Total In Count',
+                            data: inTrendData,
+                            color: '#28a745'
+                        }, {
+                            name: 'Total Out Count',
+                            data: outTrendData,
+                            color: '#dc3545'
+                        }],
+                        chart: {
+                            type: 'line',
+                            height: 400,
+                            toolbar: { show: true }
+                        },
+                        xaxis: {
+                            type: 'datetime',
+                            title: { text: 'Time' }
+                        },
+                        yaxis: {
+                            title: { text: 'Cumulative Count' }
+                        },
+                        title: {
+                            text: 'Region Hourly In/Out Trends (All Cameras Combined)',
+                            align: 'center'
+                        },
+                        stroke: {
+                            curve: 'smooth',
+                            width: 3
+                        },
+                        markers: {
+                            size: 4
+                        },
+                        legend: {
+                            position: 'top'
+                        }
+                    };
+                    
+                    var regionTrendChart = new ApexCharts(document.querySelector("#region_hourly_trends_chart"), regionTrendOptions);
+                    regionTrendChart.render();
+                }
+            {% endif %}
             
             $('#daily_summary_table').DataTable({
                 responsive: true,

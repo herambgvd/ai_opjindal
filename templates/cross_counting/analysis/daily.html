@@ -139,6 +139,13 @@
                             <div id="hourly_trends_chart"></div>
                         </div>
                     </div>
+                    
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <h6>Region Hourly In/Out Counts</h6>
+                            <div id="region_hourly_chart"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -196,6 +203,67 @@
                 
                 var chart = new ApexCharts(document.querySelector("#hourly_trends_chart"), options);
                 chart.render();
+            }
+        {% endif %}
+        
+        {% if analysis_data.region_hourly_aggregates.hourly_data %}
+            var regionHourlyData = {{ analysis_data.region_hourly_aggregates.hourly_data|safe }};
+            
+            if (regionHourlyData && regionHourlyData.length > 0) {
+                var inCountData = regionHourlyData.map(function(item) {
+                    return {
+                        x: new Date(item.hour).getTime(),
+                        y: item.total_in_count
+                    };
+                });
+                
+                var outCountData = regionHourlyData.map(function(item) {
+                    return {
+                        x: new Date(item.hour).getTime(),
+                        y: item.total_out_count
+                    };
+                });
+                
+                var regionOptions = {
+                    series: [{
+                        name: 'Total In Count',
+                        data: inCountData,
+                        color: '#28a745'
+                    }, {
+                        name: 'Total Out Count',
+                        data: outCountData,
+                        color: '#dc3545'
+                    }],
+                    chart: {
+                        type: 'line',
+                        height: 350,
+                        toolbar: { show: true }
+                    },
+                    xaxis: {
+                        type: 'datetime',
+                        title: { text: 'Hour' }
+                    },
+                    yaxis: {
+                        title: { text: 'Cumulative Count' }
+                    },
+                    title: {
+                        text: 'Region Hourly In/Out Counts (All Cameras Combined)',
+                        align: 'center'
+                    },
+                    stroke: {
+                        curve: 'smooth',
+                        width: 3
+                    },
+                    markers: {
+                        size: 5
+                    },
+                    legend: {
+                        position: 'top'
+                    }
+                };
+                
+                var regionChart = new ApexCharts(document.querySelector("#region_hourly_chart"), regionOptions);
+                regionChart.render();
             }
         {% endif %}
     </script>
