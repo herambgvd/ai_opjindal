@@ -1,5 +1,11 @@
-from django.contrib import admin
+import csv
+import io
+from django.contrib import admin, messages
+from django.shortcuts import render, redirect
+from django.urls import path
 from django.utils.html import format_html
+from django.http import HttpResponseRedirect
+from django.core.exceptions import ValidationError
 from .models import Region, Camera, CrossCountingData, HourlyAggregateView, DailyPeakView
 
 
@@ -71,6 +77,126 @@ class CameraAdmin(admin.ModelAdmin):
         updated = queryset.update(status=False)
         self.message_user(request, f'{updated} cameras were successfully deactivated.')
     deactivate_cameras.short_description = "Deactivate selected cameras"
+
+    def get_urls(self):
+        urls = super().get_urls()
+        custom_urls = [
+            path('upload-csv/', self.upload_csv, name='camera_upload_csv'),
+        ]
+        return custom_urls + urls
+
+    def changelist_view(self, request, extra_context=None):
+        extra_context = extra_context or {}
+        extra_context['show_csv_upload'] = 'true'
+        return super().changelist_view(request, extra_context=extra_context)
+
+    def upload_csv(self, request):
+        if request.method == "POST":
+            csv_file = request.FILES.get("csv_file")
+            
+            if not csv_file:
+                messages.error(request, "Please select a CSV file to upload.")
+                return redirect("..")
+            
+            if not csv_file.name.endswith('.csv'):
+                messages.error(request, "Please upload a valid CSV file.")
+                return redirect("..")
+            
+            try:
+                data_set = csv_file.read().decode('UTF-8')
+                io_string = io.StringIO(data_set)
+                reader = csv.DictReader(io_string)
+                
+                required_headers = ['name', 'region']
+                optional_headers = ['status', 'rtsp_link', 'hls_link']
+                all_headers = required_headers + optional_headers
+                
+                if not all(header in (reader.fieldnames or []) for header in required_headers):
+                    messages.error(
+                        request, 
+                        f"CSV file must contain the following required columns: {', '.join(required_headers)}. "
+                        f"Optional columns: {', '.join(optional_headers)}"
+                    )
+                    return redirect("..")
+                
+                created_count = 0
+                updated_count = 0
+                error_count = 0
+                errors = []
+                
+                for row_num, row in enumerate(reader, start=2):  # Start from 2 because row 1 is headers
+                    try:
+                        camera_name = row.get('name', '').strip()
+                        region_name = row.get('region', '').strip()
+                        
+                        if not camera_name or not region_name:
+                            errors.append(f"Row {row_num}: Camera name and region are required.")
+                            error_count += 1
+                            continue
+                        
+                        try:
+                            region = Region.objects.get(name=region_name)
+                        except Region.DoesNotExist:
+                            errors.append(f"Row {row_num}: Region '{region_name}' does not exist.")
+                            error_count += 1
+                            continue
+                        
+                        status_str = row.get('status', 'true').strip().lower()
+                        status = status_str in ['true', '1', 'yes', 'active', 'on']
+                        rtsp_link = row.get('rtsp_link', '').strip()
+                        hls_link = row.get('hls_link', '').strip()
+                        
+                        camera, created = Camera.objects.get_or_create(
+                            name=camera_name,
+                            defaults={
+                                'region': region,
+                                'status': status,
+                                'rtsp_link': rtsp_link,
+                                'hls_link': hls_link,
+                            }
+                        )
+                        
+                        if created:
+                            created_count += 1
+                        else:
+                            camera.region = region
+                            camera.status = status
+                            if rtsp_link:
+                                camera.rtsp_link = rtsp_link
+                            if hls_link:
+                                camera.hls_link = hls_link
+                            camera.save()
+                            updated_count += 1
+                            
+                    except Exception as e:
+                        errors.append(f"Row {row_num}: {str(e)}")
+                        error_count += 1
+                
+                if created_count > 0:
+                    messages.success(request, f"Successfully created {created_count} cameras.")
+                if updated_count > 0:
+                    messages.success(request, f"Successfully updated {updated_count} cameras.")
+                if error_count > 0:
+                    messages.warning(request, f"Failed to process {error_count} rows.")
+                    for error in errors[:10]:  # Show first 10 errors
+                        messages.error(request, error)
+                    if len(errors) > 10:
+                        messages.error(request, f"... and {len(errors) - 10} more errors.")
+                
+                if created_count == 0 and updated_count == 0 and error_count == 0:
+                    messages.info(request, "No cameras were processed from the CSV file.")
+                    
+            except Exception as e:
+                messages.error(request, f"Error processing CSV file: {str(e)}")
+            
+            return redirect("..")
+        
+        context = {
+            'title': 'Upload Cameras CSV',
+            'opts': self.model._meta,
+            'has_view_permission': self.has_view_permission(request),
+        }
+        return render(request, 'admin/cross_counting/camera/upload_csv.html', context)
 
 
 @admin.register(CrossCountingData)

@@ -6,6 +6,7 @@ A comprehensive Django-based video analytics platform with real-time cross-count
 
 ### Core Functionality
 - **Region & Camera Management**: Complete CRUD operations for managing regions and cameras
+- **Bulk CSV Upload**: Upload CSV files to create multiple cameras at once via Django admin
 - **Real-time MQTT Data Processing**: Continuous data ingestion from camera endpoints
 - **TimescaleDB Integration**: Optimized time-series database for high-frequency data storage
 - **Advanced Analytics**: Three comprehensive analysis views with interactive charts
@@ -100,6 +101,25 @@ To begin receiving real-time data from cameras:
 ```bash
 uv run python manage.py mqtt_consumer
 ```
+
+### Bulk Camera Upload via CSV
+To upload multiple cameras at once:
+1. Navigate to Django Admin: `http://localhost:8000/admin/cross_counting/camera/`
+2. Click "Upload CSV" button
+3. Select your CSV file with the required format:
+   - **Required columns**: `name`, `region`
+   - **Optional columns**: `status`, `rtsp_link`, `hls_link`
+4. Review the upload results and any error messages
+
+**Sample CSV format:**
+```csv
+name,region,status,rtsp_link,hls_link
+CH1,Main Hall,true,rtsp://192.168.1.100:554/stream1,http://192.168.1.100:8080/hls/stream1.m3u8
+CH2,Main Hall,true,rtsp://192.168.1.101:554/stream1,
+CH3,Parking Area,false,rtsp://192.168.1.102:554/stream1,
+```
+
+A sample CSV file is included at `sample_cameras.csv` for testing purposes.
 
 ### Accessing the Platform
 - **Main Dashboard**: `http://localhost:8000/`
