@@ -250,7 +250,7 @@
             }
         {% endif %}
         
-        {% if analysis_data.base_hourly_aggregates.hourly_data and analysis_data.compare_hourly_aggregates.hourly_data %}
+        {% if analysis_data.base_hourly_aggregates and analysis_data.base_hourly_aggregates.hourly_data and analysis_data.compare_hourly_aggregates and analysis_data.compare_hourly_aggregates.hourly_data %}
             var baseHourlyData = {{ analysis_data.base_hourly_aggregates.hourly_data|safe }};
             var compareHourlyData = {{ analysis_data.compare_hourly_aggregates.hourly_data|safe }};
             
