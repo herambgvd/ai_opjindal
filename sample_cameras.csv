@@ -1,9 +1,33 @@
-name,region,status,rtsp_link,hls_link
-CH1,Main Hall,true,rtsp://192.168.1.100:554/stream1,http://192.168.1.100:8080/hls/stream1.m3u8
-CH2,Main Hall,true,rtsp://192.168.1.101:554/stream1,
-CH3,Parking Area,false,rtsp://192.168.1.102:554/stream1,
-CH4,Reception,true,,http://192.168.1.103:8080/hls/stream1.m3u8
-CH5,Conference Room,true,rtsp://192.168.1.104:554/stream1,http://192.168.1.104:8080/hls/stream1.m3u8
-CH6,Lobby,true,rtsp://192.168.1.105:554/stream1,
-CH7,Storage Area,false,rtsp://192.168.1.106:554/stream1,
-CH8,Emergency Exit,true,rtsp://192.168.1.107:554/stream1,http://192.168.1.107:8080/hls/stream1.m3u8
+name,region,status,rtsp_link
+CH1,1st Floor,true,rtsp://admin:admin@123@172.17.41.201:80/rtsp/streaming?channel=1&subtype=0
+CH2,1st Floor,true,rtsp://admin:admin@123@172.17.41.201:80/rtsp/streaming?channel=2&subtype=0
+CH3,1st Floor,true,rtsp://admin:admin@123@172.17.41.201:80/rtsp/streaming?channel=3&subtype=0
+CH4,1st Floor,true,rtsp://admin:admin@123@172.17.41.201:80/rtsp/streaming?channel=4&subtype=0
+CH5,1st Floor,true,rtsp://admin:admin@123@172.17.41.201:80/rtsp/streaming?channel=5&subtype=0
+CH6,1st Floor,true,rtsp://admin:admin@123@172.17.41.201:80/rtsp/streaming?channel=6&subtype=0
+CH7,1st Floor,true,rtsp://admin:admin@123@172.17.41.201:80/rtsp/streaming?channel=7&subtype=0
+CH8,1st Floor,true,rtsp://admin:admin@123@172.17.41.201:80/rtsp/streaming?channel=8&subtype=0
+CH9,2nd Floor,true,rtsp://admin:admin@123@172.17.41.201:80/rtsp/streaming?channel=9&subtype=0
+CH10,2nd Floor,true,rtsp://admin:admin@123@172.17.41.201:80/rtsp/streaming?channel=10&subtype=0
+CH11,2nd Floor,true,rtsp://admin:admin@123@172.17.41.201:80/rtsp/streaming?channel=11&subtype=0
+CH12,2nd Floor,true,rtsp://admin:admin@123@172.17.41.201:80/rtsp/streaming?channel=12&subtype=0
+CH13,2nd Floor,true,rtsp://admin:admin@123@172.17.41.201:80/rtsp/streaming?channel=13&subtype=0
+CH14,2nd Floor,true,rtsp://admin:admin@123@172.17.41.201:80/rtsp/streaming?channel=14&subtype=0
+CH15,2nd Floor,true,rtsp://admin:admin@123@172.17.41.201:80/rtsp/streaming?channel=15&subtype=0
+CH16,2nd Floor,true,rtsp://admin:admin@123@172.17.41.201:80/rtsp/streaming?channel=16&subtype=0
+CH17,3rd Floor,true,rtsp://admin:admin@123@172.17.41.201:80/rtsp/streaming?channel=17&subtype=0
+CH18,3rd Floor,true,rtsp://admin:admin@123@172.17.41.201:80/rtsp/streaming?channel=18&subtype=0
+CH19,3rd Floor,true,rtsp://admin:admin@123@172.17.41.201:80/rtsp/streaming?channel=19&subtype=0
+CH20,3rd Floor,true,rtsp://admin:admin@123@172.17.41.201:80/rtsp/streaming?channel=20&subtype=0
+CH21,3rd Floor,true,rtsp://admin:admin@123@172.17.41.201:80/rtsp/streaming?channel=21&subtype=0
+CH22,3rd Floor,true,rtsp://admin:admin@123@172.17.41.201:80/rtsp/streaming?channel=22&subtype=0
+CH23,3rd Floor,true,rtsp://admin:admin@123@172.17.41.201:80/rtsp/streaming?channel=23&subtype=0
+CH24,3rd Floor,true,rtsp://admin:admin@123@172.17.41.201:80/rtsp/streaming?channel=24&subtype=0
+CH25,4th Floor,true,rtsp://admin:admin@123@172.17.41.201:80/rtsp/streaming?channel=25&subtype=0
+CH26,4th Floor,true,rtsp://admin:admin@123@172.17.41.201:80/rtsp/streaming?channel=26&subtype=0
+CH27,4th Floor,true,rtsp://admin:admin@123@172.17.41.201:80/rtsp/streaming?channel=27&subtype=0
+CH28,4th Floor,true,rtsp://admin:admin@123@172.17.41.201:80/rtsp/streaming?channel=28&subtype=0
+CH29,4th Floor,true,rtsp://admin:admin@123@172.17.41.201:80/rtsp/streaming?channel=29&subtype=0
+CH30,4th Floor,true,rtsp://admin:admin@123@172.17.41.201:80/rtsp/streaming?channel=30&subtype=0
+CH31,4th Floor,true,rtsp://admin:admin@123@172.17.41.201:80/rtsp/streaming?channel=31&subtype=0
+CH32,4th Floor,true,rtsp://admin:admin@123@172.17.41.201:80/rtsp/streaming?channel=32&subtype=0
