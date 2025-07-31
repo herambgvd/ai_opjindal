@@ -80,13 +80,13 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'opjindal.wsgi.application'
 
-# Database
+# Database with TimescaleDB
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.postgresql",
+        "ENGINE": "timescale.db.backends.postgresql",
         "NAME": env("DJANGO_DATABASE_NAME", default="op_jindal"),
         "USER": env("DJANGO_DATABASE_USER", default="postgres"),
-        "PASSWORD": env("DJANGO_DATABASE_PASSWORD", default="varanasi"),
+        "PASSWORD": env("DJANGO_DATABASE_PASSWORD", default=""),
         "HOST": env("DJANGO_DATABASE_HOST", default="localhost"),
         "PORT": env("DJANGO_DATABASE_PORT", default="5432"),
     }

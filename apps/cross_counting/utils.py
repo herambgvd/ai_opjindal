@@ -384,8 +384,8 @@ class TablePartitioningManager:
             for camera in cameras:
                 latest_data = CrossCountingData.objects.filter(
                     camera=camera,
-                    alarm_time__gte=recent_time
-                ).order_by('-alarm_time').first()
+                    time__gte=recent_time
+                ).order_by('-time').first()
                 
                 if latest_data:
                     current_total += latest_data.cc_total_count
@@ -415,7 +415,7 @@ class TablePartitioningManager:
         
         since_24h = timezone.now() - timedelta(hours=24)
         recent_data_points = CrossCountingData.objects.filter(
-            alarm_time__gte=since_24h
+            time__gte=since_24h
         ).count()
         
         health_metrics = CrossCountingAnalytics.get_system_health_metrics(minutes=60)

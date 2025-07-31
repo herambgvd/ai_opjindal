@@ -2,6 +2,8 @@ import logging
 import uuid
 
 from django.db import models
+from timescale.db.models.fields import TimescaleDateTimeField
+from timescale.db.models.managers import TimescaleManager
 
 logger = logging.getLogger(__name__)
 
@@ -53,10 +55,12 @@ class Camera(models.Model):
 
 class CrossCountingData(models.Model):
     """
-    Time-series optimized model for high-frequency MQTT payload storage (every 2 seconds)
-    Designed for fast analytical queries with proper indexing and partitioning considerations
+    TimescaleDB-optimized model for high-frequency MQTT payload storage (every 2 seconds)
+    Uses hypertables for fast analytical queries with automatic partitioning
     """
     id = models.BigAutoField(primary_key=True)
+
+    time = TimescaleDateTimeField(interval="1 day", db_index=True)
 
     device_name = models.CharField(max_length=200, db_index=True)
     device_ip = models.GenericIPAddressField(db_index=True)
@@ -92,34 +96,42 @@ class CrossCountingData(models.Model):
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    objects = models.Manager()
+    timescale = TimescaleManager()
+
     class Meta:
-        ordering = ['-alarm_time', '-created_at']
+        ordering = ['-time', '-alarm_time']
         db_table = 'cross_counting_data_timeseries'
         
         indexes = [
-            models.Index(fields=['alarm_time', 'camera'], name='ts_time_camera_idx'),
-            models.Index(fields=['alarm_time', 'channel'], name='ts_time_channel_idx'),
-            models.Index(fields=['alarm_time', 'device_name'], name='ts_time_device_idx'),
+            models.Index(fields=['time', 'camera'], name='ts_time_camera_idx'),
+            models.Index(fields=['time', 'channel'], name='ts_time_channel_idx'),
+            models.Index(fields=['time', 'device_name'], name='ts_time_device_idx'),
             
-            models.Index(fields=['camera', 'alarm_time', 'cc_total_count'], name='ts_camera_time_total_idx'),
-            models.Index(fields=['channel', 'alarm_time', 'cc_in_count', 'cc_out_count'], name='ts_channel_time_counts_idx'),
+            models.Index(fields=['camera', 'time', 'cc_total_count'], name='ts_camera_time_total_idx'),
+            models.Index(fields=['channel', 'time', 'cc_in_count', 'cc_out_count'], name='ts_channel_time_counts_idx'),
             
             models.Index(
-                fields=['alarm_time', 'camera'], 
+                fields=['time', 'camera'], 
                 name='ts_active_alarms_idx',
                 condition=models.Q(alarm_status=True)
             ),
             
-            models.Index(fields=['alarm_time', 'alarm_status'], name='ts_time_status_idx'),
+            models.Index(fields=['alarm_time', 'camera'], name='ts_alarm_time_camera_idx'),
+            models.Index(fields=['alarm_time', 'alarm_status'], name='ts_alarm_time_status_idx'),
             
-            models.Index(fields=['device_name', 'alarm_time', 'alarm_status'], name='ts_device_time_status_idx'),
-            
+            models.Index(fields=['device_name', 'time', 'alarm_status'], name='ts_device_time_status_idx'),
             models.Index(fields=['created_at'], name='ts_created_idx'),
         ]
         
 
+    def save(self, *args, **kwargs):
+        if not self.time:
+            self.time = self.alarm_time
+        super().save(*args, **kwargs)
+
     def __str__(self):
-        return f"{self.device_name} - {self.channel} - {self.alarm_time}"
+        return f"{self.device_name} - {self.channel} - {self.time}"
     
     @classmethod
     def get_latest_counts_by_camera(cls, camera_id, limit=100):
