@@ -6,6 +6,7 @@ COMPLETE VERSION - All methods included with compatible timezone handling
 
 import logging
 import json
+import pytz
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import connection
 from django.db.models import Q, Max, Min, Count, Avg, Sum
@@ -63,23 +64,22 @@ class CrossCountingAnalytics:
 
         with connection.cursor() as cursor:
             cursor.execute("""
-                SELECT 
-                    c.name as camera_name,
-                    c.id as camera_id,
-                    COUNT(ccd.id) as data_points,
-                    MAX(ccd.cc_total_count) as peak_total,
-                    MAX(ccd.cc_in_count) as peak_in,
-                    MAX(ccd.cc_out_count) as peak_out,
-                    MIN(ccd.created_at) as first_data,
-                    MAX(ccd.created_at) as last_data,
-                    AVG(ccd.cc_total_count) as avg_total
-                FROM cross_counting_data_timeseries ccd
-                JOIN cross_counting_camera c ON ccd.camera_id = c.id
-                WHERE ccd.created_at >= %s 
-                AND c.id = ANY(%s)
-                GROUP BY c.id, c.name
-                ORDER BY c.name
-            """, [since, camera_ids])
+                           SELECT c.name                  as camera_name,
+                                  c.id                    as camera_id,
+                                  COUNT(ccd.id)           as data_points,
+                                  MAX(ccd.cc_total_count) as peak_total,
+                                  MAX(ccd.cc_in_count)    as peak_in,
+                                  MAX(ccd.cc_out_count)   as peak_out,
+                                  MIN(ccd.created_at)     as first_data,
+                                  MAX(ccd.created_at)     as last_data,
+                                  AVG(ccd.cc_total_count) as avg_total
+                           FROM cross_counting_data_timeseries ccd
+                                    JOIN cross_counting_camera c ON ccd.camera_id = c.id
+                           WHERE ccd.created_at >= %s
+                             AND c.id = ANY (%s)
+                           GROUP BY c.id, c.name
+                           ORDER BY c.name
+                           """, [since, camera_ids])
 
             columns = [col[0] for col in cursor.description] if cursor.description else []
             return [dict(zip(columns, row)) for row in cursor.fetchall()]
@@ -92,32 +92,25 @@ class CrossCountingAnalytics:
         """
         with connection.cursor() as cursor:
             cursor.execute("""
-                WITH daily_resets AS (
-                    SELECT 
-                        DATE(created_at) as date,
-                        MAX(cc_in_count) as daily_max_in,
-                        MAX(cc_out_count) as daily_max_out,
-                        MAX(cc_total_count) as daily_max_total,
-                        MIN(cc_in_count) as daily_min_in,
-                        MIN(cc_out_count) as daily_min_out,
-                        COUNT(*) as data_points
-                    FROM cross_counting_data_timeseries
-                    WHERE camera_id = %s 
-                    AND created_at BETWEEN %s AND %s
-                    GROUP BY DATE(created_at)
-                )
-                SELECT 
-                    date,
-                    daily_max_in - daily_min_in as net_entries,
-                    daily_max_out - daily_min_out as net_exits,
-                    daily_max_total - daily_min_in as net_total,
-                    daily_max_in,
-                    daily_max_out,
-                    daily_max_total,
-                    data_points
-                FROM daily_resets
-                ORDER BY date
-            """, [camera_id, start_time, end_time])
+                           WITH daily_resets AS (SELECT
+                               DATE (created_at) as date
+                              , MAX (cc_in_count) as daily_max_in
+                              , MAX (cc_out_count) as daily_max_out
+                              , MAX (cc_total_count) as daily_max_total
+                              , MIN (cc_in_count) as daily_min_in
+                              , MIN (cc_out_count) as daily_min_out
+                              , COUNT (*) as data_points
+                           FROM cross_counting_data_timeseries
+                           WHERE camera_id = %s
+                             AND created_at BETWEEN %s
+                             AND %s
+                           GROUP BY DATE (created_at)
+                               )
+                           SELECT
+                               date, daily_max_in - daily_min_in as net_entries, daily_max_out - daily_min_out as net_exits, daily_max_total - daily_min_in as net_total, daily_max_in, daily_max_out, daily_max_total, data_points
+                           FROM daily_resets
+                           ORDER BY date
+                           """, [camera_id, start_time, end_time])
 
             columns = [col[0] for col in cursor.description] if cursor.description else []
             return [dict(zip(columns, row)) for row in cursor.fetchall()]
@@ -131,17 +124,16 @@ class CrossCountingAnalytics:
 
         with connection.cursor() as cursor:
             cursor.execute("""
-                SELECT 
-                    COUNT(*) as total_records,
-                    COUNT(DISTINCT camera_id) as active_cameras,
-                    COUNT(DISTINCT device_name) as active_devices,
-                    MIN(created_at) as earliest_data,
-                    MAX(created_at) as latest_data,
-                    AVG(EXTRACT(EPOCH FROM (created_at - alarm_time))) as avg_processing_delay_seconds,
-                    COUNT(CASE WHEN alarm_status = true THEN 1 END) as active_alarms
-                FROM cross_counting_data_timeseries
-                WHERE created_at >= %s
-            """, [since])
+                           SELECT COUNT(*)                                           as total_records,
+                                  COUNT(DISTINCT camera_id)                          as active_cameras,
+                                  COUNT(DISTINCT device_name)                        as active_devices,
+                                  MIN(created_at)                                    as earliest_data,
+                                  MAX(created_at)                                    as latest_data,
+                                  AVG(EXTRACT(EPOCH FROM (created_at - alarm_time))) as avg_processing_delay_seconds,
+                                  COUNT(CASE WHEN alarm_status = true THEN 1 END)    as active_alarms
+                           FROM cross_counting_data_timeseries
+                           WHERE created_at >= %s
+                           """, [since])
 
             row = cursor.fetchone()
             columns = [col[0] for col in cursor.description] if cursor.description else []
@@ -228,7 +220,8 @@ class DataRetentionManager:
             "total_records": total_records,
             "date_range": date_range,
             "daily_stats": list(daily_stats),
-            "avg_daily_records": total_records / max(1, (date_range['max_date'] - date_range['min_date']).days) if date_range['max_date'] and date_range['min_date'] else 0
+            "avg_daily_records": total_records / max(1, (date_range['max_date'] - date_range['min_date']).days) if
+            date_range['max_date'] and date_range['min_date'] else 0
         }
 
 
@@ -274,40 +267,49 @@ class TablePartitioningManager:
     def get_daily_analysis_data(region_id: int, date: date) -> Dict[str, Any]:
         """
         Get comprehensive daily analysis for all cameras in a region using created_at
-        SIMPLIFIED: Uses date filtering without complex timezone localization
+        FIXED VERSION: Proper timezone handling to ensure full 24-hour coverage
         """
         from .models import Camera, CrossCountingData
         from django.db.models import Max
+        import pytz
+        from django.utils import timezone as django_timezone
 
         cameras = Camera.objects.filter(region_id=region_id, status=True)
         camera_ids = list(cameras.values_list('id', flat=True))
 
         if not camera_ids:
-            return {"cameras": [], "summary": {}, "region_hourly_aggregates": {"hourly_data": [], "individual_camera_data": []}}
+            return {"cameras": [], "summary": {},
+                    "region_hourly_aggregates": {"hourly_data": [], "individual_camera_data": []}}
 
         daily_data = []
         total_peak_in = 0
         total_peak_out = 0
         total_peak_total = 0
 
-        # SIMPLIFIED: Use date filtering instead of complex timezone handling
-        from datetime import timedelta
+        # FIXED: Proper timezone handling for the target date
+        # Use Asia/Kolkata timezone explicitly
+        ist = pytz.timezone('Asia/Kolkata')
 
-        # Create simple datetime range for the target date
-        start_datetime = datetime.combine(date, datetime.min.time())
-        end_datetime = datetime.combine(date, datetime.max.time())
+        # Create datetime range for the target date in IST
+        start_datetime = ist.localize(datetime.combine(date, datetime.min.time()))
+        # End time should be the start of the next day to include the full 24 hours
+        end_datetime = ist.localize(datetime.combine(date + timedelta(days=1), datetime.min.time()))
 
-        # Make them timezone-aware using Django's timezone
-        start_datetime = timezone.make_aware(start_datetime)
-        end_datetime = timezone.make_aware(end_datetime)
+        # Convert to UTC for database query (PostgreSQL stores in UTC)
+        start_datetime_utc = start_datetime.astimezone(pytz.UTC)
+        end_datetime_utc = end_datetime.astimezone(pytz.UTC)
 
-        print(f"Daily analysis date range: {start_datetime} to {end_datetime}")
+        # DEBUG: Print the corrected date range
+        print(f"FIXED DEBUG: Daily analysis for {date}")
+        print(f"FIXED DEBUG: IST range: {start_datetime} to {end_datetime}")
+        print(f"FIXED DEBUG: UTC range: {start_datetime_utc} to {end_datetime_utc}")
 
         for camera in cameras:
-            # Get daily peaks using created_at with date range
+            # FIXED: Get daily peaks using proper timezone filtering
             peaks = CrossCountingData.objects.filter(
                 camera=camera,
-                created_at__date=date  # Simplified: use date filtering
+                created_at__gte=start_datetime_utc,
+                created_at__lt=end_datetime_utc  # Use < instead of <= to avoid overlap
             ).aggregate(
                 peak_in_count=Max('cc_in_count'),
                 peak_out_count=Max('cc_out_count'),
@@ -326,6 +328,15 @@ class TablePartitioningManager:
                 total_peak_out += peaks['peak_out_count'] or 0
                 total_peak_total += peaks['peak_total_count'] or 0
 
+        # FIXED: Use UTC datetime range for hourly aggregates
+        region_hourly_aggregates = TablePartitioningManager.get_hourly_region_aggregates(
+            region_id, start_datetime_utc, end_datetime_utc
+        )
+
+        # DEBUG: Print summary of what was found
+        print(f"FIXED DEBUG: Found data for {len(daily_data)} cameras")
+        print(f"FIXED DEBUG: Total peak counts - In: {total_peak_in}, Out: {total_peak_out}, Total: {total_peak_total}")
+
         result = {
             "cameras": daily_data,
             "summary": {
@@ -334,9 +345,7 @@ class TablePartitioningManager:
                 "total_peak_total": total_peak_total,
                 "active_cameras": len(daily_data)
             },
-            "region_hourly_aggregates": TablePartitioningManager.get_hourly_region_aggregates(
-                region_id, start_datetime, end_datetime
-            )
+            "region_hourly_aggregates": region_hourly_aggregates
         }
 
         return serialize_datetime_data(result)
@@ -345,9 +354,16 @@ class TablePartitioningManager:
     def get_comparative_analysis_data(region_id: int, base_date: date, compare_date: date) -> Dict[str, Any]:
         """
         Get comparative analysis between two dates for a region
+        FIXED VERSION: Uses the corrected daily analysis method
         """
+        # FIXED: Use the corrected get_daily_analysis_data method
         base_data = TablePartitioningManager.get_daily_analysis_data(region_id, base_date)
         compare_data = TablePartitioningManager.get_daily_analysis_data(region_id, compare_date)
+
+        # DEBUG: Print what data was retrieved
+        print(f"FIXED DEBUG: Comparative analysis for {base_date} vs {compare_date}")
+        print(f"FIXED DEBUG: Base data cameras: {len(base_data.get('cameras', []))}")
+        print(f"FIXED DEBUG: Compare data cameras: {len(compare_data.get('cameras', []))}")
 
         comparison = []
         for base_camera in base_data["cameras"]:
@@ -369,6 +385,12 @@ class TablePartitioningManager:
                 "diff_total": compare_camera["peak_total"] - base_camera["peak_total"]
             })
 
+        # DEBUG: Print comparison summary
+        total_base = sum(c["base_total"] for c in comparison)
+        total_compare = sum(c["compare_total"] for c in comparison)
+        print(
+            f"FIXED DEBUG: Total base: {total_base}, Total compare: {total_compare}, Difference: {total_compare - total_base}")
+
         result = {
             "base_date": base_date,
             "compare_date": compare_date,
@@ -385,46 +407,77 @@ class TablePartitioningManager:
     def get_comprehensive_analysis_data(region_id: int, from_date: date, to_date: date) -> Dict[str, Any]:
         """
         Get comprehensive analysis for a date range (max 7 days) using created_at
-        SIMPLIFIED: Uses date range filtering
+        FIXED VERSION: Proper timezone handling for accurate date range analysis
         """
         from .models import Camera, CrossCountingData
         from django.db.models import Max
         from django.db.models.functions import TruncDate
+        import pytz
+        from django.utils import timezone as django_timezone
 
         cameras = Camera.objects.filter(region_id=region_id, status=True)
 
         daily_trends = []
 
-        # SIMPLIFIED: Use date range filtering
-        start_datetime = datetime.combine(from_date, datetime.min.time())
-        end_datetime = datetime.combine(to_date, datetime.max.time())
+        # FIXED: Proper timezone handling for date range
+        ist = pytz.timezone('Asia/Kolkata')
 
-        # Make them timezone-aware
-        start_datetime = timezone.make_aware(start_datetime)
-        end_datetime = timezone.make_aware(end_datetime)
+        # Create datetime range that covers the full period
+        start_datetime = ist.localize(datetime.combine(from_date, datetime.min.time()))
+        # Add one day and use start of next day to include the full last day
+        end_datetime = ist.localize(datetime.combine(to_date + timedelta(days=1), datetime.min.time()))
 
-        print(f"Comprehensive analysis date range: {start_datetime} to {end_datetime}")
+        # Convert to UTC for database queries
+        start_datetime_utc = start_datetime.astimezone(pytz.UTC)
+        end_datetime_utc = end_datetime.astimezone(pytz.UTC)
+
+        # DEBUG: Print the corrected date range
+        print(f"FIXED DEBUG: Comprehensive analysis from {from_date} to {to_date}")
+        print(f"FIXED DEBUG: IST range: {start_datetime} to {end_datetime}")
+        print(f"FIXED DEBUG: UTC range: {start_datetime_utc} to {end_datetime_utc}")
 
         for camera in cameras:
-            # Get daily peaks using date range filtering
+            # FIXED: Get daily peaks using proper timezone filtering
+            # Use TruncDate with timezone conversion for accurate daily grouping
             daily_data = CrossCountingData.objects.filter(
                 camera=camera,
-                created_at__date__gte=from_date,
-                created_at__date__lte=to_date
-            ).annotate(
-                date=TruncDate('created_at')
-            ).values('date').annotate(
+                created_at__gte=start_datetime_utc,
+                created_at__lt=end_datetime_utc
+            ).extra(
+                # Convert UTC timestamps to IST before truncating to date
+                select={'local_date': "DATE(created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')"}
+            ).values('local_date').annotate(
                 peak_in_count=Max('cc_in_count'),
                 peak_out_count=Max('cc_out_count'),
                 peak_total_count=Max('cc_total_count')
-            ).order_by('date')
+            ).order_by('local_date')
+
+            # Convert the extra field result to proper date format
+            daily_data_formatted = []
+            for item in daily_data:
+                daily_data_formatted.append({
+                    'date': item['local_date'],
+                    'peak_in_count': item['peak_in_count'],
+                    'peak_out_count': item['peak_out_count'],
+                    'peak_total_count': item['peak_total_count']
+                })
 
             daily_trends.append({
                 "camera_name": camera.name,
-                "daily_data": list(daily_data)
+                "daily_data": daily_data_formatted
             })
 
         total_days = (to_date - from_date).days + 1
+
+        # FIXED: Use UTC datetime range for hourly aggregates
+        region_hourly_aggregates = TablePartitioningManager.get_hourly_region_aggregates(
+            region_id, start_datetime_utc, end_datetime_utc
+        )
+
+        # DEBUG: Print summary
+        print(f"FIXED DEBUG: Analyzed {len(cameras)} cameras over {total_days} days")
+        total_daily_records = sum(len(trend['daily_data']) for trend in daily_trends)
+        print(f"FIXED DEBUG: Total daily data points: {total_daily_records}")
 
         result = {
             "from_date": from_date,
@@ -432,9 +485,7 @@ class TablePartitioningManager:
             "total_days": total_days,
             "daily_trends": daily_trends,
             "cameras": [{"id": str(cam.id), "name": cam.name} for cam in cameras],
-            "region_hourly_aggregates": TablePartitioningManager.get_hourly_region_aggregates(
-                region_id, start_datetime, end_datetime
-            )
+            "region_hourly_aggregates": region_hourly_aggregates
         }
 
         return serialize_datetime_data(result)
@@ -443,12 +494,13 @@ class TablePartitioningManager:
     def get_hourly_region_aggregates(region_id: int, start_time, end_time) -> Dict[str, Any]:
         """
         Get hourly aggregated In/Out counts for all cameras in a region
-        SIMPLIFIED VERSION: More compatible timezone handling
+        FIXED VERSION: Proper timezone handling and comprehensive debugging
         """
         from .models import Camera, CrossCountingData
         from django.db.models import Max
         from collections import defaultdict
         from datetime import datetime, timedelta
+        import pytz
 
         cameras = Camera.objects.filter(region_id=region_id, status=True)
         camera_ids = list(cameras.values_list('id', flat=True))
@@ -461,55 +513,62 @@ class TablePartitioningManager:
                 "individual_camera_data": []
             }
 
-        print(f"Querying hourly data from {start_time} to {end_time}")
+        # FIXED: Ensure proper timezone handling
+        # Convert to UTC for database query if needed
+        from django.conf import settings
+        from django.utils import timezone as django_timezone
 
-        # SIMPLIFIED: Use simpler SQL without timezone conversion for compatibility
+        # Ensure the datetime objects are timezone-aware
+        if start_time.tzinfo is None:
+            start_time = django_timezone.make_aware(start_time)
+        if end_time.tzinfo is None:
+            end_time = django_timezone.make_aware(end_time)
+
+        # DEBUG: Print the actual query parameters
+        print(f"FIXED DEBUG: Querying hourly data from {start_time} to {end_time}")
+        print(f"FIXED DEBUG: Start timezone: {start_time.tzinfo}, End timezone: {end_time.tzinfo}")
+        print(f"FIXED DEBUG: Camera count: {len(camera_ids)}")
+
+        # FIXED: Updated SQL query with better timezone handling
         with connection.cursor() as cursor:
             cursor.execute("""
-                WITH ranked_data AS (
-                    SELECT 
-                        camera_id,
-                        cc_in_count,
-                        cc_out_count,
-                        EXTRACT(HOUR FROM created_at) as hour,
-                        created_at,
-                        ROW_NUMBER() OVER (
-                            PARTITION BY camera_id, EXTRACT(HOUR FROM created_at) 
-                            ORDER BY created_at DESC
-                        ) as rn
-                    FROM cross_counting_data_timeseries
-                    WHERE camera_id = ANY(%s)
-                    AND created_at >= %s 
-                    AND created_at <= %s
-                ),
-                last_values_per_hour AS (
-                    SELECT 
-                        camera_id,
-                        hour,
-                        cc_in_count,
-                        cc_out_count
-                    FROM ranked_data
-                    WHERE rn = 1
-                ),
-                region_hourly_totals AS (
-                    SELECT 
-                        hour,
-                        SUM(cc_in_count) as total_in_count,
-                        SUM(cc_out_count) as total_out_count
-                    FROM last_values_per_hour
-                    GROUP BY hour
-                ),
-                all_hours AS (
-                    SELECT generate_series(0, 23) as hour
-                )
-                SELECT 
-                    ah.hour,
-                    COALESCE(rht.total_in_count, 0) as total_in_count,
-                    COALESCE(rht.total_out_count, 0) as total_out_count
-                FROM all_hours ah
-                LEFT JOIN region_hourly_totals rht ON ah.hour = rht.hour
-                ORDER BY ah.hour
-            """, [camera_ids, start_time, end_time])
+                           WITH ranked_data AS (SELECT camera_id,
+                                                       cc_in_count,
+                                                       cc_out_count,
+                                                       -- FIXED: Use created_at in local timezone for hour extraction
+                                                       EXTRACT(HOUR FROM
+                                                               created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata') as hour, created_at, ROW_NUMBER() OVER (
+                               PARTITION BY camera_id, EXTRACT (HOUR FROM created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')
+                               ORDER BY created_at DESC
+                               ) as rn
+                           FROM cross_counting_data_timeseries
+                           WHERE camera_id = ANY (%s)
+                             AND created_at >= %s
+                             AND created_at
+                               < %s -- FIXED: Use < instead of <= to avoid edge cases
+                               )
+                               , last_values_per_hour AS (
+                           SELECT
+                               camera_id, hour, cc_in_count, cc_out_count
+                           FROM ranked_data
+                           WHERE rn = 1
+                               )
+                               , region_hourly_totals AS (
+                           SELECT
+                               hour, SUM (cc_in_count) as total_in_count, SUM (cc_out_count) as total_out_count
+                           FROM last_values_per_hour
+                           GROUP BY hour
+                               ),
+                               all_hours AS (
+                           SELECT generate_series(0, 23) as hour
+                               )
+                           SELECT ah.hour,
+                                  COALESCE(rht.total_in_count, 0)  as total_in_count,
+                                  COALESCE(rht.total_out_count, 0) as total_out_count
+                           FROM all_hours ah
+                                    LEFT JOIN region_hourly_totals rht ON ah.hour = rht.hour
+                           ORDER BY ah.hour
+                           """, [camera_ids, start_time, end_time])
 
             hourly_data = []
             for row in cursor.fetchall():
@@ -519,59 +578,57 @@ class TablePartitioningManager:
                     'total_out_count': int(row[2])
                 })
 
-        # Debug: Print how many hours of data we got
+        # DEBUG: Print results to verify fix
         non_zero_hours = [h for h in hourly_data if h['total_in_count'] > 0 or h['total_out_count'] > 0]
         if non_zero_hours:
-            print(f"Found data for hours: {[h['hour'] for h in non_zero_hours]}")
-            print(f"Last hour with data: {max([h['hour'] for h in non_zero_hours])}")
+            print(f"FIXED DEBUG: Found data for hours: {[h['hour'] for h in non_zero_hours]}")
+            print(f"FIXED DEBUG: Last hour with data: {max([h['hour'] for h in non_zero_hours])}")
+            # Print first few non-zero hours for verification
+            for h in non_zero_hours[:5]:
+                print(f"FIXED DEBUG: Hour {h['hour']}: In={h['total_in_count']}, Out={h['total_out_count']}")
 
-        # Get individual camera data for detailed charts
+        # FIXED: Updated individual camera data query with same timezone handling
         individual_camera_data = []
         camera_objects = {cam.id: cam for cam in cameras}
 
         with connection.cursor() as cursor:
             cursor.execute("""
-                WITH ranked_camera_data AS (
-                    SELECT 
-                        camera_id,
-                        cc_in_count,
-                        cc_out_count,
-                        EXTRACT(HOUR FROM created_at) as hour,
-                        created_at,
-                        ROW_NUMBER() OVER (
-                            PARTITION BY camera_id, EXTRACT(HOUR FROM created_at) 
-                            ORDER BY created_at DESC
-                        ) as rn
-                    FROM cross_counting_data_timeseries
-                    WHERE camera_id = ANY(%s)
-                    AND created_at >= %s 
-                    AND created_at <= %s
-                ),
-                camera_last_values AS (
-                    SELECT 
-                        camera_id,
-                        hour,
-                        cc_in_count,
-                        cc_out_count
-                    FROM ranked_camera_data
-                    WHERE rn = 1
-                ),
-                all_hours AS (
-                    SELECT generate_series(0, 23) as hour
-                ),
-                all_cameras AS (
-                    SELECT unnest(%s::uuid[]) as camera_id
-                )
-                SELECT 
-                    ac.camera_id,
-                    ah.hour,
-                    COALESCE(clv.cc_in_count, 0) as cc_in_count,
-                    COALESCE(clv.cc_out_count, 0) as cc_out_count
-                FROM all_cameras ac
-                CROSS JOIN all_hours ah
-                LEFT JOIN camera_last_values clv ON ac.camera_id = clv.camera_id AND ah.hour = clv.hour
-                ORDER BY ac.camera_id, ah.hour
-            """, [camera_ids, start_time, end_time, camera_ids])
+                           WITH ranked_camera_data AS (SELECT camera_id,
+                                                              cc_in_count,
+                                                              cc_out_count,
+                                                              -- FIXED: Same timezone handling for individual cameras
+                                                              EXTRACT(HOUR FROM
+                                                                      created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata') as hour, created_at, ROW_NUMBER() OVER (
+                               PARTITION BY camera_id, EXTRACT (HOUR FROM created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')
+                               ORDER BY created_at DESC
+                               ) as rn
+                           FROM cross_counting_data_timeseries
+                           WHERE camera_id = ANY (%s)
+                             AND created_at >= %s
+                             AND created_at
+                               < %s -- FIXED: Consistent with above query
+                               )
+                               , camera_last_values AS (
+                           SELECT
+                               camera_id, hour, cc_in_count, cc_out_count
+                           FROM ranked_camera_data
+                           WHERE rn = 1
+                               )
+                               , all_hours AS (
+                           SELECT generate_series(0, 23) as hour
+                               ), all_cameras AS (
+                           SELECT unnest(%s::uuid[]) as camera_id
+                               )
+                           SELECT ac.camera_id,
+                                  ah.hour,
+                                  COALESCE(clv.cc_in_count, 0)  as cc_in_count,
+                                  COALESCE(clv.cc_out_count, 0) as cc_out_count
+                           FROM all_cameras ac
+                                    CROSS JOIN all_hours ah
+                                    LEFT JOIN camera_last_values clv
+                                              ON ac.camera_id = clv.camera_id AND ah.hour = clv.hour
+                           ORDER BY ac.camera_id, ah.hour
+                           """, [camera_ids, start_time, end_time, camera_ids])
 
             # Group by camera
             camera_data_dict = defaultdict(list)
@@ -685,7 +742,8 @@ class TablePartitioningManager:
         occupancy_data = TablePartitioningManager.get_current_occupancy_data()
         total_current_occupancy = sum(item['current_count'] for item in occupancy_data)
         total_max_occupancy = sum(item['max_occupancy'] for item in occupancy_data)
-        avg_occupancy_percentage = (total_current_occupancy / total_max_occupancy * 100) if total_max_occupancy > 0 else 0.0
+        avg_occupancy_percentage = (
+                    total_current_occupancy / total_max_occupancy * 100) if total_max_occupancy > 0 else 0.0
 
         return {
             "basic_stats": {
