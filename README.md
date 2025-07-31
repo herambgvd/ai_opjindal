@@ -164,6 +164,8 @@ The system expects MQTT payloads in the following format:
 }
 ```
 
+**Note**: `cc_total_num` equals `cc_in_num + cc_out_num` (cumulative sum), but occupancy calculations use `cc_in_num - cc_out_num` (net difference) to determine actual occupancy levels.
+
 ## 📊 Database Schema
 
 ### Key Models

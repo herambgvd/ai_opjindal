@@ -359,7 +359,11 @@ class TablePartitioningManager:
 
     @staticmethod
     def get_current_occupancy_data() -> List[Dict[str, Any]]:
-        """Get current occupancy percentage for all regions for public display"""
+        """
+        Get current occupancy percentage for all regions for public display
+        Occupancy is calculated as cc_in_count - cc_out_count (difference, not sum)
+        Values are clamped to prevent negative occupancy
+        """
         from .models import Region, Camera, CrossCountingData
         from django.utils import timezone
         from datetime import timedelta
@@ -388,7 +392,8 @@ class TablePartitioningManager:
                 ).order_by('-time').first()
                 
                 if latest_data:
-                    current_total += latest_data.cc_total_count
+                    camera_occupancy = max(0, latest_data.cc_in_count - latest_data.cc_out_count)
+                    current_total += camera_occupancy
             
             occupancy_percentage = (current_total / region.occupancy * 100) if region.occupancy > 0 else 0.0
             occupancy_percentage = min(occupancy_percentage, 100.0)
