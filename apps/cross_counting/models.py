@@ -60,7 +60,7 @@ class CrossCountingData(models.Model):
     """
     id = models.BigAutoField(primary_key=True)
 
-    time = TimescaleDateTimeField(interval="1 day", db_index=True)
+    time = TimescaleDateTimeField(interval="1 day", db_index=True, null=True, blank=True)
 
     device_name = models.CharField(max_length=200, db_index=True)
     device_ip = models.GenericIPAddressField(db_index=True)
