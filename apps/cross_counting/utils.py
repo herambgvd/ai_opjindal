@@ -64,12 +64,12 @@ class CrossCountingAnalytics:
                     MAX(ccd.cc_total_count) as peak_total,
                     MAX(ccd.cc_in_count) as peak_in,
                     MAX(ccd.cc_out_count) as peak_out,
-                    MIN(ccd.alarm_time) as first_data,
-                    MAX(ccd.alarm_time) as last_data,
+                    MIN(ccd.created_at) as first_data,
+                    MAX(ccd.created_at) as last_data,
                     AVG(ccd.cc_total_count) as avg_total
                 FROM cross_counting_data_timeseries ccd
                 JOIN cross_counting_camera c ON ccd.camera_id = c.id
-                WHERE ccd.alarm_time >= %s 
+                WHERE ccd.created_at >= %s 
                 AND c.id = ANY(%s)
                 GROUP BY c.id, c.name
                 ORDER BY c.name
@@ -88,7 +88,7 @@ class CrossCountingAnalytics:
             cursor.execute("""
                 WITH daily_resets AS (
                     SELECT 
-                        DATE(alarm_time) as date,
+                        DATE(created_at) as date,
                         MAX(cc_in_count) as daily_max_in,
                         MAX(cc_out_count) as daily_max_out,
                         MAX(cc_total_count) as daily_max_total,
@@ -97,8 +97,8 @@ class CrossCountingAnalytics:
                         COUNT(*) as data_points
                     FROM cross_counting_data_timeseries
                     WHERE camera_id = %s 
-                    AND alarm_time BETWEEN %s AND %s
-                    GROUP BY DATE(alarm_time)
+                    AND created_at BETWEEN %s AND %s
+                    GROUP BY DATE(created_at)
                 )
                 SELECT 
                     date,
@@ -129,9 +129,9 @@ class CrossCountingAnalytics:
                     COUNT(*) as total_records,
                     COUNT(DISTINCT camera_id) as active_cameras,
                     COUNT(DISTINCT device_name) as active_devices,
-                    MIN(alarm_time) as earliest_data,
-                    MAX(alarm_time) as latest_data,
-                    AVG(EXTRACT(EPOCH FROM (created_at - alarm_time))) as avg_processing_delay_seconds,
+                    MIN(created_at) as earliest_data,
+                    MAX(created_at) as latest_data,
+                    AVG(EXTRACT(EPOCH FROM (created_at - created_at))) as avg_processing_delay_seconds,
                     COUNT(CASE WHEN alarm_status = true THEN 1 END) as active_alarms
                 FROM cross_counting_data_timeseries
                 WHERE created_at >= %s
@@ -183,7 +183,7 @@ class DataRetentionManager:
         
         while True:
             deleted_count = CrossCountingData.objects.filter(
-                alarm_time__lt=cutoff_date
+                created_at__lt=cutoff_date
             )[:batch_size].delete()[0]
             
             total_deleted += deleted_count
@@ -208,12 +208,12 @@ class DataRetentionManager:
             return {"total_records": 0, "daily_stats": []}
         
         date_range = CrossCountingData.objects.aggregate(
-            min_date=Min('alarm_time'),
-            max_date=Max('alarm_time')
+            min_date=Min('created_at'),
+            max_date=Max('created_at')
         )
         
         daily_stats = CrossCountingData.objects.annotate(
-            date=TruncDate('alarm_time')
+            date=TruncDate('created_at')
         ).values('date').annotate(
             record_count=Count('id')
         ).order_by('-date')[:30]  # Last 30 days
@@ -250,13 +250,13 @@ class TablePartitioningManager:
             """)
             
             cursor.execute(f"""
-                CREATE INDEX {partition_name}_alarm_time_idx 
-                ON {partition_name} (alarm_time);
+                CREATE INDEX {partition_name}_created_at_idx 
+                ON {partition_name} (created_at);
             """)
             
             cursor.execute(f"""
                 CREATE INDEX {partition_name}_camera_time_idx 
-                ON {partition_name} (camera_id, alarm_time);
+                ON {partition_name} (camera_id, created_at);
             """)
     
     @staticmethod
