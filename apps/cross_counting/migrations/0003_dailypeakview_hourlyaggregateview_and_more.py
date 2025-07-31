@@ -59,10 +59,13 @@ class Migration(migrations.Migration):
             model_name='crosscountingdata',
             name='cross_count_device__305088_idx',
         ),
-        migrations.RenameIndex(
+        migrations.RemoveIndex(
             model_name='crosscountingdata',
-            new_name='ts_created_idx',
-            old_name='cross_count_created_d08fce_idx',
+            name='cross_count_created_d08fce_idx',
+        ),
+        migrations.AddIndex(
+            model_name='crosscountingdata',
+            index=models.Index(fields=['created_at'], name='ts_created_idx'),
         ),
         migrations.AlterField(
             model_name='crosscountingdata',

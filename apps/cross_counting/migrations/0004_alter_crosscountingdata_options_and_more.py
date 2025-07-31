@@ -39,15 +39,21 @@ class Migration(migrations.Migration):
             model_name='crosscountingdata',
             name='ts_device_time_status_idx',
         ),
-        migrations.RenameIndex(
+        migrations.RemoveIndex(
             model_name='crosscountingdata',
-            new_name='ts_alarm_time_camera_idx',
-            old_name='ts_time_camera_idx',
+            name='ts_time_camera_idx',
         ),
-        migrations.RenameIndex(
+        migrations.RemoveIndex(
             model_name='crosscountingdata',
-            new_name='ts_alarm_time_status_idx',
-            old_name='ts_time_status_idx',
+            name='ts_time_status_idx',
+        ),
+        migrations.AddIndex(
+            model_name='crosscountingdata',
+            index=models.Index(fields=['alarm_time', 'camera'], name='ts_alarm_time_camera_idx'),
+        ),
+        migrations.AddIndex(
+            model_name='crosscountingdata',
+            index=models.Index(fields=['alarm_time', 'alarm_status'], name='ts_alarm_time_status_idx'),
         ),
         migrations.AddField(
             model_name='crosscountingdata',
