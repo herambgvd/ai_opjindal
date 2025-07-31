@@ -16,7 +16,7 @@ class RegionAdmin(admin.ModelAdmin):
     search_fields = ['name']
     ordering = ['name']
     readonly_fields = ['created_at', 'updated_at']
-    
+
     fieldsets = (
         ('Basic Information', {
             'fields': ('name', 'occupancy')
@@ -32,6 +32,7 @@ class RegionAdmin(admin.ModelAdmin):
         if count > 0:
             return format_html('<span style="color: green;">{}</span>', count)
         return format_html('<span style="color: gray;">0</span>')
+
     camera_count.short_description = 'Cameras'
 
 
@@ -42,7 +43,7 @@ class CameraAdmin(admin.ModelAdmin):
     search_fields = ['name', 'region__name']
     ordering = ['name']
     readonly_fields = ['id', 'created_at', 'updated_at', 'last_data_received']
-    
+
     fieldsets = (
         ('Basic Information', {
             'fields': ('name', 'region', 'status')
@@ -64,6 +65,7 @@ class CameraAdmin(admin.ModelAdmin):
         return format_html(
             '<span style="color: red; font-weight: bold;">● Inactive</span>'
         )
+
     status_display.short_description = 'Status'
 
     actions = ['activate_cameras', 'deactivate_cameras']
@@ -71,11 +73,13 @@ class CameraAdmin(admin.ModelAdmin):
     def activate_cameras(self, request, queryset):
         updated = queryset.update(status=True)
         self.message_user(request, f'{updated} cameras were successfully activated.')
+
     activate_cameras.short_description = "Activate selected cameras"
 
     def deactivate_cameras(self, request, queryset):
         updated = queryset.update(status=False)
         self.message_user(request, f'{updated} cameras were successfully deactivated.')
+
     deactivate_cameras.short_description = "Deactivate selected cameras"
 
     def get_urls(self):
@@ -93,59 +97,59 @@ class CameraAdmin(admin.ModelAdmin):
     def upload_csv(self, request):
         if request.method == "POST":
             csv_file = request.FILES.get("csv_file")
-            
+
             if not csv_file:
                 messages.error(request, "Please select a CSV file to upload.")
                 return redirect("..")
-            
+
             if not csv_file.name.endswith('.csv'):
                 messages.error(request, "Please upload a valid CSV file.")
                 return redirect("..")
-            
+
             try:
                 data_set = csv_file.read().decode('UTF-8')
                 io_string = io.StringIO(data_set)
                 reader = csv.DictReader(io_string)
-                
+
                 required_headers = ['name', 'region']
                 optional_headers = ['status', 'rtsp_link', 'hls_link']
                 all_headers = required_headers + optional_headers
-                
+
                 if not all(header in (reader.fieldnames or []) for header in required_headers):
                     messages.error(
-                        request, 
+                        request,
                         f"CSV file must contain the following required columns: {', '.join(required_headers)}. "
                         f"Optional columns: {', '.join(optional_headers)}"
                     )
                     return redirect("..")
-                
+
                 created_count = 0
                 updated_count = 0
                 error_count = 0
                 errors = []
-                
+
                 for row_num, row in enumerate(reader, start=2):  # Start from 2 because row 1 is headers
                     try:
                         camera_name = row.get('name', '').strip()
                         region_name = row.get('region', '').strip()
-                        
+
                         if not camera_name or not region_name:
                             errors.append(f"Row {row_num}: Camera name and region are required.")
                             error_count += 1
                             continue
-                        
+
                         try:
                             region = Region.objects.get(name=region_name)
                         except Region.DoesNotExist:
                             errors.append(f"Row {row_num}: Region '{region_name}' does not exist.")
                             error_count += 1
                             continue
-                        
+
                         status_str = row.get('status', 'true').strip().lower()
                         status = status_str in ['true', '1', 'yes', 'active', 'on']
                         rtsp_link = row.get('rtsp_link', '').strip()
                         hls_link = row.get('hls_link', '').strip()
-                        
+
                         camera, created = Camera.objects.get_or_create(
                             name=camera_name,
                             defaults={
@@ -155,7 +159,7 @@ class CameraAdmin(admin.ModelAdmin):
                                 'hls_link': hls_link,
                             }
                         )
-                        
+
                         if created:
                             created_count += 1
                         else:
@@ -167,11 +171,11 @@ class CameraAdmin(admin.ModelAdmin):
                                 camera.hls_link = hls_link
                             camera.save()
                             updated_count += 1
-                            
+
                     except Exception as e:
                         errors.append(f"Row {row_num}: {str(e)}")
                         error_count += 1
-                
+
                 if created_count > 0:
                     messages.success(request, f"Successfully created {created_count} cameras.")
                 if updated_count > 0:
@@ -182,15 +186,15 @@ class CameraAdmin(admin.ModelAdmin):
                         messages.error(request, error)
                     if len(errors) > 10:
                         messages.error(request, f"... and {len(errors) - 10} more errors.")
-                
+
                 if created_count == 0 and updated_count == 0 and error_count == 0:
                     messages.info(request, "No cameras were processed from the CSV file.")
-                    
+
             except Exception as e:
                 messages.error(request, f"Error processing CSV file: {str(e)}")
-            
+
             return redirect("..")
-        
+
         context = {
             'title': 'Upload Cameras CSV',
             'opts': self.model._meta,
@@ -201,14 +205,15 @@ class CameraAdmin(admin.ModelAdmin):
 
 @admin.register(CrossCountingData)
 class CrossCountingDataAdmin(admin.ModelAdmin):
-    list_display = ['device_name', 'channel', 'camera', 'cc_total_count', 'cc_in_count', 'cc_out_count', 'alarm_time', 'created_at']
-    list_filter = ['device_name', 'camera', 'channel', 'alarm_status', 'alarm_subtype', 'alarm_time', 'created_at']
+    list_display = ['device_name', 'channel', 'camera', 'cc_total_count', 'cc_in_count', 'cc_out_count',
+                    'created_at_display', 'alarm_time_display']
+    list_filter = ['device_name', 'camera', 'channel', 'alarm_status', 'alarm_subtype', 'created_at', 'alarm_time']
     search_fields = ['device_name', 'channel', 'camera__name', 'device_ip']
-    ordering = ['-alarm_time', '-created_at']
+    ordering = ['-created_at', '-alarm_time']  # Order by created_at first, then alarm_time
     readonly_fields = ['id', 'created_at', 'updated_at']
-    date_hierarchy = 'alarm_time'
+    date_hierarchy = 'created_at'  # Use created_at for date hierarchy
     list_per_page = 50
-    
+
     fieldsets = (
         ('Device Information', {
             'fields': ('device_name', 'device_ip', 'device_mac', 'device_phy')
@@ -219,18 +224,46 @@ class CrossCountingDataAdmin(admin.ModelAdmin):
         ('Cross Counting Data', {
             'fields': ('cc_in_count', 'cc_out_count', 'cc_total_count')
         }),
+        ('Timing Information', {
+            'fields': ('created_at', 'alarm_time', 'time'),
+            'description': 'created_at is when data entered system, alarm_time is from device'
+        }),
         ('Alarm Information', {
-            'fields': ('alarm_time', 'alarm_status', 'alarm_subtype', 'alarm_snapshot', 'record_flag')
+            'fields': ('alarm_status', 'alarm_subtype', 'alarm_snapshot', 'record_flag')
         }),
         ('MQTT Metadata', {
             'fields': ('subscribe_id', 'data_pos'),
             'classes': ('collapse',)
         }),
         ('System Information', {
-            'fields': ('id', 'created_at', 'updated_at'),
+            'fields': ('id', 'updated_at'),
             'classes': ('collapse',)
         }),
     )
+
+    def created_at_display(self, obj):
+        """Display created_at with better formatting"""
+        if obj.created_at:
+            return format_html(
+                '<span style="color: green; font-weight: bold;" title="System Creation Time">{}</span>',
+                obj.created_at.strftime('%Y-%m-%d %H:%M:%S')
+            )
+        return '-'
+
+    created_at_display.short_description = 'Created At (System)'
+    created_at_display.admin_order_field = 'created_at'
+
+    def alarm_time_display(self, obj):
+        """Display alarm_time with different formatting"""
+        if obj.alarm_time:
+            return format_html(
+                '<span style="color: blue;" title="Device Alarm Time">{}</span>',
+                obj.alarm_time.strftime('%Y-%m-%d %H:%M:%S')
+            )
+        return '-'
+
+    alarm_time_display.short_description = 'Alarm Time (Device)'
+    alarm_time_display.admin_order_field = 'alarm_time'
 
     def get_queryset(self, request):
         return super().get_queryset(request).select_related('camera', 'camera__region')
@@ -241,6 +274,87 @@ class CrossCountingDataAdmin(admin.ModelAdmin):
     def has_change_permission(self, request, obj=None):
         return False
 
+    # Custom actions for data analysis
+    actions = ['export_selected_data', 'analyze_time_differences']
+
+    def export_selected_data(self, request, queryset):
+        """Export selected data with created_at timestamps"""
+        import csv
+        from django.http import HttpResponse
+
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = 'attachment; filename="cross_counting_data_export.csv"'
+
+        writer = csv.writer(response)
+        writer.writerow([
+            'Device Name', 'Camera', 'Channel', 'In Count', 'Out Count', 'Total Count',
+            'Created At (System)', 'Alarm Time (Device)', 'Time Difference (seconds)'
+        ])
+
+        for obj in queryset.select_related('camera'):
+            time_diff = ''
+            if obj.created_at and obj.alarm_time:
+                time_diff = (obj.created_at - obj.alarm_time).total_seconds()
+
+            writer.writerow([
+                obj.device_name,
+                obj.camera.name if obj.camera else '',
+                obj.channel,
+                obj.cc_in_count,
+                obj.cc_out_count,
+                obj.cc_total_count,
+                obj.created_at.strftime('%Y-%m-%d %H:%M:%S') if obj.created_at else '',
+                obj.alarm_time.strftime('%Y-%m-%d %H:%M:%S') if obj.alarm_time else '',
+                f'{time_diff:.2f}' if time_diff != '' else ''
+            ])
+
+        self.message_user(request, f"Exported {queryset.count()} records.")
+        return response
+
+    export_selected_data.short_description = "Export selected data with timestamps"
+
+    def analyze_time_differences(self, request, queryset):
+        """Analyze time differences between created_at and alarm_time"""
+        from django.db.models import Avg, Min, Max
+        from django.db.models import F, ExpressionWrapper, DurationField
+
+        # Calculate time differences
+        queryset_with_diff = queryset.annotate(
+            time_diff=ExpressionWrapper(
+                F('created_at') - F('alarm_time'),
+                output_field=DurationField()
+            )
+        ).filter(
+            created_at__isnull=False,
+            alarm_time__isnull=False
+        )
+
+        if not queryset_with_diff.exists():
+            self.message_user(request, "No records with both created_at and alarm_time found.", level=messages.WARNING)
+            return
+
+        stats = queryset_with_diff.aggregate(
+            avg_diff=Avg('time_diff'),
+            min_diff=Min('time_diff'),
+            max_diff=Max('time_diff'),
+            count=Count('id')
+        )
+
+        avg_seconds = stats['avg_diff'].total_seconds() if stats['avg_diff'] else 0
+        min_seconds = stats['min_diff'].total_seconds() if stats['min_diff'] else 0
+        max_seconds = stats['max_diff'].total_seconds() if stats['max_diff'] else 0
+
+        message = (
+            f"Time Difference Analysis for {stats['count']} records:\n"
+            f"Average delay: {avg_seconds:.2f} seconds\n"
+            f"Minimum delay: {min_seconds:.2f} seconds\n"
+            f"Maximum delay: {max_seconds:.2f} seconds"
+        )
+
+        self.message_user(request, message)
+
+    analyze_time_differences.short_description = "Analyze time differences (created_at vs alarm_time)"
+
 
 @admin.register(HourlyAggregateView)
 class HourlyAggregateViewAdmin(admin.ModelAdmin):
@@ -248,14 +362,15 @@ class HourlyAggregateViewAdmin(admin.ModelAdmin):
     list_filter = ['camera', 'hour']
     search_fields = ['camera__name']
     ordering = ['-hour']
-    readonly_fields = ['camera', 'hour', 'max_in_count', 'max_out_count', 'max_total_count', 'min_in_count', 'min_out_count', 'min_total_count', 'avg_total_count', 'data_points']
-    
+    readonly_fields = ['camera', 'hour', 'max_in_count', 'max_out_count', 'max_total_count', 'min_in_count',
+                       'min_out_count', 'min_total_count', 'avg_total_count', 'data_points']
+
     def has_add_permission(self, request):
         return False
-    
+
     def has_change_permission(self, request, obj=None):
         return False
-    
+
     def has_delete_permission(self, request, obj=None):
         return False
 
@@ -267,12 +382,12 @@ class DailyPeakViewAdmin(admin.ModelAdmin):
     search_fields = ['camera__name']
     ordering = ['-date']
     readonly_fields = ['camera', 'date', 'peak_in_count', 'peak_out_count', 'peak_total_count']
-    
+
     def has_add_permission(self, request):
         return False
-    
+
     def has_change_permission(self, request, obj=None):
         return False
-    
+
     def has_delete_permission(self, request, obj=None):
         return False
