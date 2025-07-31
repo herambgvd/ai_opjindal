@@ -266,96 +266,71 @@ class TablePartitioningManager:
     @staticmethod
     def get_daily_analysis_data(region_id: int, date: date) -> Dict[str, Any]:
         """
-        Get comprehensive daily analysis for all cameras in a region
-        TRAFFIC FLOW VERSION: Calculate actual daily traffic, not just peak cumulative counts
+        Updated daily analysis using simplified approach
         """
         from .models import Camera, CrossCountingData
-        from django.db.models import Max, Min
+        from django.db.models import Max
 
         cameras = Camera.objects.filter(region_id=region_id, status=True)
-        camera_ids = list(cameras.values_list('id', flat=True))
 
-        if not camera_ids:
-            return {"cameras": [], "summary": {},
-                    "region_hourly_aggregates": {"hourly_data": [], "individual_camera_data": []}}
+        if not cameras.exists():
+            return {
+                "cameras": [],
+                "summary": {},
+                "simplified_analysis": {"individual_camera_data": [], "regional_hourly_data": []}
+            }
 
+        print(f"DAILY ANALYSIS DEBUG: Analysis for {date}")
+
+        # Get traditional summary (peak cumulative counts)
         daily_data = []
-        total_daily_in = 0
-        total_daily_out = 0
-        total_peak_occupancy = 0
-
-        print(f"TRAFFIC FLOW DEBUG: Daily analysis for {date}")
-        print(f"TRAFFIC FLOW DEBUG: Calculating daily traffic flow for {len(cameras)} cameras")
+        total_peak_in = 0
+        total_peak_out = 0
+        total_peak_total = 0
 
         for camera in cameras:
-            # FIXED: Calculate actual daily traffic flow
             daily_stats = CrossCountingData.objects.filter(
                 camera=camera,
                 created_at__date=date
             ).aggregate(
-                day_start_in=Min('cc_in_count'),
-                day_end_in=Max('cc_in_count'),
-                day_start_out=Min('cc_out_count'),
-                day_end_out=Max('cc_out_count'),
-                peak_cumulative_in=Max('cc_in_count'),
-                peak_cumulative_out=Max('cc_out_count')
+                peak_in_count=Max('cc_in_count'),
+                peak_out_count=Max('cc_out_count'),
+                peak_total_count=Max('cc_total_count')
             )
 
-            if daily_stats['day_start_in'] is not None:
-                # Calculate actual daily traffic
-                daily_entries = max(0, daily_stats['day_end_in'] - daily_stats['day_start_in'])
-                daily_exits = max(0, daily_stats['day_end_out'] - daily_stats['day_start_out'])
-                peak_occupancy = max(0, daily_stats['peak_cumulative_in'] - daily_stats['peak_cumulative_out'])
-
+            if daily_stats['peak_in_count'] is not None:
                 camera_data = {
                     "camera_name": camera.name,
-                    "daily_entries": daily_entries,  # NEW: Actual entries for the day
-                    "daily_exits": daily_exits,  # NEW: Actual exits for the day
-                    "net_daily_change": daily_entries - daily_exits,  # NEW: Net change
-                    "peak_occupancy": peak_occupancy,  # NEW: Peak occupancy level
-                    "peak_cumulative_in": daily_stats['peak_cumulative_in'],  # OLD: For reference
-                    "peak_cumulative_out": daily_stats['peak_cumulative_out'],  # OLD: For reference
-                    # Keep old fields for backward compatibility
-                    "peak_in": daily_stats['peak_cumulative_in'],
-                    "peak_out": daily_stats['peak_cumulative_out'],
-                    "peak_total": daily_stats['peak_cumulative_in'] + daily_stats['peak_cumulative_out']
+                    "peak_in": daily_stats['peak_in_count'],
+                    "peak_out": daily_stats['peak_out_count'],
+                    "peak_total": daily_stats['peak_total_count']
                 }
                 daily_data.append(camera_data)
-                total_daily_in += daily_entries
-                total_daily_out += daily_exits
-                total_peak_occupancy += peak_occupancy
+                total_peak_in += daily_stats['peak_in_count'] or 0
+                total_peak_out += daily_stats['peak_out_count'] or 0
+                total_peak_total += daily_stats['peak_total_count'] or 0
 
-        # Get hourly traffic flow data
-        region_hourly_aggregates = TablePartitioningManager.get_hourly_region_aggregates_by_date(
-            region_id, date
-        )
+        # Get simplified analysis (all data points + hourly regional)
+        simplified_analysis = TablePartitioningManager.get_simplified_daily_analysis(region_id, date)
 
-        # Calculate summary statistics
-        total_cameras = len(daily_data)
-        avg_occupancy = total_peak_occupancy / total_cameras if total_cameras > 0 else 0
-
+        print(f"DAILY ANALYSIS DEBUG: Traditional summary - Cameras: {len(daily_data)}, Peak In: {total_peak_in}")
         print(
-            f"TRAFFIC FLOW DEBUG: Daily totals - Entries: {total_daily_in}, Exits: {total_daily_out}, Net: {total_daily_in - total_daily_out}")
-        print(f"TRAFFIC FLOW DEBUG: Peak occupancy: {total_peak_occupancy}, Average per camera: {avg_occupancy:.1f}")
+            f"DAILY ANALYSIS DEBUG: Simplified analysis - Individual cameras: {len(simplified_analysis['individual_camera_data'])}")
 
         result = {
             "cameras": daily_data,
             "summary": {
-                # NEW: Traffic flow summary
-                "total_daily_entries": total_daily_in,
-                "total_daily_exits": total_daily_out,
-                "net_daily_change": total_daily_in - total_daily_out,
-                "total_peak_occupancy": total_peak_occupancy,
-                "average_peak_occupancy": round(avg_occupancy, 1),
-
-                # OLD: Keep for backward compatibility
-                "total_peak_in": sum(cam.get('peak_in', 0) for cam in daily_data),
-                "total_peak_out": sum(cam.get('peak_out', 0) for cam in daily_data),
-                "total_peak_total": sum(cam.get('peak_total', 0) for cam in daily_data),
-                "active_cameras": total_cameras
+                "total_peak_in": total_peak_in,
+                "total_peak_out": total_peak_out,
+                "total_peak_total": total_peak_total,
+                "active_cameras": len(daily_data)
             },
-            "region_hourly_aggregates": region_hourly_aggregates,
-            "data_type": "traffic_flow"
+
+            # New simplified analysis
+            "simplified_analysis": simplified_analysis,
+
+            "analysis_date": date,
+            "analysis_type": "simplified_daily"
         }
 
         return serialize_datetime_data(result)
@@ -1004,6 +979,149 @@ class TablePartitioningManager:
                 "active_hours": active_hours,
                 "total_cameras_monitored": len(camera_ids)
             }
+        }
+
+        return serialize_datetime_data(result)
+
+    @staticmethod
+    def get_simplified_daily_analysis(region_id: int, target_date: date) -> Dict[str, Any]:
+        """
+        Simplified approach:
+        1. Individual cameras: Plot ALL data points as simple line charts
+        2. Regional hourly: Take last value per hour per camera, sum for regional totals
+        """
+        from .models import Camera, CrossCountingData
+        from collections import defaultdict
+
+        cameras = Camera.objects.filter(region_id=region_id, status=True)
+        camera_ids = list(cameras.values_list('id', flat=True))
+
+        if not camera_ids:
+            return {
+                "individual_camera_data": [],
+                "regional_hourly_data": [],
+                "region_name": "",
+                "camera_count": 0
+            }
+
+        print(f"SIMPLIFIED DEBUG: Analyzing data for {target_date}")
+        print(f"SIMPLIFIED DEBUG: Cameras: {len(camera_ids)}")
+
+        # PART 1: Get ALL individual camera data points (for individual charts)
+        individual_camera_data = []
+        camera_objects = {cam.id: cam for cam in cameras}
+
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                           SELECT camera_id,
+                                  cc_in_count,
+                                  cc_out_count,
+                                  cc_total_count,
+                                  created_at
+                           FROM cross_counting_data_timeseries
+                           WHERE camera_id = ANY (%s)
+                             AND DATE (created_at) = %s
+                           ORDER BY camera_id, created_at
+                           """, [camera_ids, target_date])
+
+            all_camera_data = cursor.fetchall()
+
+        # Group by camera
+        camera_data_points = defaultdict(list)
+
+        for row in all_camera_data:
+            camera_id = row[0]
+            cc_in_count = row[1]
+            cc_out_count = row[2]
+            cc_total_count = row[3]
+            created_at = row[4]
+
+            camera_data_points[camera_id].append({
+                'cc_in_count': cc_in_count,
+                'cc_out_count': cc_out_count,
+                'cc_total_count': cc_total_count,
+                'created_at': created_at.strftime('%H:%M:%S') if created_at else '',
+                'timestamp': created_at
+            })
+
+        # Format individual camera data
+        for camera_id in camera_ids:
+            if camera_id in camera_objects and camera_id in camera_data_points:
+                data_points = camera_data_points[camera_id]
+
+                individual_camera_data.append({
+                    'camera_id': str(camera_id),
+                    'camera_name': camera_objects[camera_id].name,
+                    'data_points': data_points,  # ALL data points for this camera
+                    'total_points': len(data_points),
+                    'first_time': data_points[0]['created_at'] if data_points else '',
+                    'last_time': data_points[-1]['created_at'] if data_points else '',
+                    'max_in': max([p['cc_in_count'] for p in data_points], default=0),
+                    'max_out': max([p['cc_out_count'] for p in data_points], default=0)
+                })
+
+        print(f"SIMPLIFIED DEBUG: Individual camera data prepared for {len(individual_camera_data)} cameras")
+
+        # PART 2: Regional hourly analysis (last value per hour, summed across cameras)
+        regional_hourly_data = []
+
+        # Group all data by camera and hour
+        camera_hour_data = defaultdict(lambda: defaultdict(list))
+
+        for row in all_camera_data:
+            camera_id = row[0]
+            cc_in_count = row[1]
+            cc_out_count = row[2]
+            created_at = row[4]
+            hour = created_at.hour if created_at else 0
+
+            camera_hour_data[camera_id][hour].append({
+                'cc_in_count': cc_in_count,
+                'cc_out_count': cc_out_count,
+                'created_at': created_at
+            })
+
+        # Get last value per hour for each camera
+        for hour in range(24):
+            total_in = 0
+            total_out = 0
+            active_cameras = 0
+
+            for camera_id in camera_ids:
+                if hour in camera_hour_data[camera_id]:
+                    # Get last value for this hour for this camera
+                    hour_data = camera_hour_data[camera_id][hour]
+                    last_record = sorted(hour_data, key=lambda x: x['created_at'])[-1]
+
+                    total_in += last_record['cc_in_count']
+                    total_out += last_record['cc_out_count']
+                    active_cameras += 1
+
+            regional_hourly_data.append({
+                'hour': hour,
+                'total_in_count': total_in,
+                'total_out_count': total_out,
+                'current_occupancy': max(0, total_in - total_out),
+                'active_cameras': active_cameras
+            })
+
+        # Debug regional hourly data
+        non_zero_hours = [h for h in regional_hourly_data if h['total_in_count'] > 0 or h['total_out_count'] > 0]
+        if non_zero_hours:
+            print(f"SIMPLIFIED DEBUG: Regional data for hours: {[h['hour'] for h in non_zero_hours]}")
+            for h in non_zero_hours:
+                print(
+                    f"SIMPLIFIED DEBUG: Hour {h['hour']}: In={h['total_in_count']}, Out={h['total_out_count']}, Occupancy={h['current_occupancy']}")
+
+        region_name = cameras.first().region.name if cameras.exists() else ""
+
+        result = {
+            "individual_camera_data": individual_camera_data,  # ALL data points per camera
+            "regional_hourly_data": regional_hourly_data,  # Hourly sums of last values
+            "region_name": region_name,
+            "camera_count": len(camera_ids),
+            "analysis_type": "simplified",
+            "target_date": target_date.strftime('%Y-%m-%d')
         }
 
         return serialize_datetime_data(result)
