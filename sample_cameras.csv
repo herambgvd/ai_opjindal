@@ -1,0 +1,9 @@
+name,region,status,rtsp_link,hls_link
+CH1,Main Hall,true,rtsp://192.168.1.100:554/stream1,http://192.168.1.100:8080/hls/stream1.m3u8
+CH2,Main Hall,true,rtsp://192.168.1.101:554/stream1,
+CH3,Parking Area,false,rtsp://192.168.1.102:554/stream1,
+CH4,Reception,true,,http://192.168.1.103:8080/hls/stream1.m3u8
+CH5,Conference Room,true,rtsp://192.168.1.104:554/stream1,http://192.168.1.104:8080/hls/stream1.m3u8
+CH6,Lobby,true,rtsp://192.168.1.105:554/stream1,
+CH7,Storage Area,false,rtsp://192.168.1.106:554/stream1,
+CH8,Emergency Exit,true,rtsp://192.168.1.107:554/stream1,http://192.168.1.107:8080/hls/stream1.m3u8
