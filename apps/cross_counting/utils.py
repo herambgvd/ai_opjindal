@@ -819,7 +819,7 @@ class TablePartitioningManager:
     def get_hourly_region_aggregates_by_date(region_id: int, target_date: date) -> Dict[str, Any]:
         """
         Get hourly aggregated In/Out counts for all cameras in a region for a specific date
-        PROPER VERSION: Uses the last cumulative value per hour for each camera
+        CORRECTED VERSION: Properly gets the last cumulative value per hour for each camera
         """
         from .models import Camera, CrossCountingData
         from collections import defaultdict
@@ -835,184 +835,153 @@ class TablePartitioningManager:
                 "individual_camera_data": []
             }
 
-        print(f"PROPER HOURLY DEBUG: Analyzing hourly data for date {target_date}")
-        print(f"PROPER HOURLY DEBUG: Camera count: {len(camera_ids)}")
+        print(f"CORRECTED DEBUG: Analyzing hourly data for date {target_date}")
+        print(f"CORRECTED DEBUG: Camera count: {len(camera_ids)}")
 
-        # PROPER APPROACH: Get the last cumulative value per hour for each camera
+        # CORRECTED: Simple approach - get last value per hour per camera and sum them
         with connection.cursor() as cursor:
+            # Step 1: Get all data for the target date
             cursor.execute("""
-                WITH ranked_data AS (
-                    SELECT 
-                        camera_id,
-                        cc_in_count,
-                        cc_out_count,
-                        cc_total_count,
-                        EXTRACT(HOUR FROM created_at) as hour,
-                        created_at,
-                        ROW_NUMBER() OVER (
-                            PARTITION BY camera_id, EXTRACT(HOUR FROM created_at) 
-                            ORDER BY created_at DESC
-                        ) as rn
-                    FROM cross_counting_data_timeseries
-                    WHERE camera_id = ANY(%s)
-                    AND DATE(created_at) = %s
-                ),
-                last_values_per_hour AS (
-                    SELECT 
-                        camera_id,
-                        hour,
-                        cc_in_count as hourly_cumulative_in,
-                        cc_out_count as hourly_cumulative_out,
-                        cc_total_count as hourly_cumulative_total,
-                        created_at as last_update_time
-                    FROM ranked_data
-                    WHERE rn = 1
-                ),
-                region_hourly_totals AS (
-                    SELECT 
-                        hour,
-                        SUM(hourly_cumulative_in) as total_cumulative_in,
-                        SUM(hourly_cumulative_out) as total_cumulative_out,
-                        SUM(hourly_cumulative_total) as total_cumulative_total,
-                        COUNT(camera_id) as active_cameras_in_hour
-                    FROM last_values_per_hour
-                    GROUP BY hour
-                ),
-                all_hours AS (
-                    SELECT generate_series(0, 23) as hour
-                )
-                SELECT 
-                    ah.hour,
-                    COALESCE(rht.total_cumulative_in, 0) as total_in_count,
-                    COALESCE(rht.total_cumulative_out, 0) as total_out_count,
-                    COALESCE(rht.total_cumulative_total, 0) as total_total_count,
-                    COALESCE(rht.active_cameras_in_hour, 0) as active_cameras
-                FROM all_hours ah
-                LEFT JOIN region_hourly_totals rht ON ah.hour = rht.hour
-                ORDER BY ah.hour
-            """, [camera_ids, target_date])
+                           SELECT camera_id,
+                                  cc_in_count,
+                                  cc_out_count,
+                                  cc_total_count,
+                                  EXTRACT(HOUR FROM created_at) as hour,
+                    created_at
+                           FROM cross_counting_data_timeseries
+                           WHERE camera_id = ANY (%s)
+                             AND DATE (created_at) = %s
+                           ORDER BY camera_id, created_at
+                           """, [camera_ids, target_date])
 
-            hourly_data = []
+            # Process in Python to ensure correct logic
+            all_data = cursor.fetchall()
 
-            for row in cursor.fetchall():
-                hour = int(row[0])
-                total_in = int(row[1])
-                total_out = int(row[2])
-                total_count = int(row[3])
-                active_cameras = int(row[4])
+        # Group data by camera and hour, keeping only the last record per hour
+        camera_hour_data = defaultdict(lambda: defaultdict(list))
 
-                hourly_data.append({
-                    'hour': hour,
-                    'total_in_count': total_in,           # Sum of all cameras' cumulative in counts at this hour
-                    'total_out_count': total_out,         # Sum of all cameras' cumulative out counts at this hour
-                    'total_count': total_count,           # Sum of all cameras' total counts at this hour
-                    'current_occupancy': max(0, total_in - total_out),  # Current people in space
-                    'active_cameras': active_cameras
-                })
+        for row in all_data:
+            camera_id = row[0]
+            cc_in_count = row[1]
+            cc_out_count = row[2]
+            cc_total_count = row[3]
+            hour = int(row[4])
+            created_at = row[5]
 
-        # DEBUG: Print the proper results
+            camera_hour_data[camera_id][hour].append({
+                'cc_in_count': cc_in_count,
+                'cc_out_count': cc_out_count,
+                'cc_total_count': cc_total_count,
+                'created_at': created_at
+            })
+
+        # Get last value per hour for each camera
+        camera_hourly_last_values = defaultdict(dict)
+
+        for camera_id, hours_data in camera_hour_data.items():
+            for hour, records in hours_data.items():
+                # Sort by created_at and take the last one
+                last_record = sorted(records, key=lambda x: x['created_at'])[-1]
+                camera_hourly_last_values[camera_id][hour] = last_record
+
+        # Calculate regional totals per hour
+        hourly_data = []
+
+        for hour in range(24):
+            total_in = 0
+            total_out = 0
+            total_count = 0
+            active_cameras = 0
+
+            for camera_id in camera_ids:
+                if hour in camera_hourly_last_values[camera_id]:
+                    record = camera_hourly_last_values[camera_id][hour]
+                    total_in += record['cc_in_count']
+                    total_out += record['cc_out_count']
+                    total_count += record['cc_total_count']
+                    active_cameras += 1
+
+            hourly_data.append({
+                'hour': hour,
+                'total_in_count': total_in,
+                'total_out_count': total_out,
+                'total_count': total_count,
+                'current_occupancy': max(0, total_in - total_out),
+                'active_cameras': active_cameras
+            })
+
+        # DEBUG: Print the corrected results
         non_zero_hours = [h for h in hourly_data if h['total_in_count'] > 0 or h['total_out_count'] > 0]
 
         if non_zero_hours:
-            print(f"PROPER HOURLY DEBUG: Found data for hours: {[h['hour'] for h in non_zero_hours]}")
-            print(f"PROPER HOURLY DEBUG: Last hour with data: {max([h['hour'] for h in non_zero_hours])}")
+            print(f"CORRECTED DEBUG: Found data for hours: {[h['hour'] for h in non_zero_hours]}")
+            print(f"CORRECTED DEBUG: Last hour with data: {max([h['hour'] for h in non_zero_hours])}")
 
-            # Show the cumulative progression
+            # Show progression to verify correctness
             for h in non_zero_hours:
-                print(f"PROPER HOURLY DEBUG: Hour {h['hour']}: In={h['total_in_count']}, Out={h['total_out_count']}, Occupancy={h['current_occupancy']}, Cameras={h['active_cameras']}")
+                print(
+                    f"CORRECTED DEBUG: Hour {h['hour']}: In={h['total_in_count']}, Out={h['total_out_count']}, Occupancy={h['current_occupancy']}, Cameras={h['active_cameras']}")
 
-        # PROPER: Individual camera data using last value per hour
+        # Individual camera data using the same corrected logic
         individual_camera_data = []
         camera_objects = {cam.id: cam for cam in cameras}
 
-        with connection.cursor() as cursor:
-            cursor.execute("""
-                WITH camera_ranked_data AS (
-                    SELECT 
-                        camera_id,
-                        cc_in_count,
-                        cc_out_count,
-                        cc_total_count,
-                        EXTRACT(HOUR FROM created_at) as hour,
-                        created_at,
-                        ROW_NUMBER() OVER (
-                            PARTITION BY camera_id, EXTRACT(HOUR FROM created_at) 
-                            ORDER BY created_at DESC
-                        ) as rn
-                    FROM cross_counting_data_timeseries
-                    WHERE camera_id = ANY(%s)
-                    AND DATE(created_at) = %s
-                ),
-                camera_last_values AS (
-                    SELECT 
-                        camera_id,
-                        hour,
-                        cc_in_count,
-                        cc_out_count,
-                        cc_total_count
-                    FROM camera_ranked_data
-                    WHERE rn = 1
-                ),
-                all_hours AS (
-                    SELECT generate_series(0, 23) as hour
-                ),
-                all_cameras AS (
-                    SELECT unnest(%s::uuid[]) as camera_id
-                )
-                SELECT 
-                    ac.camera_id,
-                    ah.hour,
-                    COALESCE(clv.cc_in_count, 0) as cc_in_count,
-                    COALESCE(clv.cc_out_count, 0) as cc_out_count,
-                    COALESCE(clv.cc_total_count, 0) as cc_total_count
-                FROM all_cameras ac
-                CROSS JOIN all_hours ah
-                LEFT JOIN camera_last_values clv ON ac.camera_id = clv.camera_id AND ah.hour = clv.hour
-                ORDER BY ac.camera_id, ah.hour
-            """, [camera_ids, target_date, camera_ids])
+        for camera_id in camera_ids:
+            if camera_id in camera_objects:
+                camera_hourly_data = []
 
-            # Group by camera
-            camera_data_dict = defaultdict(list)
-            for row in cursor.fetchall():
-                camera_id = row[0]
-                hour = int(row[1])
-                cc_in_count = int(row[2])
-                cc_out_count = int(row[3])
-                cc_total_count = int(row[4])
-
-                camera_data_dict[camera_id].append({
-                    'hour': hour,
-                    'cc_in_count': cc_in_count,           # Cumulative in count at this hour
-                    'cc_out_count': cc_out_count,         # Cumulative out count at this hour
-                    'cc_total_count': cc_total_count,     # Total count at this hour
-                    'current_occupancy': max(0, cc_in_count - cc_out_count)  # Current occupancy
-                })
-
-            # Convert to final format
-            for camera_id in camera_ids:
-                if camera_id in camera_objects:
-                    camera_hourly_data = camera_data_dict[camera_id]
-
-                    # Calculate daily stats for this camera
-                    non_zero_data = [h for h in camera_hourly_data if h['cc_in_count'] > 0 or h['cc_out_count'] > 0]
-                    if non_zero_data:
-                        max_in = max(h['cc_in_count'] for h in non_zero_data)
-                        max_out = max(h['cc_out_count'] for h in non_zero_data)
-                        max_occupancy = max(h['current_occupancy'] for h in non_zero_data)
+                for hour in range(24):
+                    if hour in camera_hourly_last_values[camera_id]:
+                        record = camera_hourly_last_values[camera_id][hour]
+                        camera_hourly_data.append({
+                            'hour': hour,
+                            'cc_in_count': record['cc_in_count'],
+                            'cc_out_count': record['cc_out_count'],
+                            'cc_total_count': record['cc_total_count'],
+                            'current_occupancy': max(0, record['cc_in_count'] - record['cc_out_count'])
+                        })
                     else:
-                        max_in = max_out = max_occupancy = 0
+                        camera_hourly_data.append({
+                            'hour': hour,
+                            'cc_in_count': 0,
+                            'cc_out_count': 0,
+                            'cc_total_count': 0,
+                            'current_occupancy': 0
+                        })
 
-                    individual_camera_data.append({
-                        'camera_id': str(camera_id),
-                        'camera_name': camera_objects[camera_id].name,
-                        'hourly_data': camera_hourly_data,
-                        'daily_stats': {
-                            'max_cumulative_in': max_in,
-                            'max_cumulative_out': max_out,
-                            'max_occupancy': max_occupancy,
-                            'active_hours': len(non_zero_data)
-                        }
-                    })
+                # Calculate daily stats for this camera
+                non_zero_camera_data = [h for h in camera_hourly_data if h['cc_in_count'] > 0 or h['cc_out_count'] > 0]
+                if non_zero_camera_data:
+                    max_in = max(h['cc_in_count'] for h in non_zero_camera_data)
+                    max_out = max(h['cc_out_count'] for h in non_zero_camera_data)
+                    max_occupancy = max(h['current_occupancy'] for h in non_zero_camera_data)
+
+                    # DEBUG: Print individual camera results for CH1
+                    if camera_objects[camera_id].name in ['CH1', 'CH2']:  # Debug first few cameras
+                        print(
+                            f"CORRECTED DEBUG: {camera_objects[camera_id].name} - Max In: {max_in}, Max Out: {max_out}")
+                        active_hours = [h for h in non_zero_camera_data]
+                        if active_hours:
+                            print(
+                                f"CORRECTED DEBUG: {camera_objects[camera_id].name} hours: {[h['hour'] for h in active_hours]}")
+                            # Show last few hours
+                            for h in active_hours[-3:]:
+                                print(
+                                    f"CORRECTED DEBUG: {camera_objects[camera_id].name} Hour {h['hour']}: In={h['cc_in_count']}, Out={h['cc_out_count']}")
+                else:
+                    max_in = max_out = max_occupancy = 0
+
+                individual_camera_data.append({
+                    'camera_id': str(camera_id),
+                    'camera_name': camera_objects[camera_id].name,
+                    'hourly_data': camera_hourly_data,
+                    'daily_stats': {
+                        'max_cumulative_in': max_in,
+                        'max_cumulative_out': max_out,
+                        'max_occupancy': max_occupancy,
+                        'active_hours': len(non_zero_camera_data)
+                    }
+                })
 
         region_name = cameras.first().region.name if cameras.exists() else ""
 
@@ -1027,7 +996,7 @@ class TablePartitioningManager:
             "region_name": region_name,
             "camera_count": len(camera_ids),
             "individual_camera_data": individual_camera_data,
-            "analysis_type": "cumulative_hourly",
+            "analysis_type": "cumulative_hourly_corrected",
             "daily_summary": {
                 "max_regional_occupancy": max_regional_occupancy,
                 "peak_occupancy_hour": peak_hour,
