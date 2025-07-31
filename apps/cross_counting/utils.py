@@ -3,10 +3,35 @@ Time-series utilities for CrossCountingData analytics
 Optimized for high-frequency data analysis with PostgreSQL-specific features
 """
 
+import logging
+import json
+from django.core.serializers.json import DjangoJSONEncoder
 from django.db import connection
+from django.db.models import Q, Max, Min, Count, Avg, Sum
+from django.db.models.functions import TruncHour, TruncDay
 from django.utils import timezone
 from datetime import timedelta, datetime, date
 from typing import List, Dict, Any, Optional
+from .models import CrossCountingData, Camera, Region
+
+logger = logging.getLogger(__name__)
+
+
+def serialize_datetime_data(data):
+    """
+    Recursively serialize datetime objects in data structures to ISO format strings
+    for safe JavaScript consumption
+    """
+    if isinstance(data, datetime):
+        return data.isoformat()
+    elif isinstance(data, date):
+        return data.isoformat()
+    elif isinstance(data, dict):
+        return {key: serialize_datetime_data(value) for key, value in data.items()}
+    elif isinstance(data, list):
+        return [serialize_datetime_data(item) for item in data]
+    else:
+        return data
 
 
 class CrossCountingAnalytics:
@@ -293,9 +318,11 @@ class TablePartitioningManager:
                 "total_peak_total": total_peak_total,
                 "active_cameras": len(daily_data)
             },
-            "hourly_trends": hourly_trends,
-            "region_hourly_aggregates": TablePartitioningManager.get_hourly_region_aggregates(
-                region_id, start_datetime, end_datetime
+            "hourly_trends": serialize_datetime_data(hourly_trends),
+            "region_hourly_aggregates": serialize_datetime_data(
+                TablePartitioningManager.get_hourly_region_aggregates(
+                    region_id, start_datetime, end_datetime
+                )
             )
         }
     
@@ -331,8 +358,8 @@ class TablePartitioningManager:
             "comparison": comparison,
             "base_summary": base_data["summary"],
             "compare_summary": compare_data["summary"],
-            "base_hourly_aggregates": base_data.get("region_hourly_aggregates", {"hourly_data": []}),
-            "compare_hourly_aggregates": compare_data.get("region_hourly_aggregates", {"hourly_data": []})
+            "base_hourly_aggregates": serialize_datetime_data(base_data.get("region_hourly_aggregates", {"hourly_data": []})),
+            "compare_hourly_aggregates": serialize_datetime_data(compare_data.get("region_hourly_aggregates", {"hourly_data": []}))
         }
     
     @staticmethod
@@ -361,10 +388,12 @@ class TablePartitioningManager:
             "from_date": from_date,
             "to_date": to_date,
             "total_days": total_days,
-            "daily_trends": daily_trends,
+            "daily_trends": serialize_datetime_data(daily_trends),
             "cameras": list(cameras.values('id', 'name')),
-            "region_hourly_aggregates": TablePartitioningManager.get_hourly_region_aggregates(
-                region_id, start_datetime, end_datetime
+            "region_hourly_aggregates": serialize_datetime_data(
+                TablePartitioningManager.get_hourly_region_aggregates(
+                    region_id, start_datetime, end_datetime
+                )
             )
         }
 
@@ -561,7 +590,7 @@ class TablePartitioningManager:
         region_name = cameras.first().region.name if cameras.exists() else ""
         
         return {
-            "hourly_data": list(hourly_aggregates),
+            "hourly_data": serialize_datetime_data(list(hourly_aggregates)),
             "region_name": region_name,
             "camera_count": len(camera_ids)
         }
