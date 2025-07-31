@@ -46,28 +46,28 @@
 
                     <li class="menu-title"><span data-key="t-clarify">Clarify</span></li>
                     <li class="nav-item">
-                        <a class="nav-link menu-link {% if request.resolver_match.url_name in 'DailyAnalysis,ComparativeAnalysis,ComprehensiveAnalysis' %}active{% endif %}"
+                        <a class="nav-link menu-link {% if request.resolver_match.url_name in 'daily_analysis,comparative_analysis,comprehensive_analysis' %}active{% endif %}"
                            href="#sidebarAnalysis" data-bs-toggle="collapse"
-                           role="button" aria-expanded="{% if request.resolver_match.url_name in 'DailyAnalysis,ComparativeAnalysis,ComprehensiveAnalysis' %}true{% else %}false{% endif %}"
+                           role="button" aria-expanded="{% if request.resolver_match.url_name in 'daily_analysis,comparative_analysis,comprehensive_analysis' %}true{% else %}false{% endif %}"
                            aria-controls="sidebarAnalysis">
                             <i class="mdi mdi-chart-line"></i> <span data-key="t-analysis">Analysis</span>
                         </a>
-                        <div class="collapse menu-dropdown {% if request.resolver_match.url_name in 'DailyAnalysis,ComparativeAnalysis,ComprehensiveAnalysis' %}show{% endif %}"
+                        <div class="collapse menu-dropdown {% if request.resolver_match.url_name in 'daily_analysis,comparative_analysis,comprehensive_analysis' %}show{% endif %}"
                              id="sidebarAnalysis">
                             <ul class="nav nav-sm flex-column">
                                 <li class="nav-item">
-                                    <a href="#"
-                                       class="nav-link {% if request.resolver_match.url_name == 'DailyAnalysis' %}active{% endif %}"
+                                    <a href="{% url 'cross_counting:daily_analysis' %}"
+                                       class="nav-link {% if request.resolver_match.url_name == 'daily_analysis' %}active{% endif %}"
                                        data-key="t-daily">Daily</a>
                                 </li>
                                 <li class="nav-item">
-                                    <a href="#"
-                                       class="nav-link {% if request.resolver_match.url_name == 'ComparativeAnalysis' %}active{% endif %}"
+                                    <a href="{% url 'cross_counting:comparative_analysis' %}"
+                                       class="nav-link {% if request.resolver_match.url_name == 'comparative_analysis' %}active{% endif %}"
                                        data-key="t-comparative">Comparative</a>
                                 </li>
                                 <li class="nav-item">
-                                    <a href="#"
-                                       class="nav-link {% if request.resolver_match.url_name == 'ComprehensiveAnalysis' %}active{% endif %}"
+                                    <a href="{% url 'cross_counting:comprehensive_analysis' %}"
+                                       class="nav-link {% if request.resolver_match.url_name == 'comprehensive_analysis' %}active{% endif %}"
                                        data-key="t-comprehensive">Comprehensive</a>
                                 </li>
                             </ul>

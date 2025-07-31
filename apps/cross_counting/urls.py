@@ -1,10 +1,14 @@
 from django.urls import path
 
-from .views import (region, camera)
+from .views import (region, camera, analysis)
 
 app_name = 'cross_counting'
 
 urlpatterns = [
+    path('analysis/daily/', analysis.daily_analysis, name='daily_analysis'),
+    path('analysis/comparative/', analysis.comparative_analysis, name='comparative_analysis'),
+    path('analysis/comprehensive/', analysis.comprehensive_analysis, name='comprehensive_analysis'),
+    
     # Region Management
     path('config/region/', region.region_list, name='region_list'),
     path('config/region/create/', region.region_create, name='region_create'),

@@ -1,0 +1,240 @@
+{% extends "cross_counting/analysis/base.html" %}
+{% load static %}
+
+{% block title %}Comparative Analysis{% endblock title %}
+
+{% block analysis_form %}
+    <form method="get" class="row g-3">
+        <div class="col-md-4">
+            <label for="{{ form.region.id_for_label }}" class="form-label">Region</label>
+            {{ form.region }}
+            {% if form.region.errors %}
+                <div class="invalid-feedback d-block">{{ form.region.errors.0 }}</div>
+            {% endif %}
+        </div>
+        <div class="col-md-3">
+            <label for="{{ form.base_date.id_for_label }}" class="form-label">Base Date</label>
+            {{ form.base_date }}
+            {% if form.base_date.errors %}
+                <div class="invalid-feedback d-block">{{ form.base_date.errors.0 }}</div>
+            {% endif %}
+        </div>
+        <div class="col-md-3">
+            <label for="{{ form.compare_date.id_for_label }}" class="form-label">Compare Date</label>
+            {{ form.compare_date }}
+            {% if form.compare_date.errors %}
+                <div class="invalid-feedback d-block">{{ form.compare_date.errors.0 }}</div>
+            {% endif %}
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">&nbsp;</label>
+            <button type="submit" class="btn btn-primary d-block w-100">
+                <i class="bx bx-search"></i> Compare
+            </button>
+        </div>
+        {% if form.non_field_errors %}
+            <div class="col-12">
+                <div class="alert alert-danger">{{ form.non_field_errors.0 }}</div>
+            </div>
+        {% endif %}
+    </form>
+{% endblock %}
+
+{% block analysis_results %}
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        Comparative Analysis - {{ analysis_data.region.name }}
+                        <small class="text-muted">({{ analysis_data.base_date }} vs {{ analysis_data.compare_date }})</small>
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <div class="card border-primary">
+                                <div class="card-header bg-primary text-white">
+                                    <h6 class="mb-0">Base Date: {{ analysis_data.base_date }}</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row text-center">
+                                        <div class="col-4">
+                                            <h5 class="text-primary">{{ analysis_data.base_summary.total_peak_in }}</h5>
+                                            <p class="mb-0">Total In</p>
+                                        </div>
+                                        <div class="col-4">
+                                            <h5 class="text-success">{{ analysis_data.base_summary.total_peak_out }}</h5>
+                                            <p class="mb-0">Total Out</p>
+                                        </div>
+                                        <div class="col-4">
+                                            <h5 class="text-info">{{ analysis_data.base_summary.total_peak_total }}</h5>
+                                            <p class="mb-0">Total Count</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card border-success">
+                                <div class="card-header bg-success text-white">
+                                    <h6 class="mb-0">Compare Date: {{ analysis_data.compare_date }}</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row text-center">
+                                        <div class="col-4">
+                                            <h5 class="text-primary">{{ analysis_data.compare_summary.total_peak_in }}</h5>
+                                            <p class="mb-0">Total In</p>
+                                        </div>
+                                        <div class="col-4">
+                                            <h5 class="text-success">{{ analysis_data.compare_summary.total_peak_out }}</h5>
+                                            <p class="mb-0">Total Out</p>
+                                        </div>
+                                        <div class="col-4">
+                                            <h5 class="text-info">{{ analysis_data.compare_summary.total_peak_total }}</h5>
+                                            <p class="mb-0">Total Count</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-12">
+                            <h6>Camera-wise Comparison</h6>
+                            <div class="table-responsive">
+                                <table class="table table-bordered table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th rowspan="2">Camera</th>
+                                            <th colspan="3" class="text-center bg-primary text-white">Base Date</th>
+                                            <th colspan="3" class="text-center bg-success text-white">Compare Date</th>
+                                            <th colspan="3" class="text-center bg-warning">Difference</th>
+                                        </tr>
+                                        <tr>
+                                            <th class="bg-light">In</th>
+                                            <th class="bg-light">Out</th>
+                                            <th class="bg-light">Total</th>
+                                            <th class="bg-light">In</th>
+                                            <th class="bg-light">Out</th>
+                                            <th class="bg-light">Total</th>
+                                            <th class="bg-light">In</th>
+                                            <th class="bg-light">Out</th>
+                                            <th class="bg-light">Total</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for camera in analysis_data.comparison %}
+                                            <tr>
+                                                <td><strong>{{ camera.camera_name }}</strong></td>
+                                                <td>{{ camera.base_in }}</td>
+                                                <td>{{ camera.base_out }}</td>
+                                                <td>{{ camera.base_total }}</td>
+                                                <td>{{ camera.compare_in }}</td>
+                                                <td>{{ camera.compare_out }}</td>
+                                                <td>{{ camera.compare_total }}</td>
+                                                <td class="{% if camera.diff_in > 0 %}text-success{% elif camera.diff_in < 0 %}text-danger{% endif %}">
+                                                    {% if camera.diff_in > 0 %}+{% endif %}{{ camera.diff_in }}
+                                                </td>
+                                                <td class="{% if camera.diff_out > 0 %}text-success{% elif camera.diff_out < 0 %}text-danger{% endif %}">
+                                                    {% if camera.diff_out > 0 %}+{% endif %}{{ camera.diff_out }}
+                                                </td>
+                                                <td class="{% if camera.diff_total > 0 %}text-success{% elif camera.diff_total < 0 %}text-danger{% endif %}">
+                                                    {% if camera.diff_total > 0 %}+{% endif %}{{ camera.diff_total }}
+                                                </td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <h6>Comparison Chart</h6>
+                            <div id="comparison_chart"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block analysis_js %}
+    <script>
+        {% if analysis_data.comparison %}
+            var comparisonData = {{ analysis_data.comparison|safe }};
+            
+            if (comparisonData && comparisonData.length > 0) {
+                var categories = comparisonData.map(function(item) {
+                    return item.camera_name;
+                });
+                
+                var baseSeries = comparisonData.map(function(item) {
+                    return item.base_total;
+                });
+                
+                var compareSeries = comparisonData.map(function(item) {
+                    return item.compare_total;
+                });
+                
+                var options = {
+                    series: [{
+                        name: '{{ analysis_data.base_date }}',
+                        data: baseSeries
+                    }, {
+                        name: '{{ analysis_data.compare_date }}',
+                        data: compareSeries
+                    }],
+                    chart: {
+                        type: 'bar',
+                        height: 350,
+                        toolbar: { show: true }
+                    },
+                    plotOptions: {
+                        bar: {
+                            horizontal: false,
+                            columnWidth: '55%',
+                            endingShape: 'rounded'
+                        },
+                    },
+                    dataLabels: {
+                        enabled: false
+                    },
+                    stroke: {
+                        show: true,
+                        width: 2,
+                        colors: ['transparent']
+                    },
+                    xaxis: {
+                        categories: categories,
+                        title: { text: 'Cameras' }
+                    },
+                    yaxis: {
+                        title: { text: 'Total Count' }
+                    },
+                    fill: {
+                        opacity: 1
+                    },
+                    tooltip: {
+                        y: {
+                            formatter: function (val) {
+                                return val + " count"
+                            }
+                        }
+                    },
+                    title: {
+                        text: 'Camera-wise Comparison',
+                        align: 'center'
+                    }
+                };
+                
+                var chart = new ApexCharts(document.querySelector("#comparison_chart"), options);
+                chart.render();
+            }
+        {% endif %}
+    </script>
+{% endblock %}

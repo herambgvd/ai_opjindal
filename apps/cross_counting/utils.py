@@ -5,7 +5,7 @@ Optimized for high-frequency data analysis with PostgreSQL-specific features
 
 from django.db import connection
 from django.utils import timezone
-from datetime import timedelta, datetime
+from datetime import timedelta, datetime, date
 from typing import List, Dict, Any, Optional
 
 
@@ -238,3 +238,121 @@ class TablePartitioningManager:
     def setup_partitioning():
         """Convert existing table to partitioned table (for future use)"""
         pass
+
+    @staticmethod
+    def get_daily_analysis_data(region_id: int, date: date) -> Dict[str, Any]:
+        """Get comprehensive daily analysis for all cameras in a region"""
+        from .models import Camera, CrossCountingData
+        
+        cameras = Camera.objects.filter(region_id=region_id, status=True)
+        camera_ids = list(cameras.values_list('id', flat=True))
+        
+        if not camera_ids:
+            return {"cameras": [], "summary": {}, "hourly_trends": []}
+        
+        daily_data = []
+        total_peak_in = 0
+        total_peak_out = 0
+        total_peak_total = 0
+        
+        for camera in cameras:
+            peaks = CrossCountingData.get_daily_peak_counts(
+                camera.id, date, date
+            ).first()
+            
+            if peaks:
+                camera_data = {
+                    "camera_name": camera.name,
+                    "peak_in": peaks['peak_in_count'],
+                    "peak_out": peaks['peak_out_count'],
+                    "peak_total": peaks['peak_total_count']
+                }
+                daily_data.append(camera_data)
+                total_peak_in += peaks['peak_in_count']
+                total_peak_out += peaks['peak_out_count']
+                total_peak_total += peaks['peak_total_count']
+        
+        start_datetime = timezone.make_aware(datetime.combine(date, datetime.min.time()))
+        end_datetime = timezone.make_aware(datetime.combine(date, datetime.max.time()))
+        
+        hourly_trends = []
+        for camera in cameras:
+            hourly_data = CrossCountingData.get_hourly_aggregates(
+                camera.id, start_datetime, end_datetime
+            )
+            hourly_trends.append({
+                "camera_name": camera.name,
+                "hourly_data": list(hourly_data)
+            })
+        
+        return {
+            "cameras": daily_data,
+            "summary": {
+                "total_peak_in": total_peak_in,
+                "total_peak_out": total_peak_out,
+                "total_peak_total": total_peak_total,
+                "active_cameras": len(daily_data)
+            },
+            "hourly_trends": hourly_trends
+        }
+    
+    @staticmethod
+    def get_comparative_analysis_data(region_id: int, base_date: date, compare_date: date) -> Dict[str, Any]:
+        """Get comparative analysis between two dates for a region"""
+        base_data = TablePartitioningManager.get_daily_analysis_data(region_id, base_date)
+        compare_data = TablePartitioningManager.get_daily_analysis_data(region_id, compare_date)
+        
+        comparison = []
+        for base_camera in base_data["cameras"]:
+            compare_camera = next(
+                (c for c in compare_data["cameras"] if c["camera_name"] == base_camera["camera_name"]),
+                {"peak_in": 0, "peak_out": 0, "peak_total": 0}
+            )
+            
+            comparison.append({
+                "camera_name": base_camera["camera_name"],
+                "base_in": base_camera["peak_in"],
+                "base_out": base_camera["peak_out"],
+                "base_total": base_camera["peak_total"],
+                "compare_in": compare_camera["peak_in"],
+                "compare_out": compare_camera["peak_out"],
+                "compare_total": compare_camera["peak_total"],
+                "diff_in": compare_camera["peak_in"] - base_camera["peak_in"],
+                "diff_out": compare_camera["peak_out"] - base_camera["peak_out"],
+                "diff_total": compare_camera["peak_total"] - base_camera["peak_total"]
+            })
+        
+        return {
+            "base_date": base_date,
+            "compare_date": compare_date,
+            "comparison": comparison,
+            "base_summary": base_data["summary"],
+            "compare_summary": compare_data["summary"]
+        }
+    
+    @staticmethod
+    def get_comprehensive_analysis_data(region_id: int, from_date: date, to_date: date) -> Dict[str, Any]:
+        """Get comprehensive analysis for a date range (max 7 days)"""
+        from .models import Camera, CrossCountingData
+        
+        cameras = Camera.objects.filter(region_id=region_id, status=True)
+        
+        daily_trends = []
+        for camera in cameras:
+            daily_data = CrossCountingData.get_daily_peak_counts(
+                camera.id, from_date, to_date
+            )
+            daily_trends.append({
+                "camera_name": camera.name,
+                "daily_data": list(daily_data)
+            })
+        
+        total_days = (to_date - from_date).days + 1
+        
+        return {
+            "from_date": from_date,
+            "to_date": to_date,
+            "total_days": total_days,
+            "daily_trends": daily_trends,
+            "cameras": list(cameras.values('id', 'name'))
+        }

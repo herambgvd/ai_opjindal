@@ -1,0 +1,46 @@
+{% extends "partials/base.html" %}
+{% load static %}
+
+{% block extra_css %}
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.11.5/css/dataTables.bootstrap5.min.css"/>
+    <link rel="stylesheet" href="https://cdn.datatables.net/responsive/2.2.9/css/responsive.bootstrap.min.css"/>
+{% endblock extra_css %}
+
+{% block content %}
+    <div class="main-content">
+        <div class="page-content">
+            <div class="container-fluid" id="main-content">
+                {% block pagetitle %}
+                    {% include "partials/page-title.html" with pagetitle=title title=title subtitle="Analysis" %}
+                {% endblock pagetitle %}
+                
+                <div class="row">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-body">
+                                {% block analysis_form %}{% endblock %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                {% if analysis_data %}
+                    {% block analysis_results %}{% endblock %}
+                {% endif %}
+            </div>
+        </div>
+        
+        {% block footer %}
+            {% include "partials/footer.html" %}
+        {% endblock footer %}
+    </div>
+{% endblock content %}
+
+{% block extra_js %}
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.11.5/js/dataTables.bootstrap5.min.js"></script>
+    <script src="https://cdn.datatables.net/responsive/2.2.9/js/dataTables.responsive.min.js"></script>
+    <script src="{% static 'libs/apexcharts/dist/apexcharts.min.js' %}"></script>
+    {% block analysis_js %}{% endblock %}
+{% endblock extra_js %}
