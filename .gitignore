@@ -7,8 +7,6 @@ __pycache__/
 *.so
 
 # Django migrations
-**/migrations/
-!**/migrations/__init__.py
 
 # Environment files
 .env
