@@ -49,7 +49,7 @@ class RegionForm(forms.ModelForm):
 class CameraForm(forms.ModelForm):
     class Meta:
         model = Camera
-        fields = ['name', 'rtsp_link', 'hls_link', 'region', 'status']
+        fields = ['name', 'rtsp_link', 'region']
         widgets = {
             'name': forms.TextInput(attrs={
                 'class': 'form-control',
@@ -59,15 +59,8 @@ class CameraForm(forms.ModelForm):
                 'class': 'form-control',
                 'placeholder': 'rtsp://example.com:554/stream'
             }),
-            'hls_link': forms.URLInput(attrs={
-                'class': 'form-control',
-                'placeholder': 'http://example.com/stream.m3u8'
-            }),
             'region': forms.Select(attrs={
                 'class': 'form-select'
-            }),
-            'status': forms.CheckboxInput(attrs={
-                'class': 'form-check-input'
             })
         }
 
@@ -97,12 +90,3 @@ class CameraForm(forms.ModelForm):
             if not rtsp_link.startswith('rtsp://'):
                 raise ValidationError("RTSP link must start with 'rtsp://'")
         return rtsp_link
-
-    def clean_hls_link(self):
-        hls_link = self.cleaned_data.get('hls_link')
-        if hls_link:
-            if not (hls_link.startswith('http://') or hls_link.startswith('https://')):
-                raise ValidationError("HLS link must start with 'http://' or 'https://'")
-            if not hls_link.endswith('.m3u8'):
-                raise ValidationError("HLS link should end with '.m3u8'")
-        return hls_link

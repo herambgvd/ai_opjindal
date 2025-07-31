@@ -41,7 +41,7 @@ def region_create(request):
                 with transaction.atomic():
                     region = form.save()
                     logger.info(f"Region '{region.name}' created by user {request.user}")
-                    messages.success(request, f"Region '{region.name}' has been created successfully.")
+                    messages.success(request, f"Region has been created successfully.")
                     return redirect('cross_counting:region_list')
             except Exception as e:
                 logger.error(f"Error creating region: {e}")
@@ -70,7 +70,7 @@ def region_update(request, pk):
                 with transaction.atomic():
                     updated_region = form.save()
                     logger.info(f"Region '{updated_region.name}' updated by user {request.user}")
-                    messages.success(request, f"Region '{updated_region.name}' has been updated successfully.")
+                    messages.success(request, f"Region has been updated successfully.")
                     return redirect('cross_counting:region_list')
             except Exception as e:
                 logger.error(f"Error updating region {region.pk}: {e}")
@@ -102,14 +102,14 @@ def region_delete(request, pk):
                 if camera_count > 0:
                     messages.warning(
                         request, 
-                        f"Cannot delete region '{region_name}' because it has {camera_count} associated camera(s). "
+                        f"Cannot delete region because it has associated camera(s). "
                         "Please reassign or delete the cameras first."
                     )
                     return redirect('cross_counting:region_list')
                 
                 region.delete()
                 logger.info(f"Region '{region_name}' deleted by user {request.user}")
-                messages.success(request, f"Region '{region_name}' has been deleted successfully.")
+                messages.success(request, f"Region has been deleted successfully.")
                 return redirect('cross_counting:region_list')
         except Exception as e:
             logger.error(f"Error deleting region {region.pk}: {e}")

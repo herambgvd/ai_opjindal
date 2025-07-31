@@ -49,7 +49,7 @@
                                         <tr>
                                             <td>{{ forloop.counter }}</td>
                                             <td>{{ region.name }}</td>
-                                            <td>{{ region.occupancy_limit }}</td>
+                                            <td>{{ region.occupancy }}</td>
                                             <td>
                                                 <div class="d-flex gap-3">
                                                     <a href="{% url 'cross_counting:region_update' region.id %}"

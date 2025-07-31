@@ -60,13 +60,14 @@ def camera_create(request):
                 with transaction.atomic():
                     camera = form.save()
                     logger.info(f"Camera '{camera.name}' created by user {request.user}")
-                    messages.success(request, f"Camera '{camera.name}' has been created successfully.")
+                    messages.success(request, f"Camera has been created successfully.")
                     return redirect('cross_counting:camera_list')
             except Exception as e:
                 logger.error(f"Error creating camera: {e}")
                 messages.error(request, "An error occurred while creating the camera. Please try again.")
         else:
             messages.error(request, "Please correct the errors below.")
+            print(form.errors)
     else:
         form = CameraForm()
     
@@ -93,7 +94,7 @@ def camera_update(request, pk):
                         updated_camera.save(update_fields=['last_data_received'])
                     
                     logger.info(f"Camera '{updated_camera.name}' updated by user {request.user}")
-                    messages.success(request, f"Camera '{updated_camera.name}' has been updated successfully.")
+                    messages.success(request, f"Camera has been updated successfully.")
                     return redirect('cross_counting:camera_list')
             except Exception as e:
                 logger.error(f"Error updating camera {camera.pk}: {e}")
@@ -122,7 +123,7 @@ def camera_delete(request, pk):
                 camera_name = camera.name
                 camera.delete()
                 logger.info(f"Camera '{camera_name}' deleted by user {request.user}")
-                messages.success(request, f"Camera '{camera_name}' has been deleted successfully.")
+                messages.success(request, f"Camera has been deleted successfully.")
                 return redirect('cross_counting:camera_list')
         except Exception as e:
             logger.error(f"Error deleting camera {camera.pk}: {e}")
