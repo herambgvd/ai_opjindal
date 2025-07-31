@@ -20,7 +20,7 @@ def enhanced_dashboard(request):
             'dashboard_data': dashboard_data,
             'title': 'Platform Dashboard'
         }
-        return render(request, 'dashboard/enhanced_main.html', context)
+        return render(request, 'dashboard/main.html', context)
         
     except Exception as e:
         logger.error(f"Error loading dashboard: {e}")
