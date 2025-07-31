@@ -163,6 +163,13 @@
                             <div id="comparison_chart"></div>
                         </div>
                     </div>
+                    
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <h6>Hourly In/Out Comparison</h6>
+                            <div id="hourly_comparison_chart"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -240,6 +247,90 @@
                 
                 var chart = new ApexCharts(document.querySelector("#comparison_chart"), options);
                 chart.render();
+            }
+        {% endif %}
+        
+        {% if analysis_data.base_hourly_aggregates.hourly_data and analysis_data.compare_hourly_aggregates.hourly_data %}
+            var baseHourlyData = {{ analysis_data.base_hourly_aggregates.hourly_data|safe }};
+            var compareHourlyData = {{ analysis_data.compare_hourly_aggregates.hourly_data|safe }};
+            
+            if (baseHourlyData.length > 0 || compareHourlyData.length > 0) {
+                var baseInData = baseHourlyData.map(function(item) {
+                    return {
+                        x: new Date(item.hour).getTime(),
+                        y: item.total_in_count
+                    };
+                });
+                
+                var baseOutData = baseHourlyData.map(function(item) {
+                    return {
+                        x: new Date(item.hour).getTime(),
+                        y: item.total_out_count
+                    };
+                });
+                
+                var compareInData = compareHourlyData.map(function(item) {
+                    return {
+                        x: new Date(item.hour).getTime(),
+                        y: item.total_in_count
+                    };
+                });
+                
+                var compareOutData = compareHourlyData.map(function(item) {
+                    return {
+                        x: new Date(item.hour).getTime(),
+                        y: item.total_out_count
+                    };
+                });
+                
+                var hourlyComparisonOptions = {
+                    series: [{
+                        name: '{{ analysis_data.base_date }} - In',
+                        data: baseInData,
+                        color: '#007bff'
+                    }, {
+                        name: '{{ analysis_data.base_date }} - Out',
+                        data: baseOutData,
+                        color: '#6c757d'
+                    }, {
+                        name: '{{ analysis_data.compare_date }} - In',
+                        data: compareInData,
+                        color: '#28a745'
+                    }, {
+                        name: '{{ analysis_data.compare_date }} - Out',
+                        data: compareOutData,
+                        color: '#dc3545'
+                    }],
+                    chart: {
+                        type: 'line',
+                        height: 400,
+                        toolbar: { show: true }
+                    },
+                    xaxis: {
+                        type: 'datetime',
+                        title: { text: 'Hour' }
+                    },
+                    yaxis: {
+                        title: { text: 'Cumulative Count' }
+                    },
+                    title: {
+                        text: 'Hourly In/Out Count Comparison',
+                        align: 'center'
+                    },
+                    stroke: {
+                        curve: 'smooth',
+                        width: 2
+                    },
+                    markers: {
+                        size: 4
+                    },
+                    legend: {
+                        position: 'top'
+                    }
+                };
+                
+                var hourlyCompChart = new ApexCharts(document.querySelector("#hourly_comparison_chart"), hourlyComparisonOptions);
+                hourlyCompChart.render();
             }
         {% endif %}
     </script>

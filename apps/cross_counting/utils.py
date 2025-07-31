@@ -293,7 +293,10 @@ class TablePartitioningManager:
                 "total_peak_total": total_peak_total,
                 "active_cameras": len(daily_data)
             },
-            "hourly_trends": hourly_trends
+            "hourly_trends": hourly_trends,
+            "region_hourly_aggregates": TablePartitioningManager.get_hourly_region_aggregates(
+                region_id, start_datetime, end_datetime
+            )
         }
     
     @staticmethod
@@ -327,7 +330,9 @@ class TablePartitioningManager:
             "compare_date": compare_date,
             "comparison": comparison,
             "base_summary": base_data["summary"],
-            "compare_summary": compare_data["summary"]
+            "compare_summary": compare_data["summary"],
+            "base_hourly_aggregates": base_data.get("region_hourly_aggregates", {"hourly_data": []}),
+            "compare_hourly_aggregates": compare_data.get("region_hourly_aggregates", {"hourly_data": []})
         }
     
     @staticmethod
@@ -349,12 +354,18 @@ class TablePartitioningManager:
         
         total_days = (to_date - from_date).days + 1
         
+        start_datetime = timezone.make_aware(datetime.combine(from_date, datetime.min.time()))
+        end_datetime = timezone.make_aware(datetime.combine(to_date, datetime.max.time()))
+        
         return {
             "from_date": from_date,
             "to_date": to_date,
             "total_days": total_days,
             "daily_trends": daily_trends,
-            "cameras": list(cameras.values('id', 'name'))
+            "cameras": list(cameras.values('id', 'name')),
+            "region_hourly_aggregates": TablePartitioningManager.get_hourly_region_aggregates(
+                region_id, start_datetime, end_datetime
+            )
         }
 
     @staticmethod
@@ -518,3 +529,39 @@ class TablePartitioningManager:
             })
         
         return enhanced_data
+
+    @staticmethod
+    def get_hourly_region_aggregates(region_id: int, start_time, end_time) -> Dict[str, Any]:
+        """
+        Get hourly aggregated In/Out counts for all cameras in a region
+        Returns cumulative increasing values by summing all region cameras per hour
+        """
+        from .models import Camera, CrossCountingData
+        from django.db.models import Sum, Max
+        from django.db.models.functions import TruncHour
+        
+        cameras = Camera.objects.filter(region_id=region_id, status=True)
+        camera_ids = list(cameras.values_list('id', flat=True))
+        
+        if not camera_ids:
+            return {"hourly_data": [], "region_name": ""}
+        
+        hourly_aggregates = CrossCountingData.objects.filter(
+            camera_id__in=camera_ids,
+            time__range=[start_time, end_time]
+        ).annotate(
+            hour=TruncHour('time')
+        ).values('hour').annotate(
+            total_in_count=Sum('cc_in_count'),
+            total_out_count=Sum('cc_out_count'),
+            max_in_count=Max('cc_in_count'),
+            max_out_count=Max('cc_out_count')
+        ).order_by('hour')
+        
+        region_name = cameras.first().region.name if cameras.exists() else ""
+        
+        return {
+            "hourly_data": list(hourly_aggregates),
+            "region_name": region_name,
+            "camera_count": len(camera_ids)
+        }
