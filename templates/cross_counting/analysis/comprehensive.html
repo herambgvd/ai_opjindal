@@ -1,6 +1,5 @@
 {% extends "cross_counting/analysis/base.html" %}
 {% load static %}
-{% load json_filters %}
 
 {% block title %}Comprehensive Analysis{% endblock title %}
 
@@ -168,7 +167,7 @@
     <script>
         // Daily Trends Chart - FIXED VERSION
         {% if analysis_data.daily_trends %}
-            var dailyTrendsData = {{ analysis_data.daily_trends|json_safe|safe }};
+            var dailyTrendsData = JSON.parse('{{ analysis_data.daily_trends|escapejs }}');
             console.log('Daily trends data:', dailyTrendsData);
 
             if (dailyTrendsData && dailyTrendsData.length > 0) {
@@ -268,7 +267,7 @@
 
             // Region Hourly Trends Chart - FIXED VERSION
             {% if analysis_data.region_hourly_aggregates.hourly_data %}
-                var regionHourlyTrends = {{ analysis_data.region_hourly_aggregates.hourly_data|json_safe|safe }};
+                var regionHourlyTrends = JSON.parse('{{ analysis_data.region_hourly_aggregates.hourly_data|escapejs }}');
                 console.log('Region hourly trends:', regionHourlyTrends);
 
                 if (regionHourlyTrends && regionHourlyTrends.length > 0) {
@@ -382,7 +381,7 @@
 
             // Individual Camera Comprehensive Chart - FIXED VERSION
             {% if analysis_data.region_hourly_aggregates.individual_camera_data %}
-                var comprehensiveCameraData = {{ analysis_data.region_hourly_aggregates.individual_camera_data|json_safe|safe }};
+                var comprehensiveCameraData = JSON.parse('{{ analysis_data.region_hourly_aggregates.individual_camera_data|escapejs }}');
                 console.log('Comprehensive camera data:', comprehensiveCameraData);
 
                 if (comprehensiveCameraData && comprehensiveCameraData.length > 0) {

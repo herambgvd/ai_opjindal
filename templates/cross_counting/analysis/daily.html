@@ -1,6 +1,5 @@
 {% extends "cross_counting/analysis/base.html" %}
 {% load static %}
-{% load json_filters %}
 
 {% block title %}Daily Analysis{% endblock title %}
 
@@ -157,7 +156,7 @@
     <script>
         // Region Hourly Chart - FIXED VERSION
         {% if analysis_data.region_hourly_aggregates and analysis_data.region_hourly_aggregates.hourly_data %}
-            var regionHourlyData = {{ analysis_data.region_hourly_aggregates.hourly_data|json_safe|safe }};
+            var regionHourlyData = JSON.parse('{{ analysis_data.region_hourly_aggregates.hourly_data|escapejs }}');
             console.log('Region hourly data:', regionHourlyData);
 
             if (regionHourlyData && regionHourlyData.length > 0) {
@@ -279,7 +278,7 @@
 
         // Individual Camera Chart - FIXED VERSION
         {% if analysis_data.region_hourly_aggregates and analysis_data.region_hourly_aggregates.individual_camera_data %}
-            var individualCameraData = {{ analysis_data.region_hourly_aggregates.individual_camera_data|json_safe|safe }};
+            var individualCameraData = JSON.parse('{{ analysis_data.region_hourly_aggregates.individual_camera_data|escapejs }}');
             console.log('Individual camera data:', individualCameraData);
 
             if (individualCameraData && individualCameraData.length > 0) {

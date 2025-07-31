@@ -1,6 +1,5 @@
 {% extends "cross_counting/analysis/base.html" %}
 {% load static %}
-{% load json_filters %}
 
 {% block title %}Comparative Analysis{% endblock title %}
 
@@ -188,7 +187,7 @@
     <script>
         // Camera-wise Comparison Chart - FIXED VERSION
         {% if analysis_data.comparison %}
-            var comparisonData = {{ analysis_data.comparison|json_safe|safe }};
+            var comparisonData = JSON.parse('{{ analysis_data.comparison|escapejs }}');
             console.log('Comparison data:', comparisonData);
 
             if (comparisonData && comparisonData.length > 0) {
@@ -287,8 +286,8 @@
 
         // Hourly Comparison Chart - FIXED VERSION
         {% if analysis_data.base_hourly_aggregates.hourly_data and analysis_data.compare_hourly_aggregates.hourly_data %}
-            var baseHourlyData = {{ analysis_data.base_hourly_aggregates.hourly_data|json_safe|safe }};
-            var compareHourlyData = {{ analysis_data.compare_hourly_aggregates.hourly_data|json_safe|safe }};
+            var baseHourlyData = JSON.parse('{{ analysis_data.base_hourly_aggregates.hourly_data|escapejs }}');
+            var compareHourlyData = JSON.parse('{{ analysis_data.compare_hourly_aggregates.hourly_data|escapejs }}');
             console.log('Base hourly data:', baseHourlyData);
             console.log('Compare hourly data:', compareHourlyData);
 
@@ -419,8 +418,8 @@
 
         // Individual Camera Comparison Chart - FIXED VERSION
         {% if analysis_data.base_hourly_aggregates.individual_camera_data and analysis_data.compare_hourly_aggregates.individual_camera_data %}
-            var baseCameraData = {{ analysis_data.base_hourly_aggregates.individual_camera_data|json_safe|safe }};
-            var compareCameraData = {{ analysis_data.compare_hourly_aggregates.individual_camera_data|json_safe|safe }};
+            var baseCameraData = JSON.parse('{{ analysis_data.base_hourly_aggregates.individual_camera_data|escapejs }}');
+            var compareCameraData = JSON.parse('{{ analysis_data.compare_hourly_aggregates.individual_camera_data|escapejs }}');
             console.log('Base camera data:', baseCameraData);
             console.log('Compare camera data:', compareCameraData);
 
