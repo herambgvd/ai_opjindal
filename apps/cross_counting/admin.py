@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.utils.html import format_html
-from .models import Region, Camera
+from .models import Region, Camera, CrossCountingData
 
 
 @admin.register(Region)
@@ -71,3 +71,46 @@ class CameraAdmin(admin.ModelAdmin):
         updated = queryset.update(status=False)
         self.message_user(request, f'{updated} cameras were successfully deactivated.')
     deactivate_cameras.short_description = "Deactivate selected cameras"
+
+
+@admin.register(CrossCountingData)
+class CrossCountingDataAdmin(admin.ModelAdmin):
+    list_display = ['device_name', 'channel', 'camera', 'cc_total_count', 'cc_in_count', 'cc_out_count', 'alarm_time', 'created_at']
+    list_filter = ['device_name', 'camera', 'channel', 'alarm_status', 'alarm_subtype', 'alarm_time', 'created_at']
+    search_fields = ['device_name', 'channel', 'camera__name', 'device_ip']
+    ordering = ['-alarm_time', '-created_at']
+    readonly_fields = ['id', 'created_at', 'updated_at']
+    date_hierarchy = 'alarm_time'
+    list_per_page = 50
+    
+    fieldsets = (
+        ('Device Information', {
+            'fields': ('device_name', 'device_ip', 'device_mac', 'device_phy')
+        }),
+        ('Channel & Camera', {
+            'fields': ('channel', 'channel_alias', 'camera')
+        }),
+        ('Cross Counting Data', {
+            'fields': ('cc_in_count', 'cc_out_count', 'cc_total_count')
+        }),
+        ('Alarm Information', {
+            'fields': ('alarm_time', 'alarm_status', 'alarm_subtype', 'alarm_snapshot', 'record_flag')
+        }),
+        ('MQTT Metadata', {
+            'fields': ('subscribe_id', 'data_pos'),
+            'classes': ('collapse',)
+        }),
+        ('System Information', {
+            'fields': ('id', 'created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('camera', 'camera__region')
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False

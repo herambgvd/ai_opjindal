@@ -51,45 +51,55 @@ class Camera(models.Model):
     def __str__(self):
         return self.name
 
-#
-# class CrossCountingData(models.Model):
-#     """Time series optimized cross counting data model"""
-#     id = models.BigAutoField(primary_key=True)
-#
-#     # Device information
-#     device_name = models.CharField(max_length=200, db_index=True)
-#     device_ip = models.GenericIPAddressField(db_index=True)
-#     device_mac = models.CharField(max_length=17)
-#
-#     # Channel information
-#     channel = models.CharField(max_length=200, db_index=True)
-#     channel_alias = models.CharField(max_length=200, blank=True)
-#
-#     # Cross counting data - core metrics
-#     cc_in_count = models.PositiveIntegerField(default=0)
-#     cc_out_count = models.PositiveIntegerField(default=0)
-#     cc_total_count = models.PositiveIntegerField(default=0, db_index=True)
-#
-#     # Alarm data
-#     alarm_snapshot = models.BooleanField(default=False)
-#     alarm_subtype = models.CharField(max_length=50, db_index=True)
-#     alarm_status = models.BooleanField(default=False, db_index=True)
-#
-#     # Relationships
-#     camera = models.ForeignKey(
-#         Camera,
-#         on_delete=models.CASCADE,
-#         related_name='cross_counting_data',
-#         db_index=True
-#     )
-#
-#     # Time series timestamp - primary partition key
-#     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
-#     updated_at = models.DateTimeField(auto_now=True)
-#
-#     class Meta:
-#         ordering = ['-created_at']
-#         db_table = 'cross_counting_data_timeseries'
-#
-#     def __str__(self):
-#         return f"{self.device_name} - {self.channel} - {self.created_at}"
+class CrossCountingData(models.Model):
+    """Time series optimized cross counting data model for MQTT payload storage"""
+    id = models.BigAutoField(primary_key=True)
+
+    device_name = models.CharField(max_length=200, db_index=True)
+    device_ip = models.GenericIPAddressField(db_index=True)
+    device_mac = models.CharField(max_length=17)
+    device_phy = models.CharField(max_length=50, blank=True)
+
+    # Channel information
+    channel = models.CharField(max_length=200, db_index=True)
+    channel_alias = models.CharField(max_length=200, blank=True)
+
+    cc_in_count = models.PositiveIntegerField(default=0, db_index=True)
+    cc_out_count = models.PositiveIntegerField(default=0, db_index=True)
+    cc_total_count = models.PositiveIntegerField(default=0, db_index=True)
+
+    # Alarm data
+    alarm_snapshot = models.BooleanField(default=False)
+    alarm_subtype = models.CharField(max_length=50, db_index=True)
+    alarm_status = models.BooleanField(default=False, db_index=True)
+    record_flag = models.CharField(max_length=10, blank=True)
+
+    subscribe_id = models.PositiveIntegerField(null=True, blank=True)
+    data_pos = models.PositiveIntegerField(null=True, blank=True)
+    
+    alarm_time = models.DateTimeField(db_index=True)
+
+    # Relationships
+    camera = models.ForeignKey(
+        Camera,
+        on_delete=models.CASCADE,
+        related_name='cross_counting_data',
+        db_index=True
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-alarm_time', '-created_at']
+        db_table = 'cross_counting_data_timeseries'
+        indexes = [
+            models.Index(fields=['camera', 'alarm_time']),
+            models.Index(fields=['channel', 'alarm_time']),
+            models.Index(fields=['cc_total_count', 'alarm_time']),
+            models.Index(fields=['device_name', 'alarm_time']),
+            models.Index(fields=['created_at']),
+        ]
+
+    def __str__(self):
+        return f"{self.device_name} - {self.channel} - {self.alarm_time}"
