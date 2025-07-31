@@ -146,6 +146,13 @@
                             <div id="region_hourly_chart"></div>
                         </div>
                     </div>
+                    
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <h6>Individual Camera Hourly Trends</h6>
+                            <div id="individual_camera_chart"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -264,6 +271,76 @@
                 
                 var regionChart = new ApexCharts(document.querySelector("#region_hourly_chart"), regionOptions);
                 regionChart.render();
+            }
+        {% endif %}
+        
+        {% if analysis_data.region_hourly_aggregates and analysis_data.region_hourly_aggregates.individual_camera_data %}
+            var individualCameraData = {{ analysis_data.region_hourly_aggregates.individual_camera_data|safe }};
+            
+            if (individualCameraData && individualCameraData.length > 0) {
+                var cameraSeries = [];
+                
+                individualCameraData.forEach(function(camera) {
+                    var inData = camera.hourly_data.map(function(item) {
+                        return {
+                            x: new Date(item.hour).getTime(),
+                            y: item.cc_in_count
+                        };
+                    });
+                    
+                    var outData = camera.hourly_data.map(function(item) {
+                        return {
+                            x: new Date(item.hour).getTime(),
+                            y: item.cc_out_count
+                        };
+                    });
+                    
+                    cameraSeries.push({
+                        name: camera.camera_name + ' - In',
+                        data: inData,
+                        type: 'line'
+                    });
+                    
+                    cameraSeries.push({
+                        name: camera.camera_name + ' - Out',
+                        data: outData,
+                        type: 'line'
+                    });
+                });
+                
+                var individualCameraOptions = {
+                    series: cameraSeries,
+                    chart: {
+                        type: 'line',
+                        height: 400,
+                        toolbar: { show: true }
+                    },
+                    xaxis: {
+                        type: 'datetime',
+                        title: { text: 'Hour' }
+                    },
+                    yaxis: {
+                        title: { text: 'Cumulative Count' }
+                    },
+                    title: {
+                        text: 'Individual Camera Hourly In/Out Counts',
+                        align: 'center'
+                    },
+                    stroke: {
+                        curve: 'smooth',
+                        width: 2
+                    },
+                    markers: {
+                        size: 3
+                    },
+                    legend: {
+                        position: 'top',
+                        horizontalAlign: 'center'
+                    }
+                };
+                
+                var individualCameraChart = new ApexCharts(document.querySelector("#individual_camera_chart"), individualCameraOptions);
+                individualCameraChart.render();
             }
         {% endif %}
     </script>

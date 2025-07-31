@@ -170,6 +170,13 @@
                             <div id="hourly_comparison_chart"></div>
                         </div>
                     </div>
+                    
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <h6>Individual Camera Comparison</h6>
+                            <div id="individual_camera_comparison_chart"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -331,6 +338,79 @@
                 
                 var hourlyCompChart = new ApexCharts(document.querySelector("#hourly_comparison_chart"), hourlyComparisonOptions);
                 hourlyCompChart.render();
+            }
+        {% endif %}
+        
+        {% if analysis_data.base_hourly_aggregates.individual_camera_data and analysis_data.compare_hourly_aggregates.individual_camera_data %}
+            var baseCameraData = {{ analysis_data.base_hourly_aggregates.individual_camera_data|safe }};
+            var compareCameraData = {{ analysis_data.compare_hourly_aggregates.individual_camera_data|safe }};
+            
+            if (baseCameraData.length > 0 || compareCameraData.length > 0) {
+                var comparisonSeries = [];
+                
+                baseCameraData.forEach(function(camera) {
+                    var inData = camera.hourly_data.map(function(item) {
+                        return {
+                            x: new Date(item.hour).getTime(),
+                            y: item.cc_in_count
+                        };
+                    });
+                    
+                    comparisonSeries.push({
+                        name: camera.camera_name + ' ({{ analysis_data.base_date }}) - In',
+                        data: inData,
+                        color: '#007bff'
+                    });
+                });
+                
+                compareCameraData.forEach(function(camera) {
+                    var inData = camera.hourly_data.map(function(item) {
+                        return {
+                            x: new Date(item.hour).getTime(),
+                            y: item.cc_in_count
+                        };
+                    });
+                    
+                    comparisonSeries.push({
+                        name: camera.camera_name + ' ({{ analysis_data.compare_date }}) - In',
+                        data: inData,
+                        color: '#28a745'
+                    });
+                });
+                
+                var individualComparisonOptions = {
+                    series: comparisonSeries,
+                    chart: {
+                        type: 'line',
+                        height: 450,
+                        toolbar: { show: true }
+                    },
+                    xaxis: {
+                        type: 'datetime',
+                        title: { text: 'Hour' }
+                    },
+                    yaxis: {
+                        title: { text: 'Cumulative In Count' }
+                    },
+                    title: {
+                        text: 'Individual Camera In Count Comparison',
+                        align: 'center'
+                    },
+                    stroke: {
+                        curve: 'smooth',
+                        width: 2
+                    },
+                    markers: {
+                        size: 3
+                    },
+                    legend: {
+                        position: 'top',
+                        horizontalAlign: 'center'
+                    }
+                };
+                
+                var individualComparisonChart = new ApexCharts(document.querySelector("#individual_camera_comparison_chart"), individualComparisonOptions);
+                individualComparisonChart.render();
             }
         {% endif %}
     </script>

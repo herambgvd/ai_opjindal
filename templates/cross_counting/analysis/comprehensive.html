@@ -121,6 +121,13 @@
                     
                     <div class="row mt-4">
                         <div class="col-12">
+                            <h6>Individual Camera Comprehensive Trends</h6>
+                            <div id="individual_camera_comprehensive_chart"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-4">
+                        <div class="col-12">
                             <h6>Daily Peak Summary</h6>
                             <div class="table-responsive">
                                 <table class="table table-bordered table-striped" id="daily_summary_table">
@@ -283,6 +290,76 @@
                     
                     var regionTrendChart = new ApexCharts(document.querySelector("#region_hourly_trends_chart"), regionTrendOptions);
                     regionTrendChart.render();
+                }
+            {% endif %}
+            
+            {% if analysis_data.region_hourly_aggregates.individual_camera_data %}
+                var comprehensiveCameraData = {{ analysis_data.region_hourly_aggregates.individual_camera_data|safe }};
+                
+                if (comprehensiveCameraData && comprehensiveCameraData.length > 0) {
+                    var comprehensiveSeries = [];
+                    
+                    comprehensiveCameraData.forEach(function(camera) {
+                        var inData = camera.hourly_data.map(function(item) {
+                            return {
+                                x: new Date(item.hour).getTime(),
+                                y: item.cc_in_count
+                            };
+                        });
+                        
+                        var outData = camera.hourly_data.map(function(item) {
+                            return {
+                                x: new Date(item.hour).getTime(),
+                                y: item.cc_out_count
+                            };
+                        });
+                        
+                        comprehensiveSeries.push({
+                            name: camera.camera_name + ' - In',
+                            data: inData,
+                            type: 'line'
+                        });
+                        
+                        comprehensiveSeries.push({
+                            name: camera.camera_name + ' - Out',
+                            data: outData,
+                            type: 'line'
+                        });
+                    });
+                    
+                    var comprehensiveCameraOptions = {
+                        series: comprehensiveSeries,
+                        chart: {
+                            type: 'line',
+                            height: 450,
+                            toolbar: { show: true }
+                        },
+                        xaxis: {
+                            type: 'datetime',
+                            title: { text: 'Time' }
+                        },
+                        yaxis: {
+                            title: { text: 'Cumulative Count' }
+                        },
+                        title: {
+                            text: 'Individual Camera Comprehensive In/Out Trends',
+                            align: 'center'
+                        },
+                        stroke: {
+                            curve: 'smooth',
+                            width: 2
+                        },
+                        markers: {
+                            size: 3
+                        },
+                        legend: {
+                            position: 'top',
+                            horizontalAlign: 'center'
+                        }
+                    };
+                    
+                    var comprehensiveCameraChart = new ApexCharts(document.querySelector("#individual_camera_comprehensive_chart"), comprehensiveCameraOptions);
+                    comprehensiveCameraChart.render();
                 }
             {% endif %}
             
