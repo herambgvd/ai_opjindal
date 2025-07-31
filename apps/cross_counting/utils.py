@@ -563,34 +563,93 @@ class TablePartitioningManager:
     def get_hourly_region_aggregates(region_id: int, start_time, end_time) -> Dict[str, Any]:
         """
         Get hourly aggregated In/Out counts for all cameras in a region
-        Returns cumulative increasing values by summing all region cameras per hour
+        Takes the last value of each camera per hour, then sums across all cameras
+        Returns cumulative increasing values as requested
         """
         from .models import Camera, CrossCountingData
-        from django.db.models import Sum, Max
+        from django.db.models import Max, Q
         from django.db.models.functions import TruncHour
+        from collections import defaultdict
         
         cameras = Camera.objects.filter(region_id=region_id, status=True)
         camera_ids = list(cameras.values_list('id', flat=True))
         
         if not camera_ids:
-            return {"hourly_data": [], "region_name": ""}
+            return {
+                "hourly_data": [], 
+                "region_name": "",
+                "camera_count": 0,
+                "individual_camera_data": []
+            }
         
-        hourly_aggregates = CrossCountingData.objects.filter(
+        all_data = CrossCountingData.objects.filter(
             camera_id__in=camera_ids,
             time__range=[start_time, end_time]
         ).annotate(
             hour=TruncHour('time')
-        ).values('hour').annotate(
-            total_in_count=Sum('cc_in_count'),
-            total_out_count=Sum('cc_out_count'),
-            max_in_count=Max('cc_in_count'),
-            max_out_count=Max('cc_out_count')
-        ).order_by('hour')
+        ).values(
+            'camera_id', 'hour', 'cc_in_count', 'cc_out_count', 'time'
+        ).order_by('camera_id', 'hour', 'time')
+        
+        camera_hourly_data = defaultdict(lambda: defaultdict(dict))
+        hourly_totals = defaultdict(lambda: {'total_in_count': 0, 'total_out_count': 0})
+        
+        for entry in all_data:
+            camera_id = entry['camera_id']
+            hour = entry['hour']
+            
+            if hour not in camera_hourly_data[camera_id] or entry['time'] > camera_hourly_data[camera_id][hour].get('time'):
+                camera_hourly_data[camera_id][hour] = {
+                    'cc_in_count': entry['cc_in_count'],
+                    'cc_out_count': entry['cc_out_count'],
+                    'time': entry['time']
+                }
+        
+        for camera_id, hours_data in camera_hourly_data.items():
+            for hour, data in hours_data.items():
+                hourly_totals[hour]['total_in_count'] += data['cc_in_count']
+                hourly_totals[hour]['total_out_count'] += data['cc_out_count']
+        
+        hourly_data = []
+        for hour in sorted(hourly_totals.keys()):
+            hourly_data.append({
+                'hour': hour,
+                'total_in_count': hourly_totals[hour]['total_in_count'],
+                'total_out_count': hourly_totals[hour]['total_out_count']
+            })
+        
+        individual_camera_data = []
+        camera_objects = {cam.id: cam for cam in cameras}
+        
+        for camera_id in camera_ids:
+            if camera_id in camera_hourly_data:
+                camera_data = []
+                for hour in sorted(hourly_totals.keys()):
+                    if hour in camera_hourly_data[camera_id]:
+                        data = camera_hourly_data[camera_id][hour]
+                        camera_data.append({
+                            'hour': hour,
+                            'cc_in_count': data['cc_in_count'],
+                            'cc_out_count': data['cc_out_count']
+                        })
+                    else:
+                        camera_data.append({
+                            'hour': hour,
+                            'cc_in_count': 0,
+                            'cc_out_count': 0
+                        })
+                
+                individual_camera_data.append({
+                    'camera_id': camera_id,
+                    'camera_name': camera_objects[camera_id].name,
+                    'hourly_data': camera_data
+                })
         
         region_name = cameras.first().region.name if cameras.exists() else ""
         
         return {
-            "hourly_data": serialize_datetime_data(list(hourly_aggregates)),
+            "hourly_data": serialize_datetime_data(hourly_data),
             "region_name": region_name,
-            "camera_count": len(camera_ids)
+            "camera_count": len(camera_ids),
+            "individual_camera_data": serialize_datetime_data(individual_camera_data)
         }
