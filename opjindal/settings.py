@@ -88,7 +88,7 @@ DATABASES = {
         "USER": env("DJANGO_DATABASE_USER", default="postgres"),
         "PASSWORD": env("DJANGO_DATABASE_PASSWORD", default="Gvd@6001"),
         "HOST": env("DJANGO_DATABASE_HOST", default="localhost"),
-        "PORT": env("DJANGO_DATABASE_PORT", default="5432"),
+        "PORT": env("DJANGO_DATABASE_PORT", default="5433"),
     }
 }
 
