@@ -121,13 +121,6 @@
 
                     <div class="row mt-4">
                         <div class="col-12">
-                            <h6>Individual Camera Hourly Trends</h6>
-                            <div id="individual_camera_comprehensive_chart"></div>
-                        </div>
-                    </div>
-
-                    <div class="row mt-4">
-                        <div class="col-12">
                             <h6>Daily Peak Summary</h6>
                             <div class="table-responsive">
                                 <table class="table table-bordered table-striped" id="daily_summary_table">
@@ -165,370 +158,143 @@
 
 {% block analysis_js %}
     <script>
-        // Daily Trends Chart - FIXED VERSION
+        // Daily Trends Chart
         {% if analysis_data.daily_trends %}
-            var dailyTrendsData = JSON.parse('{{ analysis_data.daily_trends|escapejs }}');
-            console.log('Daily trends data:', dailyTrendsData);
+            var dailyTrendsSeries = [];
+            var colors = ['#007bff', '#28a745', '#dc3545', '#ffc107', '#17a2b8', '#6f42c1', '#e83e8c', '#fd7e14'];
+            var colorIndex = 0;
 
-            if (dailyTrendsData && dailyTrendsData.length > 0) {
-                var series = [];
-                var colors = ['#007bff', '#28a745', '#dc3545', '#ffc107', '#17a2b8', '#6f42c1', '#e83e8c', '#fd7e14'];
-                var colorIndex = 0;
+            {% for camera in analysis_data.daily_trends %}
+                var cameraData = [];
+                {% for daily_data in camera.daily_data %}
+                    cameraData.push({
+                        x: new Date('{{ daily_data.date }}').getTime(),
+                        y: {{ daily_data.peak_total_count|default:0 }}
+                    });
+                {% endfor %}
 
-                dailyTrendsData.forEach(function(camera) {
-                    if (camera.daily_data && Array.isArray(camera.daily_data)) {
-                        var data = camera.daily_data.map(function(item) {
-                            return {
-                                x: new Date(item.date).getTime(),
-                                y: item.peak_total_count || 0
-                            };
-                        });
-
-                        series.push({
-                            name: camera.camera_name,
-                            data: data,
-                            color: colors[colorIndex % colors.length]
-                        });
-                        colorIndex++;
-                    }
+                dailyTrendsSeries.push({
+                    name: '{{ camera.camera_name }}',
+                    data: cameraData,
+                    color: colors[colorIndex % colors.length]
                 });
+                colorIndex++;
+            {% endfor %}
 
-                var options = {
-                    series: series,
-                    chart: {
-                        type: 'line',
-                        height: 450,
-                        toolbar: { show: true },
-                        zoom: {
-                            enabled: true
-                        }
-                    },
-                    xaxis: {
-                        type: 'datetime',
-                        title: {
-                            text: 'Date',
-                            style: {
-                                fontSize: '14px',
-                                fontWeight: 600
-                            }
-                        }
-                    },
-                    yaxis: {
-                        title: {
-                            text: 'Peak Total Count',
-                            style: {
-                                fontSize: '14px',
-                                fontWeight: 600
-                            }
-                        },
-                        min: 0
-                    },
+            var dailyTrendsOptions = {
+                series: dailyTrendsSeries,
+                chart: {
+                    type: 'line',
+                    height: 450,
+                    toolbar: { show: true }
+                },
+                xaxis: {
+                    type: 'datetime',
                     title: {
-                        text: 'Daily Peak Trends by Camera',
-                        align: 'center',
-                        style: {
-                            fontSize: '16px',
-                            fontWeight: 600
-                        }
-                    },
-                    stroke: {
-                        curve: 'smooth',
-                        width: 3
-                    },
-                    markers: {
-                        size: 5,
-                        strokeWidth: 2
-                    },
-                    grid: {
-                        borderColor: '#e7e7e7',
-                        strokeDashArray: 3
-                    },
-                    legend: {
-                        position: 'top',
-                        horizontalAlign: 'center'
-                    },
-                    tooltip: {
-                        y: {
-                            formatter: function (val) {
-                                return val + " count"
-                            }
-                        }
-                    },
-                    dataLabels: {
-                        enabled: false
+                        text: 'Date',
+                        style: { fontSize: '14px', fontWeight: 600 }
                     }
-                };
-
-                var chart = new ApexCharts(document.querySelector("#daily_trends_chart"), options);
-                chart.render();
-            } else {
-                document.querySelector("#daily_trends_chart").innerHTML = '<div class="alert alert-info">No daily trend data available for the selected date range.</div>';
-            }
-
-            // Region Hourly Trends Chart - FIXED VERSION
-            {% if analysis_data.region_hourly_aggregates.hourly_data %}
-                var regionHourlyTrends = JSON.parse('{{ analysis_data.region_hourly_aggregates.hourly_data|escapejs }}');
-                console.log('Region hourly trends:', regionHourlyTrends);
-
-                if (regionHourlyTrends && regionHourlyTrends.length > 0) {
-                    // Prepare data for all 24 hours (0-23)
-                    var inTrendData = new Array(24).fill(0);
-                    var outTrendData = new Array(24).fill(0);
-
-                    regionHourlyTrends.forEach(function(item) {
-                        var hour = parseInt(item.hour);
-                        if (hour >= 0 && hour <= 23) {
-                            inTrendData[hour] = item.total_in_count || 0;
-                            outTrendData[hour] = item.total_out_count || 0;
-                        }
-                    });
-
-                    var regionTrendOptions = {
-                        series: [{
-                            name: 'Total In Count',
-                            data: inTrendData,
-                            color: '#28a745'
-                        }, {
-                            name: 'Total Out Count',
-                            data: outTrendData,
-                            color: '#dc3545'
-                        }],
-                        chart: {
-                            type: 'line',
-                            height: 450,
-                            toolbar: { show: true },
-                            zoom: {
-                                enabled: true
-                            }
-                        },
-                        xaxis: {
-                            categories: [
-                                '00:00', '01:00', '02:00', '03:00', '04:00', '05:00',
-                                '06:00', '07:00', '08:00', '09:00', '10:00', '11:00',
-                                '12:00', '13:00', '14:00', '15:00', '16:00', '17:00',
-                                '18:00', '19:00', '20:00', '21:00', '22:00', '23:00'
-                            ],
-                            title: {
-                                text: 'Hour (24-hour format)',
-                                style: {
-                                    fontSize: '14px',
-                                    fontWeight: 600
-                                }
-                            },
-                            labels: {
-                                rotate: -45
-                            }
-                        },
-                        yaxis: {
-                            title: {
-                                text: 'Cumulative Count',
-                                style: {
-                                    fontSize: '14px',
-                                    fontWeight: 600
-                                }
-                            },
-                            min: 0
-                        },
-                        title: {
-                            text: 'Region Hourly In/Out Trends (All Cameras Combined)',
-                            align: 'center',
-                            style: {
-                                fontSize: '16px',
-                                fontWeight: 600
-                            }
-                        },
-                        stroke: {
-                            curve: 'smooth',
-                            width: 3
-                        },
-                        markers: {
-                            size: 5,
-                            strokeWidth: 2
-                        },
-                        legend: {
-                            position: 'top',
-                            horizontalAlign: 'center'
-                        },
-                        grid: {
-                            borderColor: '#e7e7e7',
-                            strokeDashArray: 3
-                        },
-                        tooltip: {
-                            y: {
-                                formatter: function (val) {
-                                    return val + " count"
-                                }
-                            },
-                            x: {
-                                formatter: function (val) {
-                                    return "Hour: " + val
-                                }
-                            }
-                        },
-                        dataLabels: {
-                            enabled: false
-                        }
-                    };
-
-                    var regionTrendChart = new ApexCharts(document.querySelector("#region_hourly_trends_chart"), regionTrendOptions);
-                    regionTrendChart.render();
-                } else {
-                    document.querySelector("#region_hourly_trends_chart").innerHTML = '<div class="alert alert-info">No region hourly data available for the selected date range.</div>';
+                },
+                yaxis: {
+                    title: {
+                        text: 'Peak Total Count',
+                        style: { fontSize: '14px', fontWeight: 600 }
+                    },
+                    min: 0
+                },
+                title: {
+                    text: 'Daily Peak Trends by Camera',
+                    align: 'center',
+                    style: { fontSize: '16px', fontWeight: 600 }
+                },
+                stroke: { curve: 'smooth', width: 3 },
+                markers: { size: 5, strokeWidth: 2 },
+                grid: { borderColor: '#e7e7e7', strokeDashArray: 3 },
+                legend: {
+                    position: 'top',
+                    horizontalAlign: 'center'
+                },
+                tooltip: {
+                    y: { formatter: function (val) { return val + " count" } }
                 }
-            {% else %}
-                document.querySelector("#region_hourly_trends_chart").innerHTML = '<div class="alert alert-info">No region hourly data available for the selected date range.</div>';
-            {% endif %}
+            };
 
-            // Individual Camera Comprehensive Chart - FIXED VERSION
-            {% if analysis_data.region_hourly_aggregates.individual_camera_data %}
-                var comprehensiveCameraData = JSON.parse('{{ analysis_data.region_hourly_aggregates.individual_camera_data|escapejs }}');
-                console.log('Comprehensive camera data:', comprehensiveCameraData);
-
-                if (comprehensiveCameraData && comprehensiveCameraData.length > 0) {
-                    var comprehensiveSeries = [];
-                    var colors = ['#007bff', '#28a745', '#dc3545', '#ffc107', '#17a2b8', '#6f42c1', '#e83e8c', '#fd7e14'];
-                    var colorIndex = 0;
-
-                    comprehensiveCameraData.forEach(function(camera) {
-                        // Prepare In Count and Out Count data for all 24 hours
-                        var inData = new Array(24).fill(0);
-                        var outData = new Array(24).fill(0);
-
-                        if (camera.hourly_data && Array.isArray(camera.hourly_data)) {
-                            camera.hourly_data.forEach(function(hourData) {
-                                var hour = parseInt(hourData.hour);
-                                if (hour >= 0 && hour <= 23) {
-                                    inData[hour] = hourData.cc_in_count || 0;
-                                    outData[hour] = hourData.cc_out_count || 0;
-                                }
-                            });
-                        }
-
-                        var baseColor = colors[colorIndex % colors.length];
-
-                        comprehensiveSeries.push({
-                            name: camera.camera_name + ' - In',
-                            data: inData,
-                            color: baseColor,
-                            type: 'line'
-                        });
-
-                        comprehensiveSeries.push({
-                            name: camera.camera_name + ' - Out',
-                            data: outData,
-                            color: baseColor,
-                            type: 'line',
-                            stroke: {
-                                dashArray: 5
-                            }
-                        });
-
-                        colorIndex++;
-                    });
-
-                    var comprehensiveCameraOptions = {
-                        series: comprehensiveSeries,
-                        chart: {
-                            type: 'line',
-                            height: 500,
-                            toolbar: { show: true },
-                            zoom: {
-                                enabled: true
-                            }
-                        },
-                        xaxis: {
-                            categories: [
-                                '00:00', '01:00', '02:00', '03:00', '04:00', '05:00',
-                                '06:00', '07:00', '08:00', '09:00', '10:00', '11:00',
-                                '12:00', '13:00', '14:00', '15:00', '16:00', '17:00',
-                                '18:00', '19:00', '20:00', '21:00', '22:00', '23:00'
-                            ],
-                            title: {
-                                text: 'Hour (24-hour format)',
-                                style: {
-                                    fontSize: '14px',
-                                    fontWeight: 600
-                                }
-                            },
-                            labels: {
-                                rotate: -45
-                            }
-                        },
-                        yaxis: {
-                            title: {
-                                text: 'Cumulative Count',
-                                style: {
-                                    fontSize: '14px',
-                                    fontWeight: 600
-                                }
-                            },
-                            min: 0
-                        },
-                        title: {
-                            text: 'Individual Camera Comprehensive In/Out Trends',
-                            align: 'center',
-                            style: {
-                                fontSize: '16px',
-                                fontWeight: 600
-                            }
-                        },
-                        stroke: {
-                            curve: 'smooth',
-                            width: 2
-                        },
-                        markers: {
-                            size: 3
-                        },
-                        legend: {
-                            position: 'top',
-                            horizontalAlign: 'center',
-                            fontSize: '12px',
-                            itemMargin: {
-                                horizontal: 5,
-                                vertical: 5
-                            }
-                        },
-                        grid: {
-                            borderColor: '#e7e7e7',
-                            strokeDashArray: 3
-                        },
-                        tooltip: {
-                            y: {
-                                formatter: function (val) {
-                                    return val + " count"
-                                }
-                            },
-                            x: {
-                                formatter: function (val) {
-                                    return "Hour: " + val
-                                }
-                            }
-                        },
-                        dataLabels: {
-                            enabled: false
-                        }
-                    };
-
-                    var comprehensiveCameraChart = new ApexCharts(document.querySelector("#individual_camera_comprehensive_chart"), comprehensiveCameraOptions);
-                    comprehensiveCameraChart.render();
-                } else {
-                    document.querySelector("#individual_camera_comprehensive_chart").innerHTML = '<div class="alert alert-info">No individual camera data available for the selected date range.</div>';
-                }
-            {% else %}
-                document.querySelector("#individual_camera_comprehensive_chart").innerHTML = '<div class="alert alert-info">No individual camera data available for the selected date range.</div>';
-            {% endif %}
-
-            // Initialize DataTable for daily summary
-            $('#daily_summary_table').DataTable({
-                responsive: true,
-                pageLength: 10,
-                order: [[1, 'desc']],
-                scrollX: true
-            });
-        {% else %}
-            document.querySelector("#daily_trends_chart").innerHTML = '<div class="alert alert-info">No daily trend data available for the selected date range.</div>';
-            document.querySelector("#region_hourly_trends_chart").innerHTML = '<div class="alert alert-info">No region hourly data available for the selected date range.</div>';
-            document.querySelector("#individual_camera_comprehensive_chart").innerHTML = '<div class="alert alert-info">No individual camera data available for the selected date range.</div>';
+            var dailyTrendsChart = new ApexCharts(document.querySelector("#daily_trends_chart"), dailyTrendsOptions);
+            dailyTrendsChart.render();
         {% endif %}
+
+        // Region Hourly Trends Chart
+        {% if analysis_data.region_hourly_aggregates.hourly_data %}
+            var regionInData = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
+            var regionOutData = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
+
+            {% for hour_data in analysis_data.region_hourly_aggregates.hourly_data %}
+                regionInData[{{ hour_data.hour }}] = {{ hour_data.total_in_count|default:0 }};
+                regionOutData[{{ hour_data.hour }}] = {{ hour_data.total_out_count|default:0 }};
+            {% endfor %}
+
+            var regionTrendOptions = {
+                series: [{
+                    name: 'Total In Count',
+                    data: regionInData,
+                    color: '#28a745'
+                }, {
+                    name: 'Total Out Count',
+                    data: regionOutData,
+                    color: '#dc3545'
+                }],
+                chart: {
+                    type: 'line',
+                    height: 450,
+                    toolbar: { show: true }
+                },
+                xaxis: {
+                    categories: [
+                        '00:00', '01:00', '02:00', '03:00', '04:00', '05:00',
+                        '06:00', '07:00', '08:00', '09:00', '10:00', '11:00',
+                        '12:00', '13:00', '14:00', '15:00', '16:00', '17:00',
+                        '18:00', '19:00', '20:00', '21:00', '22:00', '23:00'
+                    ],
+                    title: {
+                        text: 'Hour (24-hour format)',
+                        style: { fontSize: '14px', fontWeight: 600 }
+                    },
+                    labels: { rotate: -45 }
+                },
+                yaxis: {
+                    title: {
+                        text: 'Cumulative Count',
+                        style: { fontSize: '14px', fontWeight: 600 }
+                    },
+                    min: 0
+                },
+                title: {
+                    text: 'Region Hourly In/Out Trends (All Cameras Combined)',
+                    align: 'center',
+                    style: { fontSize: '16px', fontWeight: 600 }
+                },
+                stroke: { curve: 'smooth', width: 3 },
+                markers: { size: 5, strokeWidth: 2 },
+                legend: {
+                    position: 'top',
+                    horizontalAlign: 'center'
+                },
+                grid: { borderColor: '#e7e7e7', strokeDashArray: 3 },
+                tooltip: {
+                    y: { formatter: function (val) { return val + " count" } }
+                }
+            };
+
+            var regionTrendChart = new ApexCharts(document.querySelector("#region_hourly_trends_chart"), regionTrendOptions);
+            regionTrendChart.render();
+        {% endif %}
+
+        // Initialize DataTable for daily summary
+        $('#daily_summary_table').DataTable({
+            responsive: true,
+            pageLength: 10,
+            order: [[1, 'desc']],
+            scrollX: true
+        });
     </script>
 {% endblock %}

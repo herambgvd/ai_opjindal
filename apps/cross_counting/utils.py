@@ -280,7 +280,7 @@ class TablePartitioningManager:
     def get_daily_analysis_data(region_id: int, date: date) -> Dict[str, Any]:
         """
         Get comprehensive daily analysis for all cameras in a region using created_at
-        FIXED: Proper 24-hour timeline and last value per hour logic
+        FIXED: Proper 24-hour timeline and timezone handling for complete day data
         """
         from .models import Camera, CrossCountingData
         from django.db.models import Max
@@ -296,18 +296,27 @@ class TablePartitioningManager:
         total_peak_out = 0
         total_peak_total = 0
 
-        # Use created_at for accurate daily peak calculations with proper timezone handling
+        # FIXED: Use timezone-aware datetime handling for the full day (00:00 to 23:59:59)
         from datetime import timedelta
-        start_datetime = timezone.make_aware(datetime.combine(date, datetime.min.time()))
-        next_day = date + timedelta(days=1)
-        end_datetime = timezone.make_aware(datetime.combine(next_day, datetime.min.time()))
+        from django.utils import timezone as django_timezone
+
+        # Create timezone-aware start and end times for the complete day
+        local_tz = django_timezone.get_current_timezone()
+
+        # Start of the day in local timezone
+        start_datetime = local_tz.localize(datetime.combine(date, datetime.min.time()))
+
+        # End of the day in local timezone (23:59:59.999999)
+        end_datetime = local_tz.localize(datetime.combine(date, datetime.max.time()))
+
+        print(f"Daily analysis date range: {start_datetime} to {end_datetime}")
 
         for camera in cameras:
-            # Get daily peaks using created_at
+            # Get daily peaks using created_at with proper timezone range
             peaks = CrossCountingData.objects.filter(
                 camera=camera,
                 created_at__gte=start_datetime,
-                created_at__lt=end_datetime
+                created_at__lte=end_datetime  # Changed from __lt to __lte to include end of day
             ).aggregate(
                 peak_in_count=Max('cc_in_count'),
                 peak_out_count=Max('cc_out_count'),
@@ -345,7 +354,7 @@ class TablePartitioningManager:
     def get_comparative_analysis_data(region_id: int, base_date: date, compare_date: date) -> Dict[str, Any]:
         """
         Get comparative analysis between two dates for a region
-        FIXED: Consistent created_at usage
+        FIXED: Consistent created_at usage with proper timezone handling
         """
         base_data = TablePartitioningManager.get_daily_analysis_data(region_id, base_date)
         compare_data = TablePartitioningManager.get_daily_analysis_data(region_id, compare_date)
@@ -386,7 +395,7 @@ class TablePartitioningManager:
     def get_comprehensive_analysis_data(region_id: int, from_date: date, to_date: date) -> Dict[str, Any]:
         """
         Get comprehensive analysis for a date range (max 7 days) using created_at
-        FIXED: Proper timezone handling and created_at usage
+        FIXED: Proper timezone handling and created_at usage for complete day coverage
         """
         from .models import Camera, CrossCountingData
         from django.db.models import Max
@@ -396,17 +405,27 @@ class TablePartitioningManager:
 
         daily_trends = []
 
-        # Use created_at for comprehensive analysis with proper timezone handling
+        # FIXED: Use timezone-aware datetime handling for complete date range
         from datetime import timedelta
-        start_datetime = timezone.make_aware(datetime.combine(from_date, datetime.min.time()))
-        next_day = to_date + timedelta(days=1)
-        end_datetime = timezone.make_aware(datetime.combine(next_day, datetime.min.time()))
+        from django.utils import timezone as django_timezone
+
+        # Create timezone-aware start and end times for the complete range
+        local_tz = django_timezone.get_current_timezone()
+
+        # Start of the first day in local timezone
+        start_datetime = local_tz.localize(datetime.combine(from_date, datetime.min.time()))
+
+        # End of the last day in local timezone (23:59:59.999999)
+        end_datetime = local_tz.localize(datetime.combine(to_date, datetime.max.time()))
+
+        print(f"Comprehensive analysis date range: {start_datetime} to {end_datetime}")
 
         for camera in cameras:
-            # Get daily peaks using created_at and TruncDate
+            # Get daily peaks using created_at and TruncDate with proper timezone range
             daily_data = CrossCountingData.objects.filter(
                 camera=camera,
-                created_at__range=[start_datetime, end_datetime]
+                created_at__gte=start_datetime,
+                created_at__lte=end_datetime  # Changed from __range to __gte and __lte for inclusive range
             ).annotate(
                 date=TruncDate('created_at')
             ).values('date').annotate(
@@ -426,7 +445,7 @@ class TablePartitioningManager:
             "from_date": from_date,
             "to_date": to_date,
             "total_days": total_days,
-            "daily_trends": daily_trends,  # Already serialized by serialize_datetime_data call below
+            "daily_trends": daily_trends,  # Will be serialized by serialize_datetime_data call below
             "cameras": [{"id": str(cam.id), "name": cam.name} for cam in cameras],  # Convert UUID to string
             "region_hourly_aggregates": TablePartitioningManager.get_hourly_region_aggregates(
                 region_id, start_datetime, end_datetime

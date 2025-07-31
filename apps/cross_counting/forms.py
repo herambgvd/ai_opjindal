@@ -3,6 +3,7 @@ import re
 from django import forms
 from django.core.exceptions import ValidationError
 from django.utils import timezone
+from datetime import datetime, date
 
 from .models import Region, Camera
 
@@ -105,11 +106,16 @@ class DailyAnalysisForm(forms.Form):
             'type': 'date'
         })
     )
-    
+
     def clean_date(self):
         date = self.cleaned_data.get('date')
-        if date and date > timezone.now().date():
-            raise ValidationError("Date cannot be in the future.")
+        if date:
+            # Get current date in the application's timezone (Asia/Kolkata)
+            current_date = timezone.localtime(timezone.now()).date()
+
+            # Allow today's date and past dates
+            if date > current_date:
+                raise ValidationError(f"Date cannot be in the future. Today is {current_date}.")
         return date
 
 
@@ -131,18 +137,36 @@ class ComparativeAnalysisForm(forms.Form):
             'type': 'date'
         })
     )
-    
+
+    def clean_base_date(self):
+        date = self.cleaned_data.get('base_date')
+        if date:
+            # Get current date in the application's timezone (Asia/Kolkata)
+            current_date = timezone.localtime(timezone.now()).date()
+
+            if date > current_date:
+                raise ValidationError(f"Base date cannot be in the future. Today is {current_date}.")
+        return date
+
+    def clean_compare_date(self):
+        date = self.cleaned_data.get('compare_date')
+        if date:
+            # Get current date in the application's timezone (Asia/Kolkata)
+            current_date = timezone.localtime(timezone.now()).date()
+
+            if date > current_date:
+                raise ValidationError(f"Compare date cannot be in the future. Today is {current_date}.")
+        return date
+
     def clean(self):
         cleaned_data = super().clean()
         base_date = cleaned_data.get('base_date')
         compare_date = cleaned_data.get('compare_date')
-        
+
         if base_date and compare_date:
             if base_date == compare_date:
                 raise ValidationError("Base date and compare date must be different.")
-            if base_date > timezone.now().date() or compare_date > timezone.now().date():
-                raise ValidationError("Dates cannot be in the future.")
-        
+
         return cleaned_data
 
 
@@ -164,19 +188,37 @@ class ComprehensiveAnalysisForm(forms.Form):
             'type': 'date'
         })
     )
-    
+
+    def clean_from_date(self):
+        date = self.cleaned_data.get('from_date')
+        if date:
+            # Get current date in the application's timezone (Asia/Kolkata)
+            current_date = timezone.localtime(timezone.now()).date()
+
+            if date > current_date:
+                raise ValidationError(f"From date cannot be in the future. Today is {current_date}.")
+        return date
+
+    def clean_to_date(self):
+        date = self.cleaned_data.get('to_date')
+        if date:
+            # Get current date in the application's timezone (Asia/Kolkata)
+            current_date = timezone.localtime(timezone.now()).date()
+
+            if date > current_date:
+                raise ValidationError(f"To date cannot be in the future. Today is {current_date}.")
+        return date
+
     def clean(self):
         cleaned_data = super().clean()
         from_date = cleaned_data.get('from_date')
         to_date = cleaned_data.get('to_date')
-        
+
         if from_date and to_date:
             if from_date > to_date:
                 raise ValidationError("From date must be before to date.")
-            if to_date > timezone.now().date():
-                raise ValidationError("To date cannot be in the future.")
-            
+
             if (to_date - from_date).days > 7:
                 raise ValidationError("Date range cannot exceed 7 days.")
-        
+
         return cleaned_data
