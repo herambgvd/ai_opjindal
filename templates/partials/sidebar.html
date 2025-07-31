@@ -38,9 +38,11 @@
                     <!-- ########## Dashboard  ########## -->
                     <li class="menu-title"><span data-key="t-main">Main</span></li>
                     <li class="nav-item">
-                        <a class="nav-link menu-link {% if request.resolver_match.url_name == 'Dashboard' %}active{% endif %}"
-                           href="#">
-                            <i class="ri-dashboard-line"></i> <span data-key="t-dashboard">Dashboard</span>
+                        <a href="{% url 'cross_counting:enhanced_dashboard' %}"
+                           class="nav-link {% if request.resolver_match.url_name == 'enhanced_dashboard' %}active{% endif %}"
+                           data-key="t-dashboard">
+                            <i class="ri-dashboard-2-line"></i>
+                            <span data-key="t-dashboard">Dashboard</span>
                         </a>
                     </li>
 

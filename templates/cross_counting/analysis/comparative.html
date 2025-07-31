@@ -28,9 +28,15 @@
         </div>
         <div class="col-md-2">
             <label class="form-label">&nbsp;</label>
-            <button type="submit" class="btn btn-primary d-block w-100">
+            <button type="submit" class="btn btn-primary d-block w-100 mb-2">
                 <i class="bx bx-search"></i> Compare
             </button>
+            {% if analysis_data %}
+                <a href="{% url 'cross_counting:comparative_analysis_csv' %}?{{ request.GET.urlencode }}" 
+                   class="btn btn-success d-block w-100">
+                    <i class="bx bx-download"></i> Export CSV
+                </a>
+            {% endif %}
         </div>
         {% if form.non_field_errors %}
             <div class="col-12">

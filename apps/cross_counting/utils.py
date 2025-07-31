@@ -356,3 +356,94 @@ class TablePartitioningManager:
             "daily_trends": daily_trends,
             "cameras": list(cameras.values('id', 'name'))
         }
+
+    @staticmethod
+    def get_current_occupancy_data() -> List[Dict[str, Any]]:
+        """Get current occupancy percentage for all regions for public display"""
+        from .models import Region, Camera, CrossCountingData
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        regions = Region.objects.all()
+        occupancy_data = []
+        
+        for region in regions:
+            cameras = Camera.objects.filter(region=region, status=True)
+            if not cameras.exists():
+                occupancy_data.append({
+                    "region_name": region.name,
+                    "current_count": 0,
+                    "max_occupancy": region.occupancy,
+                    "occupancy_percentage": 0.0
+                })
+                continue
+            
+            current_total = 0
+            recent_time = timezone.now() - timedelta(minutes=5)
+            
+            for camera in cameras:
+                latest_data = CrossCountingData.objects.filter(
+                    camera=camera,
+                    alarm_time__gte=recent_time
+                ).order_by('-alarm_time').first()
+                
+                if latest_data:
+                    current_total += latest_data.cc_total_count
+            
+            occupancy_percentage = (current_total / region.occupancy * 100) if region.occupancy > 0 else 0.0
+            occupancy_percentage = min(occupancy_percentage, 100.0)
+            
+            occupancy_data.append({
+                "region_name": region.name,
+                "current_count": current_total,
+                "max_occupancy": region.occupancy,
+                "occupancy_percentage": round(occupancy_percentage, 1)
+            })
+        
+        return occupancy_data
+
+    @staticmethod
+    def get_dashboard_statistics() -> Dict[str, Any]:
+        """Get comprehensive platform statistics for dashboard"""
+        from .models import Region, Camera, CrossCountingData
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        total_regions = Region.objects.count()
+        total_cameras = Camera.objects.count()
+        active_cameras = Camera.objects.filter(status=True).count()
+        
+        since_24h = timezone.now() - timedelta(hours=24)
+        recent_data_points = CrossCountingData.objects.filter(
+            alarm_time__gte=since_24h
+        ).count()
+        
+        health_metrics = CrossCountingAnalytics.get_system_health_metrics(minutes=60)
+        
+        volume_stats = DataRetentionManager.get_data_volume_stats()
+        
+        occupancy_data = TablePartitioningManager.get_current_occupancy_data()
+        total_current_occupancy = sum(item['current_count'] for item in occupancy_data)
+        total_max_occupancy = sum(item['max_occupancy'] for item in occupancy_data)
+        avg_occupancy_percentage = (total_current_occupancy / total_max_occupancy * 100) if total_max_occupancy > 0 else 0.0
+        
+        return {
+            "basic_stats": {
+                "total_regions": total_regions,
+                "total_cameras": total_cameras,
+                "active_cameras": active_cameras,
+                "inactive_cameras": total_cameras - active_cameras
+            },
+            "activity_stats": {
+                "recent_data_points_24h": recent_data_points,
+                "avg_data_points_per_hour": recent_data_points / 24 if recent_data_points > 0 else 0
+            },
+            "system_health": health_metrics,
+            "data_volume": volume_stats,
+            "occupancy_summary": {
+                "total_current_occupancy": total_current_occupancy,
+                "total_max_occupancy": total_max_occupancy,
+                "avg_occupancy_percentage": round(avg_occupancy_percentage, 1),
+                "regions_data": occupancy_data
+            }
+        }
