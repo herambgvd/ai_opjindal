@@ -170,7 +170,7 @@
                 hourlyTrendsData.forEach(function(camera) {
                     var data = camera.hourly_data.map(function(item) {
                         return {
-                            x: new Date(item.hour).getTime(),
+                            x: new Date(item.hour).getHours(),
                             y: item.max_total_count
                         };
                     });
@@ -189,8 +189,9 @@
                         toolbar: { show: true }
                     },
                     xaxis: {
-                        type: 'datetime',
-                        title: { text: 'Hour' }
+                        type: 'category',
+                        categories: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23],
+                        title: { text: 'Hour (24-hour format)' }
                     },
                     yaxis: {
                         title: { text: 'Count' }
@@ -219,14 +220,14 @@
             if (regionHourlyData && regionHourlyData.length > 0) {
                 var inCountData = regionHourlyData.map(function(item) {
                     return {
-                        x: new Date(item.hour).getTime(),
+                        x: new Date(item.hour).getHours(),
                         y: item.total_in_count
                     };
                 });
                 
                 var outCountData = regionHourlyData.map(function(item) {
                     return {
-                        x: new Date(item.hour).getTime(),
+                        x: new Date(item.hour).getHours(),
                         y: item.total_out_count
                     };
                 });
@@ -247,8 +248,9 @@
                         toolbar: { show: true }
                     },
                     xaxis: {
-                        type: 'datetime',
-                        title: { text: 'Hour' }
+                        type: 'category',
+                        categories: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23],
+                        title: { text: 'Hour (24-hour format)' }
                     },
                     yaxis: {
                         title: { text: 'Cumulative Count' }
@@ -283,14 +285,14 @@
                 individualCameraData.forEach(function(camera) {
                     var inData = camera.hourly_data.map(function(item) {
                         return {
-                            x: new Date(item.hour).getTime(),
+                            x: new Date(item.hour).getHours(),
                             y: item.cc_in_count
                         };
                     });
                     
                     var outData = camera.hourly_data.map(function(item) {
                         return {
-                            x: new Date(item.hour).getTime(),
+                            x: new Date(item.hour).getHours(),
                             y: item.cc_out_count
                         };
                     });
@@ -316,8 +318,9 @@
                         toolbar: { show: true }
                     },
                     xaxis: {
-                        type: 'datetime',
-                        title: { text: 'Hour' }
+                        type: 'category',
+                        categories: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23],
+                        title: { text: 'Hour (24-hour format)' }
                     },
                     yaxis: {
                         title: { text: 'Cumulative Count' }
