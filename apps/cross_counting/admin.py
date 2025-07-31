@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.utils.html import format_html
-from .models import Region, Camera, CrossCountingData
+from .models import Region, Camera, CrossCountingData, HourlyAggregateView, DailyPeakView
 
 
 @admin.register(Region)
@@ -113,4 +113,40 @@ class CrossCountingDataAdmin(admin.ModelAdmin):
         return False
 
     def has_change_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(HourlyAggregateView)
+class HourlyAggregateViewAdmin(admin.ModelAdmin):
+    list_display = ['camera', 'hour', 'max_total_count', 'avg_total_count', 'data_points']
+    list_filter = ['camera', 'hour']
+    search_fields = ['camera__name']
+    ordering = ['-hour']
+    readonly_fields = ['camera', 'hour', 'max_in_count', 'max_out_count', 'max_total_count', 'min_in_count', 'min_out_count', 'min_total_count', 'avg_total_count', 'data_points']
+    
+    def has_add_permission(self, request):
+        return False
+    
+    def has_change_permission(self, request, obj=None):
+        return False
+    
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(DailyPeakView)
+class DailyPeakViewAdmin(admin.ModelAdmin):
+    list_display = ['camera', 'date', 'peak_total_count', 'peak_in_count', 'peak_out_count']
+    list_filter = ['camera', 'date']
+    search_fields = ['camera__name']
+    ordering = ['-date']
+    readonly_fields = ['camera', 'date', 'peak_in_count', 'peak_out_count', 'peak_total_count']
+    
+    def has_add_permission(self, request):
+        return False
+    
+    def has_change_permission(self, request, obj=None):
+        return False
+    
+    def has_delete_permission(self, request, obj=None):
         return False
