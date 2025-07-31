@@ -110,9 +110,10 @@ AUTH_PASSWORD_VALIDATORS = [
 
 # Internationalization
 LANGUAGE_CODE = 'en-us'
-TIME_ZONE = 'Asia/Kolkata'
+TIME_ZONE = 'Asia/Kolkata'  # Indian Standard Time (UTC+5:30)
+USE_TZ = True  # Keep timezone-aware datetimes
 USE_I18N = True
-USE_TZ = True
+USE_L10N = True
 
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = 'static/'
@@ -264,3 +265,33 @@ LOGGING = {
         },
     },
 }
+
+
+# Date and Time Formatting for Indian locale
+DATETIME_FORMAT = 'd/m/Y H:i:s'  # DD/MM/YYYY HH:MM:SS
+DATE_FORMAT = 'd/m/Y'  # DD/MM/YYYY
+TIME_FORMAT = 'H:i:s'  # HH:MM:SS
+
+# Optional: Set locale for number formatting
+LANGUAGE_CODE = 'en-in'  # English (India)
+
+# For admin interface datetime display
+DATETIME_INPUT_FORMATS = [
+    '%d/%m/%Y %H:%M:%S',     # 25/12/2023 14:30:45
+    '%d/%m/%Y %H:%M',        # 25/12/2023 14:30
+    '%d-%m-%Y %H:%M:%S',     # 25-12-2023 14:30:45
+    '%d-%m-%Y %H:%M',        # 25-12-2023 14:30
+    '%Y-%m-%d %H:%M:%S',     # 2023-12-25 14:30:45 (ISO format)
+    '%Y-%m-%d %H:%M',        # 2023-12-25 14:30
+]
+
+DATE_INPUT_FORMATS = [
+    '%d/%m/%Y',    # 25/12/2023
+    '%d-%m-%Y',    # 25-12-2023
+    '%Y-%m-%d',    # 2023-12-25 (ISO format)
+]
+
+TIME_INPUT_FORMATS = [
+    '%H:%M:%S',    # 14:30:45
+    '%H:%M',       # 14:30
+]

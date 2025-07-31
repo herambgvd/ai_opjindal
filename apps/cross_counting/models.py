@@ -2,6 +2,7 @@ import logging
 import uuid
 
 from django.db import models
+from django.utils import timezone
 from timescale.db.models.fields import TimescaleDateTimeField
 from timescale.db.models.managers import TimescaleManager
 
@@ -60,7 +61,7 @@ class CrossCountingData(models.Model):
     """
     id = models.BigAutoField(primary_key=True)
 
-    time = TimescaleDateTimeField(interval="1 day", db_index=True, null=True, blank=True)
+    time = TimescaleDateTimeField(interval="1 day", db_index=True, null=True, blank=True,default=timezone.now)
 
     device_name = models.CharField(max_length=200, db_index=True)
     device_ip = models.GenericIPAddressField(db_index=True)
