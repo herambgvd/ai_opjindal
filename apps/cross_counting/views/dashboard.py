@@ -15,9 +15,11 @@ def enhanced_dashboard(request):
     """Enhanced dashboard with comprehensive platform statistics"""
     try:
         dashboard_data = TablePartitioningManager.get_dashboard_statistics()
+        enhanced_regions = TablePartitioningManager.get_enhanced_dashboard_data()
         
         context = {
             'dashboard_data': dashboard_data,
+            'enhanced_regions': enhanced_regions,
             'title': 'Platform Dashboard'
         }
         return render(request, 'dashboard/main.html', context)
