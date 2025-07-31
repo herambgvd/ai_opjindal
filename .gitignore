@@ -1,3 +1,93 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Django migrations
+**/migrations/
+!**/migrations/__init__.py
+
+# Environment files
 .env
-.venv
-.env.example
+.venv/
+venv/
+
+# pip files
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Python virtualenv
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE files
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Logs
+*.log
+logs/
+*.pid
+*.seed
+*.pid.lock
+
+# Static and media files
+staticfiles/
+static/
+media/
+
+# Local databases
+db.sqlite3
+db.sqlite3-journal
+
+# Coverage reports
+htmlcov/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+
+# Pytest
+.pytest_cache/
+
+# MyPy and Pyright
+.mypy_cache/
+.pyright/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Docker
+*.pid
+*.tar
+*.bak
+
+# Test/Debug artifacts
+*.orig
+*.swp
+*.tmp
+*.DS_Store
+
+# Translations
+*.mo
+
+# Celery beat scheduler
+celerybeat-schedule
+
+# gunicorn socket
+*.sock
+
+# Node (if using frontend in same repo)
+node_modules/
+npm-debug.log
+yarn-error.log
+pnpm-debug.log
