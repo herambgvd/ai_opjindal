@@ -1,5 +1,6 @@
 {% extends "cross_counting/analysis/base.html" %}
 {% load static %}
+{% load json_filters %}
 
 {% block title %}Daily Analysis{% endblock title %}
 
@@ -25,7 +26,7 @@
                 <i class="bx bx-search"></i> Analyze
             </button>
             {% if analysis_data %}
-                <a href="{% url 'cross_counting:daily_analysis_csv' %}?{{ request.GET.urlencode }}" 
+                <a href="{% url 'cross_counting:daily_analysis_csv' %}?{{ request.GET.urlencode }}"
                    class="btn btn-success d-block w-100">
                     <i class="bx bx-download"></i> Export CSV
                 </a>
@@ -106,7 +107,7 @@
                             </div>
                         </div>
                     </div>
-                    
+
                     <div class="row">
                         <div class="col-12">
                             <h6>Camera-wise Peak Counts</h6>
@@ -132,7 +133,7 @@
                             </table>
                         </div>
                     </div>
-                    
+
                     <div class="row mt-4">
                         <div class="col-12">
                             <h6>Region Hourly In/Out Counts (24-Hour Timeline)</h6>
@@ -156,7 +157,7 @@
     <script>
         // Region Hourly Chart - FIXED VERSION
         {% if analysis_data.region_hourly_aggregates and analysis_data.region_hourly_aggregates.hourly_data %}
-            var regionHourlyData = {{ analysis_data.region_hourly_aggregates.hourly_data|safe }};
+            var regionHourlyData = {{ analysis_data.region_hourly_aggregates.hourly_data|json_safe|safe }};
             console.log('Region hourly data:', regionHourlyData);
 
             if (regionHourlyData && regionHourlyData.length > 0) {
@@ -278,7 +279,7 @@
 
         // Individual Camera Chart - FIXED VERSION
         {% if analysis_data.region_hourly_aggregates and analysis_data.region_hourly_aggregates.individual_camera_data %}
-            var individualCameraData = {{ analysis_data.region_hourly_aggregates.individual_camera_data|safe }};
+            var individualCameraData = {{ analysis_data.region_hourly_aggregates.individual_camera_data|json_safe|safe }};
             console.log('Individual camera data:', individualCameraData);
 
             if (individualCameraData && individualCameraData.length > 0) {

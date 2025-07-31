@@ -1,5 +1,6 @@
 {% extends "cross_counting/analysis/base.html" %}
 {% load static %}
+{% load json_filters %}
 
 {% block title %}Comparative Analysis{% endblock title %}
 
@@ -32,7 +33,7 @@
                 <i class="bx bx-search"></i> Compare
             </button>
             {% if analysis_data %}
-                <a href="{% url 'cross_counting:comparative_analysis_csv' %}?{{ request.GET.urlencode }}" 
+                <a href="{% url 'cross_counting:comparative_analysis_csv' %}?{{ request.GET.urlencode }}"
                    class="btn btn-success d-block w-100">
                     <i class="bx bx-download"></i> Export CSV
                 </a>
@@ -105,7 +106,7 @@
                             </div>
                         </div>
                     </div>
-                    
+
                     <div class="row">
                         <div class="col-12">
                             <h6>Camera-wise Comparison</h6>
@@ -156,7 +157,7 @@
                             </div>
                         </div>
                     </div>
-                    
+
                     <div class="row mt-4">
                         <div class="col-12">
                             <h6>Camera-wise Total Count Comparison</h6>
@@ -187,7 +188,7 @@
     <script>
         // Camera-wise Comparison Chart - FIXED VERSION
         {% if analysis_data.comparison %}
-            var comparisonData = {{ analysis_data.comparison|safe }};
+            var comparisonData = {{ analysis_data.comparison|json_safe|safe }};
             console.log('Comparison data:', comparisonData);
 
             if (comparisonData && comparisonData.length > 0) {
@@ -286,8 +287,8 @@
 
         // Hourly Comparison Chart - FIXED VERSION
         {% if analysis_data.base_hourly_aggregates.hourly_data and analysis_data.compare_hourly_aggregates.hourly_data %}
-            var baseHourlyData = {{ analysis_data.base_hourly_aggregates.hourly_data|safe }};
-            var compareHourlyData = {{ analysis_data.compare_hourly_aggregates.hourly_data|safe }};
+            var baseHourlyData = {{ analysis_data.base_hourly_aggregates.hourly_data|json_safe|safe }};
+            var compareHourlyData = {{ analysis_data.compare_hourly_aggregates.hourly_data|json_safe|safe }};
             console.log('Base hourly data:', baseHourlyData);
             console.log('Compare hourly data:', compareHourlyData);
 
@@ -418,8 +419,8 @@
 
         // Individual Camera Comparison Chart - FIXED VERSION
         {% if analysis_data.base_hourly_aggregates.individual_camera_data and analysis_data.compare_hourly_aggregates.individual_camera_data %}
-            var baseCameraData = {{ analysis_data.base_hourly_aggregates.individual_camera_data|safe }};
-            var compareCameraData = {{ analysis_data.compare_hourly_aggregates.individual_camera_data|safe }};
+            var baseCameraData = {{ analysis_data.base_hourly_aggregates.individual_camera_data|json_safe|safe }};
+            var compareCameraData = {{ analysis_data.compare_hourly_aggregates.individual_camera_data|json_safe|safe }};
             console.log('Base camera data:', baseCameraData);
             console.log('Compare camera data:', compareCameraData);
 

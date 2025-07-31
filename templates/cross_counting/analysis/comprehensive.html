@@ -1,5 +1,6 @@
 {% extends "cross_counting/analysis/base.html" %}
 {% load static %}
+{% load json_filters %}
 
 {% block title %}Comprehensive Analysis{% endblock title %}
 
@@ -32,7 +33,7 @@
                 <i class="bx bx-search"></i> Analyze
             </button>
             {% if analysis_data %}
-                <a href="{% url 'cross_counting:comprehensive_analysis_csv' %}?{{ request.GET.urlencode }}" 
+                <a href="{% url 'cross_counting:comprehensive_analysis_csv' %}?{{ request.GET.urlencode }}"
                    class="btn btn-success d-block w-100">
                     <i class="bx bx-download"></i> Export CSV
                 </a>
@@ -104,7 +105,7 @@
                             </div>
                         </div>
                     </div>
-                    
+
                     <div class="row">
                         <div class="col-12">
                             <h6>Daily Peak Trends by Camera</h6>
@@ -167,7 +168,7 @@
     <script>
         // Daily Trends Chart - FIXED VERSION
         {% if analysis_data.daily_trends %}
-            var dailyTrendsData = {{ analysis_data.daily_trends|safe }};
+            var dailyTrendsData = {{ analysis_data.daily_trends|json_safe|safe }};
             console.log('Daily trends data:', dailyTrendsData);
 
             if (dailyTrendsData && dailyTrendsData.length > 0) {
@@ -267,7 +268,7 @@
 
             // Region Hourly Trends Chart - FIXED VERSION
             {% if analysis_data.region_hourly_aggregates.hourly_data %}
-                var regionHourlyTrends = {{ analysis_data.region_hourly_aggregates.hourly_data|safe }};
+                var regionHourlyTrends = {{ analysis_data.region_hourly_aggregates.hourly_data|json_safe|safe }};
                 console.log('Region hourly trends:', regionHourlyTrends);
 
                 if (regionHourlyTrends && regionHourlyTrends.length > 0) {
@@ -381,7 +382,7 @@
 
             // Individual Camera Comprehensive Chart - FIXED VERSION
             {% if analysis_data.region_hourly_aggregates.individual_camera_data %}
-                var comprehensiveCameraData = {{ analysis_data.region_hourly_aggregates.individual_camera_data|safe }};
+                var comprehensiveCameraData = {{ analysis_data.region_hourly_aggregates.individual_camera_data|json_safe|safe }};
                 console.log('Comprehensive camera data:', comprehensiveCameraData);
 
                 if (comprehensiveCameraData && comprehensiveCameraData.length > 0) {

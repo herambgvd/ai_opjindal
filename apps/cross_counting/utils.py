@@ -20,13 +20,17 @@ logger = logging.getLogger(__name__)
 
 def serialize_datetime_data(data):
     """
-    Recursively serialize datetime objects in data structures to ISO format strings
-    for safe JavaScript consumption
+    Recursively serialize datetime and UUID objects in data structures to safe formats
+    for JavaScript consumption
     """
+    import uuid
+
     if isinstance(data, datetime):
         return data.isoformat()
     elif isinstance(data, date):
         return data.isoformat()
+    elif isinstance(data, uuid.UUID):
+        return str(data)  # Convert UUID to string
     elif isinstance(data, dict):
         return {key: serialize_datetime_data(value) for key, value in data.items()}
     elif isinstance(data, list):
@@ -322,7 +326,7 @@ class TablePartitioningManager:
                 total_peak_out += peaks['peak_out_count'] or 0
                 total_peak_total += peaks['peak_total_count'] or 0
 
-        return {
+        result = {
             "cameras": daily_data,
             "summary": {
                 "total_peak_in": total_peak_in,
@@ -334,6 +338,8 @@ class TablePartitioningManager:
                 region_id, start_datetime, end_datetime
             )
         }
+
+        return serialize_datetime_data(result)
 
     @staticmethod
     def get_comparative_analysis_data(region_id: int, base_date: date, compare_date: date) -> Dict[str, Any]:
@@ -364,7 +370,7 @@ class TablePartitioningManager:
                 "diff_total": compare_camera["peak_total"] - base_camera["peak_total"]
             })
 
-        return {
+        result = {
             "base_date": base_date,
             "compare_date": compare_date,
             "comparison": comparison,
@@ -373,6 +379,8 @@ class TablePartitioningManager:
             "base_hourly_aggregates": base_data.get("region_hourly_aggregates", {"hourly_data": []}),
             "compare_hourly_aggregates": compare_data.get("region_hourly_aggregates", {"hourly_data": []})
         }
+
+        return serialize_datetime_data(result)
 
     @staticmethod
     def get_comprehensive_analysis_data(region_id: int, from_date: date, to_date: date) -> Dict[str, Any]:
@@ -414,16 +422,18 @@ class TablePartitioningManager:
 
         total_days = (to_date - from_date).days + 1
 
-        return {
+        result = {
             "from_date": from_date,
             "to_date": to_date,
             "total_days": total_days,
-            "daily_trends": serialize_datetime_data(daily_trends),
-            "cameras": list(cameras.values('id', 'name')),
+            "daily_trends": daily_trends,  # Already serialized by serialize_datetime_data call below
+            "cameras": [{"id": str(cam.id), "name": cam.name} for cam in cameras],  # Convert UUID to string
             "region_hourly_aggregates": TablePartitioningManager.get_hourly_region_aggregates(
                 region_id, start_datetime, end_datetime
             )
         }
+
+        return serialize_datetime_data(result)
 
     @staticmethod
     def get_current_occupancy_data() -> List[Dict[str, Any]]:
