@@ -35,194 +35,22 @@
 {% endblock %}
 
 {% block analysis_results %}
-    {#    <div class="row mb-4">#}
-    {#        <div class="col-md-3">#}
-    {#            <div class="card bg-success text-white">#}
-    {#                <div class="card-body">#}
-    {#                    <div class="d-flex align-items-center">#}
-    {#                        <div class="flex-grow-1">#}
-    {#                            <p class="text-truncate font-size-14 mb-2">Daily Entries</p>#}
-    {#                            <h4 class="mb-2">{{ analysis_data.summary.total_daily_entries|default:0 }}</h4>#}
-    {#                            <small>People entered today</small>#}
-    {#                        </div>#}
-    {#                        <div class="flex-shrink-0">#}
-    {#                            <i class="mdi mdi-arrow-down-bold font-size-24"></i>#}
-    {#                        </div>#}
-    {#                    </div>#}
-    {#                </div>#}
-    {#            </div>#}
-    {#        </div>#}
-    {#        <div class="col-md-3">#}
-    {#            <div class="card bg-danger text-white">#}
-    {#                <div class="card-body">#}
-    {#                    <div class="d-flex align-items-center">#}
-    {#                        <div class="flex-grow-1">#}
-    {#                            <p class="text-truncate font-size-14 mb-2">Daily Exits</p>#}
-    {#                            <h4 class="mb-2">{{ analysis_data.summary.total_daily_exits|default:0 }}</h4>#}
-    {#                            <small>People exited today</small>#}
-    {#                        </div>#}
-    {#                        <div class="flex-shrink-0">#}
-    {#                            <i class="mdi mdi-arrow-up-bold font-size-24"></i>#}
-    {#                        </div>#}
-    {#                    </div>#}
-    {#                </div>#}
-    {#            </div>#}
-    {#        </div>#}
-    {#        <div class="col-md-3">#}
-    {#            <div class="card bg-info text-white">#}
-    {#                <div class="card-body">#}
-    {#                    <div class="d-flex align-items-center">#}
-    {#                        <div class="flex-grow-1">#}
-    {#                            <p class="text-truncate font-size-14 mb-2">Net Change</p>#}
-    {#                            <h4 class="mb-2">#}
-    {#                                {% if analysis_data.summary.net_daily_change >= 0 %}#}
-    {#                                    +{{ analysis_data.summary.net_daily_change|default:0 }}#}
-    {#                                {% else %}#}
-    {#                                    {{ analysis_data.summary.net_daily_change|default:0 }}#}
-    {#                                {% endif %}#}
-    {#                            </h4>#}
-    {#                            <small>Net occupancy change</small>#}
-    {#                        </div>#}
-    {#                        <div class="flex-shrink-0">#}
-    {#                            {% if analysis_data.summary.net_daily_change >= 0 %}#}
-    {#                                <i class="mdi mdi-trending-up font-size-24"></i>#}
-    {#                            {% else %}#}
-    {#                                <i class="mdi mdi-trending-down font-size-24"></i>#}
-    {#                            {% endif %}#}
-    {#                        </div>#}
-    {#                    </div>#}
-    {#                </div>#}
-    {#            </div>#}
-    {#        </div>#}
-    {#        <div class="col-md-3">#}
-    {#            <div class="card bg-warning text-white">#}
-    {#                <div class="card-body">#}
-    {#                    <div class="d-flex align-items-center">#}
-    {#                        <div class="flex-grow-1">#}
-    {#                            <p class="text-truncate font-size-14 mb-2">Peak Occupancy</p>#}
-    {#                            <h4 class="mb-2">{{ analysis_data.summary.total_peak_occupancy|default:0 }}</h4>#}
-    {#                            <small>Maximum people present</small>#}
-    {#                        </div>#}
-    {#                        <div class="flex-shrink-0">#}
-    {#                            <i class="mdi mdi-account-group font-size-24"></i>#}
-    {#                        </div>#}
-    {#                    </div>#}
-    {#                </div>#}
-    {#            </div>#}
-    {#        </div>#}
-    {#    </div>#}
-
-    <!-- Update the camera-wise table as well -->
-    {#    <div class="row">#}
-    {#        <div class="col-12">#}
-    {#            <h6>Camera-wise Daily Traffic Flow</h6>#}
-    {#            <table class="table table-bordered table-striped">#}
-    {#                <thead>#}
-    {#                <tr>#}
-    {#                    <th>Camera</th>#}
-    {#                    <th>Daily Entries</th>#}
-    {#                    <th>Daily Exits</th>#}
-    {#                    <th>Net Change</th>#}
-    {#                    <th>Peak Occupancy</th>#}
-    {#                    <th class="text-muted">Peak Cumulative In</th>#}
-    {#                    <th class="text-muted">Peak Cumulative Out</th>#}
-    {#                </tr>#}
-    {#                </thead>#}
-    {#                <tbody>#}
-    {#                {% for camera in analysis_data.cameras %}#}
-    {#                    <tr>#}
-    {#                        <td><strong>{{ camera.camera_name }}</strong></td>#}
-    {#                        <td class="text-success">{{ camera.daily_entries|default:0 }}</td>#}
-    {#                        <td class="text-danger">{{ camera.daily_exits|default:0 }}</td>#}
-    {#                        <td class="{% if camera.net_daily_change >= 0 %}text-success{% else %}text-warning{% endif %}">#}
-    {#                            {% if camera.net_daily_change >= 0 %}+{% endif %}{{ camera.net_daily_change|default:0 }}#}
-    {#                        </td>#}
-    {#                        <td class="text-info">{{ camera.peak_occupancy|default:0 }}</td>#}
-    {#                        <td class="text-muted small">{{ camera.peak_cumulative_in|default:0 }}</td>#}
-    {#                        <td class="text-muted small">{{ camera.peak_cumulative_out|default:0 }}</td>#}
-    {#                    </tr>#}
-    {#                {% endfor %}#}
-    {#                </tbody>#}
-    {#            </table>#}
-    {#        </div>#}
-    {#    </div>#}
-    <!-- Replace the charts section in your daily.html template with this comprehensive version -->
+    <!-- Replace the charts section in your daily.html template -->
 
     <div class="row mt-4">
         <div class="col-12">
-            <div class="card">
-                <div class="card-header">
-                    <h6 class="card-title mb-0">Hourly Analysis Dashboard</h6>
-                    <div class="btn-group btn-group-sm mt-2" role="group" id="chartToggle">
-                        <input type="radio" class="btn-check" name="chartView" id="trafficView" checked>
-                        <label class="btn btn-outline-primary" for="trafficView">Traffic Flow</label>
-
-                        <input type="radio" class="btn-check" name="chartView" id="occupancyView">
-                        <label class="btn btn-outline-success" for="occupancyView">Occupancy</label>
-
-                        <input type="radio" class="btn-check" name="chartView" id="cumulativeView">
-                        <label class="btn btn-outline-info" for="cumulativeView">Cumulative Counts</label>
-                    </div>
-                </div>
-                <div class="card-body">
-                    <!-- Traffic Flow Chart -->
-                    <div id="trafficFlowChart" class="chart-container">
-                        <h6>Regional Hourly Traffic Flow - {{ analysis_data.date }}</h6>
-                        <p class="text-muted">Shows actual entries and exits per hour (not cumulative)</p>
-                        <div id="region_traffic_chart"></div>
-                    </div>
-
-                    <!-- Occupancy Chart -->
-                    <div id="occupancyChart" class="chart-container" style="display: none;">
-                        <h6>Regional Hourly Occupancy - {{ analysis_data.date }}</h6>
-                        <p class="text-muted">Shows current occupancy levels and changes</p>
-                        <div id="region_occupancy_chart"></div>
-                    </div>
-
-                    <!-- Cumulative Chart -->
-                    <div id="cumulativeChart" class="chart-container" style="display: none;">
-                        <h6>Regional Hourly Cumulative Counts - {{ analysis_data.date }}</h6>
-                        <p class="text-muted">Shows traditional cumulative in/out counts</p>
-                        <div id="region_cumulative_chart"></div>
-                    </div>
-                </div>
-            </div>
+            <h6>Regional Hourly Cumulative Analysis</h6>
+            <p class="text-muted">Shows cumulative in/out counts and current occupancy levels throughout the day</p>
+            <div id="region_hourly_chart"></div>
         </div>
     </div>
 
     <div class="row mt-4">
         <div class="col-12">
-            <div class="card">
-                <div class="card-header">
-                    <h6 class="card-title mb-0">Individual Camera Analysis</h6>
-                    <div class="btn-group btn-group-sm mt-2" role="group" id="cameraChartToggle">
-                        <input type="radio" class="btn-check" name="cameraView" id="cameraTrafficView" checked>
-                        <label class="btn btn-outline-primary" for="cameraTrafficView">Traffic Flow</label>
-
-                        <input type="radio" class="btn-check" name="cameraView" id="cameraOccupancyView">
-                        <label class="btn btn-outline-success" for="cameraOccupancyView">Occupancy</label>
-
-                        <input type="radio" class="btn-check" name="cameraView" id="cameraCumulativeView">
-                        <label class="btn btn-outline-info" for="cameraCumulativeView">Cumulative</label>
-                    </div>
-                </div>
-                <div class="card-body">
-                    <!-- Camera Traffic Flow Chart -->
-                    <div id="cameraTrafficChart" class="camera-chart-container">
-                        <div id="individual_traffic_chart"></div>
-                    </div>
-
-                    <!-- Camera Occupancy Chart -->
-                    <div id="cameraOccupancyChart" class="camera-chart-container" style="display: none;">
-                        <div id="individual_occupancy_chart"></div>
-                    </div>
-
-                    <!-- Camera Cumulative Chart -->
-                    <div id="cameraCumulativeChart" class="camera-chart-container" style="display: none;">
-                        <div id="individual_cumulative_chart"></div>
-                    </div>
-                </div>
-            </div>
+            <h6>Individual Camera Cumulative Trends</h6>
+            <p class="text-muted">Shows each camera's cumulative counts progression (solid line = in, dashed line =
+                out)</p>
+            <div id="individual_camera_chart"></div>
         </div>
     </div>
 
@@ -232,43 +60,42 @@
             <div class="col-12">
                 <div class="card">
                     <div class="card-header">
-                        <h6 class="card-title mb-0">Daily Summary Insights</h6>
+                        <h6 class="card-title mb-0">Daily Analysis Summary</h6>
                     </div>
                     <div class="card-body">
                         <div class="row text-center">
-                            <div class="col-md-2">
+                            <div class="col-md-3">
                                 <div class="border-end">
-                                    <h5 class="text-primary">{{ analysis_data.region_hourly_aggregates.daily_summary.total_entries }}</h5>
-                                    <p class="mb-0 small">Total Daily Entries</p>
+                                    <h5 class="text-success">{{ analysis_data.region_hourly_aggregates.daily_summary.max_regional_occupancy }}</h5>
+                                    <p class="mb-0 small">Peak Regional Occupancy</p>
+                                    <small class="text-muted">Maximum people in all areas combined</small>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="border-end">
+                                    <h5 class="text-info">{{ analysis_data.region_hourly_aggregates.daily_summary.peak_occupancy_hour }}:00</h5>
+                                    <p class="mb-0 small">Peak Occupancy Hour</p>
+                                    <small class="text-muted">Busiest time of day</small>
                                 </div>
                             </div>
                             <div class="col-md-2">
                                 <div class="border-end">
-                                    <h5 class="text-danger">{{ analysis_data.region_hourly_aggregates.daily_summary.total_exits }}</h5>
-                                    <p class="mb-0 small">Total Daily Exits</p>
-                                </div>
-                            </div>
-                            <div class="col-md-2">
-                                <div class="border-end">
-                                    <h5 class="text-success">{{ analysis_data.region_hourly_aggregates.daily_summary.peak_occupancy }}</h5>
-                                    <p class="mb-0 small">Peak Occupancy</p>
-                                </div>
-                            </div>
-                            <div class="col-md-2">
-                                <div class="border-end">
-                                    <h5 class="text-info">{{ analysis_data.region_hourly_aggregates.daily_summary.busiest_hour }}:00</h5>
-                                    <p class="mb-0 small">Busiest Hour</p>
+                                    <h5 class="text-primary">{{ analysis_data.region_hourly_aggregates.daily_summary.active_cameras }}</h5>
+                                    <p class="mb-0 small">Active Cameras</p>
+                                    <small class="text-muted">Cameras with data</small>
                                 </div>
                             </div>
                             <div class="col-md-2">
                                 <div class="border-end">
                                     <h5 class="text-warning">{{ analysis_data.region_hourly_aggregates.daily_summary.active_hours }}</h5>
                                     <p class="mb-0 small">Active Hours</p>
+                                    <small class="text-muted">Hours with activity</small>
                                 </div>
                             </div>
                             <div class="col-md-2">
-                                <h5 class="text-secondary">{{ analysis_data.region_hourly_aggregates.camera_count }}</h5>
-                                <p class="mb-0 small">Active Cameras</p>
+                                <h5 class="text-secondary">{{ analysis_data.region_hourly_aggregates.daily_summary.total_cameras_monitored }}</h5>
+                                <p class="mb-0 small">Total Cameras</p>
+                                <small class="text-muted">All cameras in region</small>
                             </div>
                         </div>
                     </div>
@@ -276,423 +103,220 @@
             </div>
         </div>
     {% endif %}
+
+    <!-- Camera-wise Summary Table -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="card-title mb-0">Camera-wise Daily Summary</h6>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-striped">
+                            <thead>
+                            <tr>
+                                <th>Camera</th>
+                                <th>Max Cumulative In</th>
+                                <th>Max Cumulative Out</th>
+                                <th>Peak Occupancy</th>
+                                <th>Active Hours</th>
+                                <th>Status</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {% for camera in analysis_data.region_hourly_aggregates.individual_camera_data %}
+                                <tr>
+                                    <td><strong>{{ camera.camera_name }}</strong></td>
+                                    <td class="text-success">{{ camera.daily_stats.max_cumulative_in }}</td>
+                                    <td class="text-danger">{{ camera.daily_stats.max_cumulative_out }}</td>
+                                    <td class="text-info">{{ camera.daily_stats.max_occupancy }}</td>
+                                    <td class="text-warning">{{ camera.daily_stats.active_hours }}</td>
+                                    <td>
+                                        {% if camera.daily_stats.max_cumulative_in > 0 %}
+                                            <span class="badge bg-success">Active</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">No Data</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% empty %}
+                                <tr>
+                                    <td colspan="6" class="text-center text-muted">No camera data available
+                                        for {{ analysis_data.date }}</td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 {% endblock %}
 
 {% block analysis_js %}
     <script>
-        // Chart toggle functionality
-        document.addEventListener('DOMContentLoaded', function () {
-            // Regional chart toggles
-            const chartViews = document.querySelectorAll('input[name="chartView"]');
-            chartViews.forEach(radio => {
-                radio.addEventListener('change', function () {
-                    document.querySelectorAll('.chart-container').forEach(container => {
-                        container.style.display = 'none';
-                    });
-
-                    if (this.id === 'trafficView') {
-                        document.getElementById('trafficFlowChart').style.display = 'block';
-                    } else if (this.id === 'occupancyView') {
-                        document.getElementById('occupancyChart').style.display = 'block';
-                    } else if (this.id === 'cumulativeView') {
-                        document.getElementById('cumulativeChart').style.display = 'block';
-                    }
-                });
-            });
-
-            // Camera chart toggles
-            const cameraViews = document.querySelectorAll('input[name="cameraView"]');
-            cameraViews.forEach(radio => {
-                radio.addEventListener('change', function () {
-                    document.querySelectorAll('.camera-chart-container').forEach(container => {
-                        container.style.display = 'none';
-                    });
-
-                    if (this.id === 'cameraTrafficView') {
-                        document.getElementById('cameraTrafficChart').style.display = 'block';
-                    } else if (this.id === 'cameraOccupancyView') {
-                        document.getElementById('cameraOccupancyChart').style.display = 'block';
-                    } else if (this.id === 'cameraCumulativeView') {
-                        document.getElementById('cameraCumulativeChart').style.display = 'block';
-                    }
-                });
-            });
-        });
-
-        {% if analysis_data.region_hourly_aggregates %}
-            // Prepare data arrays
+        {% if analysis_data.region_hourly_aggregates and analysis_data.region_hourly_aggregates.hourly_data %}
+            // Prepare data arrays for cumulative display
             var hours = ['00:00', '01:00', '02:00', '03:00', '04:00', '05:00', '06:00', '07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00', '22:00', '23:00'];
 
-            // TRAFFIC FLOW DATA
-            var trafficInData = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-            var trafficOutData = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-            var netChangeData = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-
-            {% if analysis_data.region_hourly_aggregates.traffic_flow_data %}
-                {% for hour_data in analysis_data.region_hourly_aggregates.traffic_flow_data %}
-                    trafficInData[{{ hour_data.hour }}] = {{ hour_data.total_in_count|default:0 }};
-                    trafficOutData[{{ hour_data.hour }}] = {{ hour_data.total_out_count|default:0 }};
-                    netChangeData[{{ hour_data.hour }}] = {{ hour_data.net_occupancy_change|default:0 }};
-                {% endfor %}
-            {% endif %}
-
-            // OCCUPANCY DATA
+            // Regional cumulative data (sum of all cameras)
+            var regionalInData = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+            var regionalOutData = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
             var occupancyData = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-            var occupancyChangeData = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 
-            {% if analysis_data.region_hourly_aggregates.occupancy_data %}
-                {% for hour_data in analysis_data.region_hourly_aggregates.occupancy_data %}
-                    occupancyData[{{ hour_data.hour }}] = {{ hour_data.current_occupancy|default:0 }};
-                    occupancyChangeData[{{ hour_data.hour }}] = {{ hour_data.occupancy_change|default:0 }};
-                {% endfor %}
-            {% endif %}
+            {% for hour_data in analysis_data.region_hourly_aggregates.hourly_data %}
+                regionalInData[{{ hour_data.hour }}] = {{ hour_data.total_in_count|default:0 }};
+                regionalOutData[{{ hour_data.hour }}] = {{ hour_data.total_out_count|default:0 }};
+                occupancyData[{{ hour_data.hour }}] = {{ hour_data.current_occupancy|default:0 }};
+            {% endfor %}
 
-            // CUMULATIVE DATA
-            var cumulativeInData = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-            var cumulativeOutData = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-
-            {% if analysis_data.region_hourly_aggregates.cumulative_data %}
-                {% for hour_data in analysis_data.region_hourly_aggregates.cumulative_data %}
-                    cumulativeInData[{{ hour_data.hour }}] = {{ hour_data.cumulative_in|default:0 }};
-                    cumulativeOutData[{{ hour_data.hour }}] = {{ hour_data.cumulative_out|default:0 }};
-                {% endfor %}
-            {% endif %}
-
-            // 1. TRAFFIC FLOW CHART
-            var trafficOptions = {
+            // 1. REGIONAL CUMULATIVE CHART
+            var regionalOptions = {
                 series: [{
-                    name: 'Hourly Entries',
-                    data: trafficInData,
+                    name: 'Total In Count',
+                    data: regionalInData,
                     color: '#28a745',
-                    type: 'column'
-                }, {
-                    name: 'Hourly Exits',
-                    data: trafficOutData,
-                    color: '#dc3545',
-                    type: 'column'
-                }, {
-                    name: 'Net Change',
-                    data: netChangeData,
-                    color: '#007bff',
                     type: 'line'
+                }, {
+                    name: 'Total Out Count',
+                    data: regionalOutData,
+                    color: '#dc3545',
+                    type: 'line'
+                }, {
+                    name: 'Current Occupancy',
+                    data: occupancyData,
+                    color: '#007bff',
+                    type: 'area'
                 }],
                 chart: {
                     type: 'line',
-                    height: 400,
+                    height: 450,
                     toolbar: {show: true}
-                },
-                plotOptions: {
-                    bar: {
-                        horizontal: false,
-                        columnWidth: '60%',
-                        endingShape: 'rounded'
-                    }
                 },
                 xaxis: {
                     categories: hours,
-                    title: {text: 'Hour (24-hour format)'},
+                    title: {
+                        text: 'Hour (24-hour format)',
+                        style: {fontSize: '14px', fontWeight: 600}
+                    },
                     labels: {rotate: -45}
                 },
                 yaxis: {
-                    title: {text: 'People Count (Per Hour)'},
+                    title: {
+                        text: 'Cumulative Count',
+                        style: {fontSize: '14px', fontWeight: 600}
+                    },
                     min: 0
                 },
                 title: {
-                    text: 'Hourly Traffic Flow - Entries & Exits per Hour',
-                    align: 'center'
+                    text: 'Regional Hourly Cumulative Counts & Occupancy - {{ analysis_data.date }}',
+                    align: 'center',
+                    style: {fontSize: '16px', fontWeight: 600}
                 },
-                stroke: {curve: 'smooth', width: [0, 0, 3]},
-                markers: {size: [0, 0, 5]},
-                legend: {position: 'top'},
+                stroke: {
+                    curve: 'smooth',
+                    width: [3, 3, 2]
+                },
+                fill: {
+                    type: ['solid', 'solid', 'gradient'],
+                    gradient: {
+                        shadeIntensity: 1,
+                        opacityFrom: 0.4,
+                        opacityTo: 0.1,
+                        stops: [0, 90, 100]
+                    }
+                },
+                markers: {size: [4, 4, 0]},
+                legend: {
+                    position: 'top',
+                    horizontalAlign: 'center'
+                },
+                grid: {
+                    borderColor: '#e7e7e7',
+                    strokeDashArray: 3
+                },
                 tooltip: {
                     y: {
                         formatter: function (val, opts) {
                             if (opts.seriesIndex === 2) {
-                                return val > 0 ? `+${val} net increase` : `${val} net decrease`;
+                                return val + " people currently in space";
                             }
-                            return val + " people";
-                        }
-                    }
-                }
-            };
-
-            // 2. OCCUPANCY CHART
-            var occupancyOptions = {
-                series: [{
-                    name: 'Current Occupancy',
-                    data: occupancyData,
-                    color: '#17a2b8',
-                    type: 'area'
-                }, {
-                    name: 'Occupancy Change',
-                    data: occupancyChangeData,
-                    color: '#ffc107',
-                    type: 'line'
-                }],
-                chart: {
-                    type: 'area',
-                    height: 400,
-                    toolbar: {show: true}
-                },
-                xaxis: {
-                    categories: hours,
-                    title: {text: 'Hour (24-hour format)'},
-                    labels: {rotate: -45}
-                },
-                yaxis: {
-                    title: {text: 'People Count (Current Occupancy)'},
-                    min: 0
-                },
-                title: {
-                    text: 'Hourly Occupancy Levels - Current People in Space',
-                    align: 'center'
-                },
-                fill: {
-                    type: 'gradient',
-                    gradient: {
-                        shadeIntensity: 1,
-                        opacityFrom: 0.6,
-                        opacityTo: 0.1
-                    }
-                },
-                stroke: {curve: 'smooth', width: [2, 3]},
-                markers: {size: [4, 5]},
-                legend: {position: 'top'},
-                tooltip: {
-                    y: {
-                        formatter: function (val, opts) {
-                            if (opts.seriesIndex === 1) {
-                                return val > 0 ? `+${val} people joined` : `${Math.abs(val)} people left`;
-                            }
-                            return val + " people currently in space";
-                        }
-                    }
-                }
-            };
-
-            // 3. CUMULATIVE CHART
-            var cumulativeOptions = {
-                series: [{
-                    name: 'Cumulative In Count',
-                    data: cumulativeInData,
-                    color: '#28a745'
-                }, {
-                    name: 'Cumulative Out Count',
-                    data: cumulativeOutData,
-                    color: '#dc3545'
-                }],
-                chart: {
-                    type: 'line',
-                    height: 400,
-                    toolbar: {show: true}
-                },
-                xaxis: {
-                    categories: hours,
-                    title: {text: 'Hour (24-hour format)'},
-                    labels: {rotate: -45}
-                },
-                yaxis: {
-                    title: {text: 'Cumulative Count (Total Since Start)'},
-                    min: 0
-                },
-                title: {
-                    text: 'Cumulative Counts - Traditional Counter View',
-                    align: 'center'
-                },
-                stroke: {curve: 'smooth', width: 3},
-                markers: {size: 5},
-                legend: {position: 'top'},
-                tooltip: {
-                    y: {
-                        formatter: function (val) {
                             return val + " total count";
                         }
                     }
+                },
+                annotations: {
+                    yaxis: [{
+                        y: Math.max(...occupancyData),
+                        borderColor: '#007bff',
+                        label: {
+                            borderColor: '#007bff',
+                            style: {
+                                color: '#fff',
+                                background: '#007bff'
+                            },
+                            text: 'Peak Occupancy: ' + Math.max(...occupancyData)
+                        }
+                    }]
                 }
             };
 
-            // Render charts
-            var trafficChart = new ApexCharts(document.querySelector("#region_traffic_chart"), trafficOptions);
-            trafficChart.render();
+            var regionalChart = new ApexCharts(document.querySelector("#region_hourly_chart"), regionalOptions);
+            regionalChart.render();
 
-            var occupancyChart = new ApexCharts(document.querySelector("#region_occupancy_chart"), occupancyOptions);
-            occupancyChart.render();
-
-            var cumulativeChart = new ApexCharts(document.querySelector("#region_cumulative_chart"), cumulativeOptions);
-            cumulativeChart.render();
-
-            // INDIVIDUAL CAMERA CHARTS
+            // 2. INDIVIDUAL CAMERA CHARTS
             {% if analysis_data.region_hourly_aggregates.individual_camera_data %}
-                var colors = ['#007bff', '#28a745', '#dc3545', '#ffc107', '#17a2b8', '#6f42c1', '#e83e8c', '#fd7e14'];
+                var colors = ['#007bff', '#28a745', '#dc3545', '#ffc107', '#17a2b8', '#6f42c1', '#e83e8c', '#fd7e14', '#20c997', '#6610f2'];
 
-                // Camera Traffic Flow Series
-                var cameraTrafficSeries = [];
-                var cameraOccupancySeries = [];
+                // Camera series for cumulative display
                 var cameraCumulativeSeries = [];
+                var cameraOccupancySeries = [];
 
                 {% for camera in analysis_data.region_hourly_aggregates.individual_camera_data %}
-                    // Traffic flow data
-                    var trafficInData_{{ forloop.counter0 }} = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-                    var trafficOutData_{{ forloop.counter0 }} = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+                    // Initialize arrays for this camera
+                    var cameraInData_{{ forloop.counter0 }} = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+                    var cameraOutData_{{ forloop.counter0 }} = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+                    var cameraOccupancy_{{ forloop.counter0 }} = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 
+                    // Populate hourly data for this camera
                     {% for hour_data in camera.hourly_data %}
-                        trafficInData_{{ forloop.parentloop.counter0 }}[{{ hour_data.hour }}] = {{ hour_data.cc_in_count|default:0 }};
-                        trafficOutData_{{ forloop.parentloop.counter0 }}[{{ hour_data.hour }}] = {{ hour_data.cc_out_count|default:0 }};
+                        cameraInData_{{ forloop.parentloop.counter0 }}[{{ hour_data.hour }}] = {{ hour_data.cc_in_count|default:0 }};
+                        cameraOutData_{{ forloop.parentloop.counter0 }}[{{ hour_data.hour }}] = {{ hour_data.cc_out_count|default:0 }};
+                        cameraOccupancy_{{ forloop.parentloop.counter0 }}[{{ hour_data.hour }}] = {{ hour_data.current_occupancy|default:0 }};
                     {% endfor %}
 
-                    // Only add if there's data
-                    var hasTrafficData = trafficInData_{{ forloop.counter0 }}.some(val => val > 0) || trafficOutData_{{ forloop.counter0 }}.some(val => val > 0);
-                    if (hasTrafficData) {
-                        cameraTrafficSeries.push({
-                            name: '{{ camera.camera_name }} - Entries',
-                            data: trafficInData_{{ forloop.counter0 }},
+                    // Only add camera if it has data
+                    var hasData = cameraInData_{{ forloop.counter0 }}.some(val => val > 0) || cameraOutData_{{ forloop.counter0 }}.some(val => val > 0);
+                    if (hasData) {
+                        // Cumulative counts
+                        cameraCumulativeSeries.push({
+                            name: '{{ camera.camera_name }} - In',
+                            data: cameraInData_{{ forloop.counter0 }},
                             color: colors[{{ forloop.counter0 }} % colors.length],
-                            type: 'area'
+                            stroke: {width: 2}
                         });
-                        cameraTrafficSeries.push({
-                            name: '{{ camera.camera_name }} - Exits',
-                            data: trafficOutData_{{ forloop.counter0 }},
+
+                        cameraCumulativeSeries.push({
+                            name: '{{ camera.camera_name }} - Out',
+                            data: cameraOutData_{{ forloop.counter0 }},
                             color: colors[{{ forloop.counter0 }} % colors.length],
-                            type: 'area',
-                            fill: {opacity: 0.3}
+                            stroke: {width: 2, dashArray: 5}
+                        });
+
+                        // Occupancy levels
+                        cameraOccupancySeries.push({
+                            name: '{{ camera.camera_name }}',
+                            data: cameraOccupancy_{{ forloop.counter0 }},
+                            color: colors[{{ forloop.counter0 }} % colors.length]
                         });
                     }
-
-                    // Occupancy data
-                    {% if camera.occupancy_data %}
-                        var occupancyData_{{ forloop.counter0 }} = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-
-                        {% for hour_data in camera.occupancy_data %}
-                            occupancyData_{{ forloop.parentloop.counter0 }}[{{ hour_data.hour }}] = {{ hour_data.current_occupancy|default:0 }};
-                        {% endfor %}
-
-                        var hasOccupancyData = occupancyData_{{ forloop.counter0 }}.some(val => val > 0);
-                        if (hasOccupancyData) {
-                            cameraOccupancySeries.push({
-                                name: '{{ camera.camera_name }}',
-                                data: occupancyData_{{ forloop.counter0 }},
-                                color: colors[{{ forloop.counter0 }} % colors.length]
-                            });
-                        }
-                    {% endif %}
-
-                    // Cumulative data
-                    {% if camera.cumulative_data %}
-                        var cumInData_{{ forloop.counter0 }} = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-                        var cumOutData_{{ forloop.counter0 }} = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-
-                        {% for hour_data in camera.cumulative_data %}
-                            cumInData_{{ forloop.parentloop.counter0 }}[{{ hour_data.hour }}] = {{ hour_data.cumulative_in|default:0 }};
-                            cumOutData_{{ forloop.parentloop.counter0 }}[{{ hour_data.hour }}] = {{ hour_data.cumulative_out|default:0 }};
-                        {% endfor %}
-
-                        var hasCumData = cumInData_{{ forloop.counter0 }}.some(val => val > 0) || cumOutData_{{ forloop.counter0 }}.some(val => val > 0);
-                        if (hasCumData) {
-                            cameraCumulativeSeries.push({
-                                name: '{{ camera.camera_name }} - In',
-                                data: cumInData_{{ forloop.counter0 }},
-                                color: colors[{{ forloop.counter0 }} % colors.length]
-                            });
-                            cameraCumulativeSeries.push({
-                                name: '{{ camera.camera_name }} - Out',
-                                data: cumOutData_{{ forloop.counter0 }},
-                                color: colors[{{ forloop.counter0 }} % colors.length],
-                                stroke: {dashArray: 5}
-                            });
-                        }
-                    {% endif %}
                 {% endfor %}
 
-                // Camera Traffic Flow Chart
-                if (cameraTrafficSeries.length > 0) {
-                    var cameraTrafficOptions = {
-                        series: cameraTrafficSeries,
-                        chart: {
-                            type: 'area',
-                            height: 500,
-                            toolbar: {show: true}
-                        },
-                        xaxis: {
-                            categories: hours,
-                            title: {text: 'Hour (24-hour format)'},
-                            labels: {rotate: -45}
-                        },
-                        yaxis: {
-                            title: {text: 'People Count (Entries/Exits per Hour)'},
-                            min: 0
-                        },
-                        title: {
-                            text: 'Individual Camera Traffic Flow - {{ analysis_data.date }}',
-                            align: 'center'
-                        },
-                        stroke: {curve: 'smooth', width: 2},
-                        fill: {
-                            type: 'gradient',
-                            gradient: {
-                                shadeIntensity: 1,
-                                opacityFrom: 0.6,
-                                opacityTo: 0.1
-                            }
-                        },
-                        legend: {position: 'top', fontSize: '12px'},
-                        tooltip: {
-                            y: {
-                                formatter: function (val) {
-                                    return val + " people per hour";
-                                }
-                            }
-                        }
-                    };
-
-                    var cameraTrafficChart = new ApexCharts(document.querySelector("#individual_traffic_chart"), cameraTrafficOptions);
-                    cameraTrafficChart.render();
-                } else {
-                    document.querySelector("#individual_traffic_chart").innerHTML = '<div class="alert alert-info">No camera traffic flow data available.</div>';
-                }
-
-                // Camera Occupancy Chart
-                if (cameraOccupancySeries.length > 0) {
-                    var cameraOccupancyOptions = {
-                        series: cameraOccupancySeries,
-                        chart: {
-                            type: 'line',
-                            height: 500,
-                            toolbar: {show: true}
-                        },
-                        xaxis: {
-                            categories: hours,
-                            title: {text: 'Hour (24-hour format)'},
-                            labels: {rotate: -45}
-                        },
-                        yaxis: {
-                            title: {text: 'Current Occupancy (People in Space)'},
-                            min: 0
-                        },
-                        title: {
-                            text: 'Individual Camera Occupancy Levels - {{ analysis_data.date }}',
-                            align: 'center'
-                        },
-                        stroke: {curve: 'smooth', width: 3},
-                        markers: {size: 4},
-                        legend: {position: 'top', fontSize: '12px'},
-                        tooltip: {
-                            y: {
-                                formatter: function (val) {
-                                    return val + " people currently";
-                                }
-                            }
-                        }
-                    };
-
-                    var cameraOccupancyChart = new ApexCharts(document.querySelector("#individual_occupancy_chart"), cameraOccupancyOptions);
-                    cameraOccupancyChart.render();
-                } else {
-                    document.querySelector("#individual_occupancy_chart").innerHTML = '<div class="alert alert-info">No camera occupancy data available.</div>';
-                }
-
-                // Camera Cumulative Chart
+                // Individual Camera Cumulative Chart
                 if (cameraCumulativeSeries.length > 0) {
-                    var cameraCumulativeOptions = {
+                    var individualCumulativeOptions = {
                         series: cameraCumulativeSeries,
                         chart: {
                             type: 'line',
@@ -701,40 +325,132 @@
                         },
                         xaxis: {
                             categories: hours,
-                            title: {text: 'Hour (24-hour format)'},
+                            title: {
+                                text: 'Hour (24-hour format)',
+                                style: {fontSize: '14px', fontWeight: 600}
+                            },
                             labels: {rotate: -45}
                         },
                         yaxis: {
-                            title: {text: 'Cumulative Count (Total Since Start)'},
+                            title: {
+                                text: 'Cumulative Count',
+                                style: {fontSize: '14px', fontWeight: 600}
+                            },
                             min: 0
                         },
                         title: {
                             text: 'Individual Camera Cumulative Counts - {{ analysis_data.date }}',
-                            align: 'center'
+                            align: 'center',
+                            style: {fontSize: '16px', fontWeight: 600}
                         },
                         stroke: {curve: 'smooth', width: 2},
                         markers: {size: 3},
-                        legend: {position: 'top', fontSize: '12px'},
+                        legend: {
+                            position: 'top',
+                            horizontalAlign: 'center',
+                            fontSize: '11px',
+                            markers: {
+                                width: 8,
+                                height: 8
+                            }
+                        },
+                        grid: {borderColor: '#e7e7e7', strokeDashArray: 3},
                         tooltip: {
                             y: {
                                 formatter: function (val) {
-                                    return val + " total count";
+                                    return val + " cumulative count";
                                 }
                             }
                         }
                     };
 
-                    var cameraCumulativeChart = new ApexCharts(document.querySelector("#individual_cumulative_chart"), cameraCumulativeOptions);
-                    cameraCumulativeChart.render();
+                    var individualCumulativeChart = new ApexCharts(document.querySelector("#individual_camera_chart"), individualCumulativeOptions);
+                    individualCumulativeChart.render();
                 } else {
-                    document.querySelector("#individual_cumulative_chart").innerHTML = '<div class="alert alert-info">No camera cumulative data available.</div>';
+                    document.querySelector("#individual_camera_chart").innerHTML = '<div class="alert alert-info">No individual camera data available for {{ analysis_data.date }}.</div>';
+                }
+
+                // Camera Occupancy Chart (as secondary analysis)
+                if (cameraOccupancySeries.length > 0) {
+                    // Add a toggle to switch between cumulative and occupancy view
+                    var occupancyChartHtml = `
+                <div class="mt-4">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h6>Individual Camera Occupancy Levels</h6>
+                        <button type="button" class="btn btn-sm btn-outline-info" onclick="toggleOccupancyChart()">
+                            Show Occupancy View
+                        </button>
+                    </div>
+                    <div id="individual_occupancy_chart" style="display: none;"></div>
+                </div>
+            `;
+
+                    document.querySelector("#individual_camera_chart").insertAdjacentHTML('afterend', occupancyChartHtml);
+
+                    window.toggleOccupancyChart = function () {
+                        var occupancyDiv = document.getElementById('individual_occupancy_chart');
+                        var button = event.target;
+
+                        if (occupancyDiv.style.display === 'none') {
+                            occupancyDiv.style.display = 'block';
+                            button.textContent = 'Hide Occupancy View';
+
+                            // Render occupancy chart if not already rendered
+                            if (!window.occupancyChartRendered) {
+                                var occupancyOptions = {
+                                    series: cameraOccupancySeries,
+                                    chart: {
+                                        type: 'area',
+                                        height: 400,
+                                        toolbar: {show: true}
+                                    },
+                                    xaxis: {
+                                        categories: hours,
+                                        title: {text: 'Hour (24-hour format)'},
+                                        labels: {rotate: -45}
+                                    },
+                                    yaxis: {
+                                        title: {text: 'Current Occupancy (People in Space)'},
+                                        min: 0
+                                    },
+                                    title: {
+                                        text: 'Individual Camera Occupancy Levels - {{ analysis_data.date }}',
+                                        align: 'center'
+                                    },
+                                    stroke: {curve: 'smooth', width: 2},
+                                    fill: {
+                                        type: 'gradient',
+                                        gradient: {
+                                            shadeIntensity: 1,
+                                            opacityFrom: 0.6,
+                                            opacityTo: 0.1
+                                        }
+                                    },
+                                    legend: {position: 'top', fontSize: '11px'},
+                                    tooltip: {
+                                        y: {
+                                            formatter: function (val) {
+                                                return val + " people";
+                                            }
+                                        }
+                                    }
+                                };
+
+                                var occupancyChart = new ApexCharts(document.querySelector("#individual_occupancy_chart"), occupancyOptions);
+                                occupancyChart.render();
+                                window.occupancyChartRendered = true;
+                            }
+                        } else {
+                            occupancyDiv.style.display = 'none';
+                            button.textContent = 'Show Occupancy View';
+                        }
+                    };
                 }
             {% endif %}
 
         {% else %}
-            document.querySelector("#region_traffic_chart").innerHTML = '<div class="alert alert-info">No hourly analysis data available.</div>';
-            document.querySelector("#region_occupancy_chart").innerHTML = '<div class="alert alert-info">No occupancy data available.</div>';
-            document.querySelector("#region_cumulative_chart").innerHTML = '<div class="alert alert-info">No cumulative data available.</div>';
+            document.querySelector("#region_hourly_chart").innerHTML = '<div class="alert alert-info">No hourly data available for {{ analysis_data.date }}.</div>';
+            document.querySelector("#individual_camera_chart").innerHTML = '<div class="alert alert-info">No camera data available for {{ analysis_data.date }}.</div>';
         {% endif %}
     </script>
 {% endblock %}

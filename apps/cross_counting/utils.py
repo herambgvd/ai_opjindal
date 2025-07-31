@@ -818,11 +818,10 @@ class TablePartitioningManager:
     @staticmethod
     def get_hourly_region_aggregates_by_date(region_id: int, target_date: date) -> Dict[str, Any]:
         """
-        Get comprehensive hourly analysis for all cameras in a region for a specific date
-        COMPLETE VERSION: Provides both traffic flow and occupancy tracking data
+        Get hourly aggregated In/Out counts for all cameras in a region for a specific date
+        PROPER VERSION: Uses the last cumulative value per hour for each camera
         """
         from .models import Camera, CrossCountingData
-        from django.db.models import Max, Min
         from collections import defaultdict
 
         cameras = Camera.objects.filter(region_id=region_id, status=True)
@@ -836,263 +835,205 @@ class TablePartitioningManager:
                 "individual_camera_data": []
             }
 
-        print(f"COMPREHENSIVE DEBUG: Analyzing hourly data for date {target_date}")
-        print(f"COMPREHENSIVE DEBUG: Camera count: {len(camera_ids)}")
+        print(f"PROPER HOURLY DEBUG: Analyzing hourly data for date {target_date}")
+        print(f"PROPER HOURLY DEBUG: Camera count: {len(camera_ids)}")
 
-        # COMPREHENSIVE: Get both traffic flow and occupancy data
+        # PROPER APPROACH: Get the last cumulative value per hour for each camera
         with connection.cursor() as cursor:
             cursor.execute("""
-                           WITH hourly_camera_data AS (SELECT camera_id,
-                                                              EXTRACT(HOUR FROM created_at) as hour, MIN (cc_in_count) as hour_start_in, MAX (cc_in_count) as hour_end_in, MIN (cc_out_count) as hour_start_out, MAX (cc_out_count) as hour_end_out, MIN (created_at) as first_time, MAX (created_at) as last_time, COUNT (*) as data_points
-                           FROM cross_counting_data_timeseries
-                           WHERE camera_id = ANY (%s)
-                             AND DATE (created_at) = %s
-                           GROUP BY camera_id, EXTRACT (HOUR FROM created_at)
-                               ),
-                               hourly_comprehensive AS (
-                           SELECT
-                               camera_id, hour,
-                               -- Traffic flow (new entries/exits this hour)
-                               GREATEST(0, hour_end_in - hour_start_in) as hourly_entries, GREATEST(0, hour_end_out - hour_start_out) as hourly_exits,
-                               -- Cumulative counts (for occupancy calculation)
-                               hour_end_in as cumulative_in, hour_end_out as cumulative_out,
-                               -- Occupancy at end of hour
-                               GREATEST(0, hour_end_in - hour_end_out) as hour_end_occupancy,
-                               -- Data quality
-                               data_points
-                           FROM hourly_camera_data
-                               ), region_hourly_totals AS (
-                           SELECT
-                               hour,
-                               -- Traffic flow totals
-                               SUM (hourly_entries) as total_hourly_entries, SUM (hourly_exits) as total_hourly_exits,
-                               -- Cumulative totals
-                               SUM (cumulative_in) as total_cumulative_in, SUM (cumulative_out) as total_cumulative_out,
-                               -- Occupancy totals
-                               SUM (hour_end_occupancy) as total_occupancy,
-                               -- Data quality
-                               SUM (data_points) as total_data_points, COUNT (camera_id) as active_cameras
-                           FROM hourly_comprehensive
-                           GROUP BY hour
-                               ),
-                               all_hours AS (
-                           SELECT generate_series(0, 23) as hour
-                               )
-                           SELECT ah.hour,
-                                  COALESCE(rht.total_hourly_entries, 0) as hourly_entries,
-                                  COALESCE(rht.total_hourly_exits, 0)   as hourly_exits,
-                                  COALESCE(rht.total_cumulative_in, 0)  as cumulative_in,
-                                  COALESCE(rht.total_cumulative_out, 0) as cumulative_out,
-                                  COALESCE(rht.total_occupancy, 0)      as current_occupancy,
-                                  COALESCE(rht.total_data_points, 0)    as data_points,
-                                  COALESCE(rht.active_cameras, 0)       as active_cameras
-                           FROM all_hours ah
-                                    LEFT JOIN region_hourly_totals rht ON ah.hour = rht.hour
-                           ORDER BY ah.hour
-                           """, [camera_ids, target_date])
+                WITH ranked_data AS (
+                    SELECT 
+                        camera_id,
+                        cc_in_count,
+                        cc_out_count,
+                        cc_total_count,
+                        EXTRACT(HOUR FROM created_at) as hour,
+                        created_at,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY camera_id, EXTRACT(HOUR FROM created_at) 
+                            ORDER BY created_at DESC
+                        ) as rn
+                    FROM cross_counting_data_timeseries
+                    WHERE camera_id = ANY(%s)
+                    AND DATE(created_at) = %s
+                ),
+                last_values_per_hour AS (
+                    SELECT 
+                        camera_id,
+                        hour,
+                        cc_in_count as hourly_cumulative_in,
+                        cc_out_count as hourly_cumulative_out,
+                        cc_total_count as hourly_cumulative_total,
+                        created_at as last_update_time
+                    FROM ranked_data
+                    WHERE rn = 1
+                ),
+                region_hourly_totals AS (
+                    SELECT 
+                        hour,
+                        SUM(hourly_cumulative_in) as total_cumulative_in,
+                        SUM(hourly_cumulative_out) as total_cumulative_out,
+                        SUM(hourly_cumulative_total) as total_cumulative_total,
+                        COUNT(camera_id) as active_cameras_in_hour
+                    FROM last_values_per_hour
+                    GROUP BY hour
+                ),
+                all_hours AS (
+                    SELECT generate_series(0, 23) as hour
+                )
+                SELECT 
+                    ah.hour,
+                    COALESCE(rht.total_cumulative_in, 0) as total_in_count,
+                    COALESCE(rht.total_cumulative_out, 0) as total_out_count,
+                    COALESCE(rht.total_cumulative_total, 0) as total_total_count,
+                    COALESCE(rht.active_cameras_in_hour, 0) as active_cameras
+                FROM all_hours ah
+                LEFT JOIN region_hourly_totals rht ON ah.hour = rht.hour
+                ORDER BY ah.hour
+            """, [camera_ids, target_date])
 
-            # COMPREHENSIVE: Create multiple data views
-            traffic_flow_data = []  # For traffic flow charts
-            occupancy_data = []  # For occupancy charts
-            cumulative_data = []  # For cumulative count charts
-            data_quality_info = []  # For monitoring data completeness
+            hourly_data = []
 
             for row in cursor.fetchall():
                 hour = int(row[0])
-                hourly_entries = int(row[1])
-                hourly_exits = int(row[2])
-                cumulative_in = int(row[3])
-                cumulative_out = int(row[4])
-                current_occupancy = int(row[5])
-                data_points = int(row[6])
-                active_cameras = int(row[7])
+                total_in = int(row[1])
+                total_out = int(row[2])
+                total_count = int(row[3])
+                active_cameras = int(row[4])
 
-                # Traffic flow data (for understanding movement patterns)
-                traffic_flow_data.append({
+                hourly_data.append({
                     'hour': hour,
-                    'total_in_count': hourly_entries,  # New entries this hour
-                    'total_out_count': hourly_exits,  # New exits this hour
-                    'net_occupancy_change': hourly_entries - hourly_exits,
+                    'total_in_count': total_in,           # Sum of all cameras' cumulative in counts at this hour
+                    'total_out_count': total_out,         # Sum of all cameras' cumulative out counts at this hour
+                    'total_count': total_count,           # Sum of all cameras' total counts at this hour
+                    'current_occupancy': max(0, total_in - total_out),  # Current people in space
                     'active_cameras': active_cameras
                 })
 
-                # Occupancy data (for understanding space utilization)
-                occupancy_data.append({
-                    'hour': hour,
-                    'current_occupancy': current_occupancy,
-                    'occupancy_change': hourly_entries - hourly_exits,
-                    'active_cameras': active_cameras
-                })
+        # DEBUG: Print the proper results
+        non_zero_hours = [h for h in hourly_data if h['total_in_count'] > 0 or h['total_out_count'] > 0]
 
-                # Cumulative data (for traditional counting perspective)
-                cumulative_data.append({
-                    'hour': hour,
-                    'cumulative_in': cumulative_in,
-                    'cumulative_out': cumulative_out,
-                    'total_cumulative': cumulative_in + cumulative_out,
-                    'active_cameras': active_cameras
-                })
+        if non_zero_hours:
+            print(f"PROPER HOURLY DEBUG: Found data for hours: {[h['hour'] for h in non_zero_hours]}")
+            print(f"PROPER HOURLY DEBUG: Last hour with data: {max([h['hour'] for h in non_zero_hours])}")
 
-                # Data quality information
-                data_quality_info.append({
-                    'hour': hour,
-                    'data_points': data_points,
-                    'active_cameras': active_cameras,
-                    'avg_points_per_camera': round(data_points / active_cameras, 1) if active_cameras > 0 else 0
-                })
+            # Show the cumulative progression
+            for h in non_zero_hours:
+                print(f"PROPER HOURLY DEBUG: Hour {h['hour']}: In={h['total_in_count']}, Out={h['total_out_count']}, Occupancy={h['current_occupancy']}, Cameras={h['active_cameras']}")
 
-        # DEBUG: Print comprehensive analysis results
-        non_zero_flow = [h for h in traffic_flow_data if h['total_in_count'] > 0 or h['total_out_count'] > 0]
-        non_zero_occupancy = [h for h in occupancy_data if h['current_occupancy'] > 0]
-
-        if non_zero_flow:
-            print(f"COMPREHENSIVE DEBUG: Traffic flow hours: {[h['hour'] for h in non_zero_flow]}")
-            for h in non_zero_flow[:3]:  # Show first 3 hours
-                print(
-                    f"COMPREHENSIVE DEBUG: Hour {h['hour']}: +{h['total_in_count']} entries, +{h['total_out_count']} exits, net: {h['net_occupancy_change']}")
-
-        if non_zero_occupancy:
-            peak_occupancy = max(h['current_occupancy'] for h in non_zero_occupancy)
-            peak_hour = max(non_zero_occupancy, key=lambda x: x['current_occupancy'])['hour']
-            print(f"COMPREHENSIVE DEBUG: Peak occupancy: {peak_occupancy} people at hour {peak_hour}")
-
-        # COMPREHENSIVE: Individual camera analysis
+        # PROPER: Individual camera data using last value per hour
         individual_camera_data = []
         camera_objects = {cam.id: cam for cam in cameras}
 
         with connection.cursor() as cursor:
             cursor.execute("""
-                           WITH camera_hourly_comprehensive AS (SELECT camera_id,
-                                                                       EXTRACT(HOUR FROM created_at) as hour, MIN (cc_in_count) as hour_start_in, MAX (cc_in_count) as hour_end_in, MIN (cc_out_count) as hour_start_out, MAX (cc_out_count) as hour_end_out, COUNT (*) as data_points
-                           FROM cross_counting_data_timeseries
-                           WHERE camera_id = ANY (%s)
-                             AND DATE (created_at) = %s
-                           GROUP BY camera_id, EXTRACT (HOUR FROM created_at)
-                               ),
-                               camera_traffic_analysis AS (
-                           SELECT
-                               camera_id, hour,
-                               -- Traffic flow
-                               GREATEST(0, hour_end_in - hour_start_in) as hourly_entries, GREATEST(0, hour_end_out - hour_start_out) as hourly_exits,
-                               -- Cumulative
-                               hour_end_in as cumulative_in, hour_end_out as cumulative_out,
-                               -- Occupancy
-                               GREATEST(0, hour_end_in - hour_end_out) as current_occupancy,
-                               -- Quality
-                               data_points
-                           FROM camera_hourly_comprehensive
-                               ), all_hours AS (
-                           SELECT generate_series(0, 23) as hour
-                               ), all_cameras AS (
-                           SELECT unnest(%s::uuid[]) as camera_id
-                               )
-                           SELECT ac.camera_id,
-                                  ah.hour,
-                                  COALESCE(cta.hourly_entries, 0)    as hourly_entries,
-                                  COALESCE(cta.hourly_exits, 0)      as hourly_exits,
-                                  COALESCE(cta.cumulative_in, 0)     as cumulative_in,
-                                  COALESCE(cta.cumulative_out, 0)    as cumulative_out,
-                                  COALESCE(cta.current_occupancy, 0) as current_occupancy,
-                                  COALESCE(cta.data_points, 0)       as data_points
-                           FROM all_cameras ac
-                                    CROSS JOIN all_hours ah
-                                    LEFT JOIN camera_traffic_analysis cta
-                                              ON ac.camera_id = cta.camera_id AND ah.hour = cta.hour
-                           ORDER BY ac.camera_id, ah.hour
-                           """, [camera_ids, target_date, camera_ids])
+                WITH camera_ranked_data AS (
+                    SELECT 
+                        camera_id,
+                        cc_in_count,
+                        cc_out_count,
+                        cc_total_count,
+                        EXTRACT(HOUR FROM created_at) as hour,
+                        created_at,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY camera_id, EXTRACT(HOUR FROM created_at) 
+                            ORDER BY created_at DESC
+                        ) as rn
+                    FROM cross_counting_data_timeseries
+                    WHERE camera_id = ANY(%s)
+                    AND DATE(created_at) = %s
+                ),
+                camera_last_values AS (
+                    SELECT 
+                        camera_id,
+                        hour,
+                        cc_in_count,
+                        cc_out_count,
+                        cc_total_count
+                    FROM camera_ranked_data
+                    WHERE rn = 1
+                ),
+                all_hours AS (
+                    SELECT generate_series(0, 23) as hour
+                ),
+                all_cameras AS (
+                    SELECT unnest(%s::uuid[]) as camera_id
+                )
+                SELECT 
+                    ac.camera_id,
+                    ah.hour,
+                    COALESCE(clv.cc_in_count, 0) as cc_in_count,
+                    COALESCE(clv.cc_out_count, 0) as cc_out_count,
+                    COALESCE(clv.cc_total_count, 0) as cc_total_count
+                FROM all_cameras ac
+                CROSS JOIN all_hours ah
+                LEFT JOIN camera_last_values clv ON ac.camera_id = clv.camera_id AND ah.hour = clv.hour
+                ORDER BY ac.camera_id, ah.hour
+            """, [camera_ids, target_date, camera_ids])
 
-            # Group by camera with comprehensive data
-            camera_data_dict = defaultdict(lambda: {
-                'traffic_flow': [],
-                'occupancy': [],
-                'cumulative': []
-            })
-
+            # Group by camera
+            camera_data_dict = defaultdict(list)
             for row in cursor.fetchall():
                 camera_id = row[0]
                 hour = int(row[1])
-                hourly_entries = int(row[2])
-                hourly_exits = int(row[3])
-                cumulative_in = int(row[4])
-                cumulative_out = int(row[5])
-                current_occupancy = int(row[6])
-                data_points = int(row[7])
+                cc_in_count = int(row[2])
+                cc_out_count = int(row[3])
+                cc_total_count = int(row[4])
 
-                # Traffic flow view
-                camera_data_dict[camera_id]['traffic_flow'].append({
+                camera_data_dict[camera_id].append({
                     'hour': hour,
-                    'cc_in_count': hourly_entries,  # Entries this hour
-                    'cc_out_count': hourly_exits,  # Exits this hour
-                    'net_change': hourly_entries - hourly_exits,
-                    'data_points': data_points
+                    'cc_in_count': cc_in_count,           # Cumulative in count at this hour
+                    'cc_out_count': cc_out_count,         # Cumulative out count at this hour
+                    'cc_total_count': cc_total_count,     # Total count at this hour
+                    'current_occupancy': max(0, cc_in_count - cc_out_count)  # Current occupancy
                 })
 
-                # Occupancy view
-                camera_data_dict[camera_id]['occupancy'].append({
-                    'hour': hour,
-                    'current_occupancy': current_occupancy,
-                    'occupancy_change': hourly_entries - hourly_exits
-                })
-
-                # Cumulative view
-                camera_data_dict[camera_id]['cumulative'].append({
-                    'hour': hour,
-                    'cumulative_in': cumulative_in,
-                    'cumulative_out': cumulative_out,
-                    'total_count': cumulative_in + cumulative_out
-                })
-
-            # Convert to final format with comprehensive data
+            # Convert to final format
             for camera_id in camera_ids:
                 if camera_id in camera_objects:
-                    camera_traffic_flow = camera_data_dict[camera_id]['traffic_flow']
-                    total_daily_entries = sum(h['cc_in_count'] for h in camera_traffic_flow)
-                    total_daily_exits = sum(h['cc_out_count'] for h in camera_traffic_flow)
-                    peak_occupancy = max((h['current_occupancy'] for h in camera_data_dict[camera_id]['occupancy']),
-                                         default=0)
+                    camera_hourly_data = camera_data_dict[camera_id]
+
+                    # Calculate daily stats for this camera
+                    non_zero_data = [h for h in camera_hourly_data if h['cc_in_count'] > 0 or h['cc_out_count'] > 0]
+                    if non_zero_data:
+                        max_in = max(h['cc_in_count'] for h in non_zero_data)
+                        max_out = max(h['cc_out_count'] for h in non_zero_data)
+                        max_occupancy = max(h['current_occupancy'] for h in non_zero_data)
+                    else:
+                        max_in = max_out = max_occupancy = 0
 
                     individual_camera_data.append({
                         'camera_id': str(camera_id),
                         'camera_name': camera_objects[camera_id].name,
-                        'hourly_data': camera_traffic_flow,  # For traffic flow charts
-                        'occupancy_data': camera_data_dict[camera_id]['occupancy'],  # For occupancy charts
-                        'cumulative_data': camera_data_dict[camera_id]['cumulative'],  # For cumulative charts
-                        'daily_summary': {
-                            'total_entries': total_daily_entries,
-                            'total_exits': total_daily_exits,
-                            'net_change': total_daily_entries - total_daily_exits,
-                            'peak_occupancy': peak_occupancy
+                        'hourly_data': camera_hourly_data,
+                        'daily_stats': {
+                            'max_cumulative_in': max_in,
+                            'max_cumulative_out': max_out,
+                            'max_occupancy': max_occupancy,
+                            'active_hours': len(non_zero_data)
                         }
                     })
 
         region_name = cameras.first().region.name if cameras.exists() else ""
 
-        # COMPREHENSIVE: Return all analysis perspectives
+        # Calculate summary statistics
+        total_cameras = len([cam for cam in individual_camera_data if cam['daily_stats']['max_cumulative_in'] > 0])
+        max_regional_occupancy = max((h['current_occupancy'] for h in hourly_data), default=0)
+        peak_hour = max(hourly_data, key=lambda x: x['current_occupancy'])['hour'] if hourly_data else 0
+        active_hours = len([h for h in hourly_data if h['total_in_count'] > 0 or h['total_out_count'] > 0])
+
         result = {
-            # Primary data for charts (backward compatibility)
-            "hourly_data": traffic_flow_data,
-
-            # Additional comprehensive views
-            "traffic_flow_data": traffic_flow_data,  # Hourly entries/exits
-            "occupancy_data": occupancy_data,  # Current occupancy levels
-            "cumulative_data": cumulative_data,  # Traditional cumulative counts
-            "data_quality": data_quality_info,  # Data completeness metrics
-
-            # Metadata
+            "hourly_data": hourly_data,
             "region_name": region_name,
             "camera_count": len(camera_ids),
             "individual_camera_data": individual_camera_data,
-            "analysis_type": "comprehensive",
-
-            # Summary statistics
+            "analysis_type": "cumulative_hourly",
             "daily_summary": {
-                "total_entries": sum(h['total_in_count'] for h in traffic_flow_data),
-                "total_exits": sum(h['total_out_count'] for h in traffic_flow_data),
-                "peak_occupancy": max((h['current_occupancy'] for h in occupancy_data), default=0),
-                "busiest_hour": max(traffic_flow_data, key=lambda x: x['total_in_count'] + x['total_out_count'])[
-                    'hour'] if traffic_flow_data else 0,
-                "active_hours": len(
-                    [h for h in traffic_flow_data if h['total_in_count'] > 0 or h['total_out_count'] > 0])
+                "max_regional_occupancy": max_regional_occupancy,
+                "peak_occupancy_hour": peak_hour,
+                "active_cameras": total_cameras,
+                "active_hours": active_hours,
+                "total_cameras_monitored": len(camera_ids)
             }
         }
 
