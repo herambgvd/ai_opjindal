@@ -3,7 +3,7 @@ from django.shortcuts import render, redirect
 
 def home(request):
     if request.user.is_authenticated:
-        return render(request, "dashboard/main.html")
+        return redirect('cross_counting:enhanced_dashboard')
     else:
         return render(request, "web/landing_page.html")
 

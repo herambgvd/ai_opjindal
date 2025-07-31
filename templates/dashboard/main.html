@@ -1,31 +1,241 @@
 {% extends "partials/base.html" %}
 {% load static %}
-{% block title %}Dashboard{% endblock title %}
-{% block extra_css %}
-{% endblock extra_css %}
-{% block content %}
-    <!-- ============================================================== -->
-    <!-- Start right Content here -->
-    <!-- ============================================================== -->
-    <div class="main-content">
 
+{% block title %}Platform Dashboard{% endblock title %}
+
+{% block extra_css %}
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.11.5/css/dataTables.bootstrap5.min.css"/>
+{% endblock extra_css %}
+
+{% block content %}
+    <div class="main-content">
         <div class="page-content">
             <div class="container-fluid" id="main-content">
-
                 {% block pagetitle %}
-                    {% include "partials/page-title.html" with pagetitle="Dashboard" title="Main" subtitle="Main" %}
+                    {% include "partials/page-title.html" with pagetitle="Dashboard" title="Platform Overview" subtitle="Real-time Analytics" %}
                 {% endblock pagetitle %}
 
+                <!-- Basic Statistics Cards -->
+                <div class="row">
+                    <div class="col-xl-3 col-md-6">
+                        <div class="card">
+                            <div class="card-body">
+                                <div class="d-flex align-items-center">
+                                    <div class="flex-grow-1">
+                                        <p class="text-truncate font-size-14 mb-2">Total Regions</p>
+                                        <h4 class="mb-2">{{ dashboard_data.basic_stats.total_regions }}</h4>
+                                    </div>
+                                    <div class="flex-shrink-0">
+                                        <i class="mdi mdi-map-marker-multiple font-size-24 text-primary"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-xl-3 col-md-6">
+                        <div class="card">
+                            <div class="card-body">
+                                <div class="d-flex align-items-center">
+                                    <div class="flex-grow-1">
+                                        <p class="text-truncate font-size-14 mb-2">Active Cameras</p>
+                                        <h4 class="mb-2 text-success">{{ dashboard_data.basic_stats.active_cameras }}</h4>
+                                        <p class="text-muted mb-0">
+                                            <small>{{ dashboard_data.basic_stats.inactive_cameras }} inactive</small>
+                                        </p>
+                                    </div>
+                                    <div class="flex-shrink-0">
+                                        <i class="mdi mdi-camera font-size-24 text-success"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-xl-3 col-md-6">
+                        <div class="card">
+                            <div class="card-body">
+                                <div class="d-flex align-items-center">
+                                    <div class="flex-grow-1">
+                                        <p class="text-truncate font-size-14 mb-2">Current Occupancy</p>
+                                        <h4 class="mb-2 text-info">{{ dashboard_data.occupancy_summary.total_current_occupancy }}</h4>
+                                        <p class="text-muted mb-0">
+                                            <small>{{ dashboard_data.occupancy_summary.avg_occupancy_percentage }}% of capacity</small>
+                                        </p>
+                                    </div>
+                                    <div class="flex-shrink-0">
+                                        <i class="mdi mdi-account-group font-size-24 text-info"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-xl-3 col-md-6">
+                        <div class="card">
+                            <div class="card-body">
+                                <div class="d-flex align-items-center">
+                                    <div class="flex-grow-1">
+                                        <p class="text-truncate font-size-14 mb-2">Data Points (24h)</p>
+                                        <h4 class="mb-2 text-warning">{{ dashboard_data.activity_stats.recent_data_points_24h|floatformat:0 }}</h4>
+                                        <p class="text-muted mb-0">
+                                            <small>{{ dashboard_data.activity_stats.avg_data_points_per_hour|floatformat:0 }}/hour avg</small>
+                                        </p>
+                                    </div>
+                                    <div class="flex-shrink-0">
+                                        <i class="mdi mdi-chart-line font-size-24 text-warning"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- System Health and Occupancy -->
+                <div class="row">
+                    <div class="col-xl-8">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">Region Occupancy Status</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-nowrap table-hover mb-0">
+                                        <thead>
+                                            <tr>
+                                                <th>Region</th>
+                                                <th>Current</th>
+                                                <th>Capacity</th>
+                                                <th>Occupancy %</th>
+                                                <th>Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for region in dashboard_data.occupancy_summary.regions_data %}
+                                                <tr>
+                                                    <td>{{ region.region_name }}</td>
+                                                    <td>{{ region.current_count }}</td>
+                                                    <td>{{ region.max_occupancy }}</td>
+                                                    <td>
+                                                        <div class="d-flex align-items-center">
+                                                            <div class="flex-grow-1">
+                                                                <div class="progress progress-sm">
+                                                                    <div class="progress-bar
+                                                                        {% if region.occupancy_percentage < 50 %}bg-success
+                                                                        {% elif region.occupancy_percentage < 80 %}bg-warning
+                                                                        {% else %}bg-danger{% endif %}"
+                                                                        style="width: {{ region.occupancy_percentage }}%">
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            <div class="flex-shrink-0 ms-2">
+                                                                <small class="text-muted">{{ region.occupancy_percentage }}%</small>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td>
+                                                        {% if region.occupancy_percentage < 50 %}
+                                                            <span class="badge bg-success">Normal</span>
+                                                        {% elif region.occupancy_percentage < 80 %}
+                                                            <span class="badge bg-warning">Moderate</span>
+                                                        {% else %}
+                                                            <span class="badge bg-danger">High</span>
+                                                        {% endif %}
+                                                    </td>
+                                                </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-xl-4">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">System Health</h5>
+                            </div>
+                            <div class="card-body">
+                                {% if dashboard_data.system_health %}
+                                    <div class="mb-3">
+                                        <p class="text-muted mb-1">Active Devices</p>
+                                        <h6 class="mb-0">{{ dashboard_data.system_health.active_devices|default:"N/A" }}</h6>
+                                    </div>
+                                    <div class="mb-3">
+                                        <p class="text-muted mb-1">Processing Delay</p>
+                                        <h6 class="mb-0">{{ dashboard_data.system_health.avg_processing_delay_seconds|floatformat:2|default:"N/A" }}s</h6>
+                                    </div>
+                                    <div class="mb-3">
+                                        <p class="text-muted mb-1">Active Alarms</p>
+                                        <h6 class="mb-0 {% if dashboard_data.system_health.active_alarms > 0 %}text-danger{% else %}text-success{% endif %}">
+                                            {{ dashboard_data.system_health.active_alarms|default:"0" }}
+                                        </h6>
+                                    </div>
+                                {% endif %}
+
+                                {% if dashboard_data.data_volume %}
+                                    <div class="mb-3">
+                                        <p class="text-muted mb-1">Total Records</p>
+                                        <h6 class="mb-0">{{ dashboard_data.data_volume.total_records|floatformat:0 }}</h6>
+                                    </div>
+                                    <div class="mb-3">
+                                        <p class="text-muted mb-1">Avg Daily Records</p>
+                                        <h6 class="mb-0">{{ dashboard_data.data_volume.avg_daily_records|floatformat:0 }}</h6>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Actions -->
+                <div class="row">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">Quick Actions</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-3">
+                                        <a href="{% url 'cross_counting:daily_analysis' %}" class="btn btn-primary w-100 mb-2">
+                                            <i class="mdi mdi-chart-bar me-1"></i> Daily Analysis
+                                        </a>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <a href="{% url 'cross_counting:comparative_analysis' %}" class="btn btn-info w-100 mb-2">
+                                            <i class="mdi mdi-compare me-1"></i> Comparative Analysis
+                                        </a>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <a href="{% url 'cross_counting:comprehensive_analysis' %}" class="btn btn-success w-100 mb-2">
+                                            <i class="mdi mdi-chart-timeline me-1"></i> Comprehensive Analysis
+                                        </a>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <a href="{% url 'cross_counting:public_occupancy_display' %}" class="btn btn-warning w-100 mb-2" target="_blank">
+                                            <i class="mdi mdi-television me-1"></i> Public Display
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <!-- container-fluid -->
         </div>
-        <!-- End Page-content -->
 
         {% block footer %}
             {% include "partials/footer.html" %}
         {% endblock footer %}
     </div>
-    <!-- end main content-->
 {% endblock content %}
+
 {% block extra_js %}
+    <script>
+        setTimeout(function() {
+            location.reload();
+        }, 30000);
+    </script>
 {% endblock extra_js %}

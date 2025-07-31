@@ -1,0 +1,228 @@
+{% extends "cross_counting/analysis/base.html" %}
+{% load static %}
+
+{% block title %}Comprehensive Analysis{% endblock title %}
+
+{% block analysis_form %}
+    <form method="get" class="row g-3">
+        <div class="col-md-4">
+            <label for="{{ form.region.id_for_label }}" class="form-label">Region</label>
+            {{ form.region }}
+            {% if form.region.errors %}
+                <div class="invalid-feedback d-block">{{ form.region.errors.0 }}</div>
+            {% endif %}
+        </div>
+        <div class="col-md-3">
+            <label for="{{ form.from_date.id_for_label }}" class="form-label">From Date</label>
+            {{ form.from_date }}
+            {% if form.from_date.errors %}
+                <div class="invalid-feedback d-block">{{ form.from_date.errors.0 }}</div>
+            {% endif %}
+        </div>
+        <div class="col-md-3">
+            <label for="{{ form.to_date.id_for_label }}" class="form-label">To Date</label>
+            {{ form.to_date }}
+            {% if form.to_date.errors %}
+                <div class="invalid-feedback d-block">{{ form.to_date.errors.0 }}</div>
+            {% endif %}
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">&nbsp;</label>
+            <button type="submit" class="btn btn-primary d-block w-100 mb-2">
+                <i class="bx bx-search"></i> Analyze
+            </button>
+            {% if analysis_data %}
+                <a href="{% url 'cross_counting:comprehensive_analysis_csv' %}?{{ request.GET.urlencode }}" 
+                   class="btn btn-success d-block w-100">
+                    <i class="bx bx-download"></i> Export CSV
+                </a>
+            {% endif %}
+        </div>
+        {% if form.non_field_errors %}
+            <div class="col-12">
+                <div class="alert alert-danger">{{ form.non_field_errors.0 }}</div>
+            </div>
+        {% endif %}
+    </form>
+{% endblock %}
+
+{% block analysis_results %}
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        Comprehensive Analysis - {{ analysis_data.region.name }}
+                        <small class="text-muted">({{ analysis_data.from_date }} to {{ analysis_data.to_date }} - {{ analysis_data.total_days }} days)</small>
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-4">
+                        <div class="col-md-4">
+                            <div class="card bg-info text-white">
+                                <div class="card-body">
+                                    <div class="d-flex align-items-center">
+                                        <div class="flex-grow-1">
+                                            <p class="text-truncate font-size-14 mb-2">Date Range</p>
+                                            <h5 class="mb-2">{{ analysis_data.total_days }} Days</h5>
+                                        </div>
+                                        <div class="flex-shrink-0">
+                                            <i class="mdi mdi-calendar-range font-size-24"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card bg-success text-white">
+                                <div class="card-body">
+                                    <div class="d-flex align-items-center">
+                                        <div class="flex-grow-1">
+                                            <p class="text-truncate font-size-14 mb-2">Active Cameras</p>
+                                            <h5 class="mb-2">{{ analysis_data.cameras|length }}</h5>
+                                        </div>
+                                        <div class="flex-shrink-0">
+                                            <i class="mdi mdi-camera font-size-24"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card bg-warning text-white">
+                                <div class="card-body">
+                                    <div class="d-flex align-items-center">
+                                        <div class="flex-grow-1">
+                                            <p class="text-truncate font-size-14 mb-2">Analysis Period</p>
+                                            <h6 class="mb-2">{{ analysis_data.from_date|date:"M d" }} - {{ analysis_data.to_date|date:"M d" }}</h6>
+                                        </div>
+                                        <div class="flex-shrink-0">
+                                            <i class="mdi mdi-chart-timeline-variant font-size-24"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-12">
+                            <h6>Daily Trends by Camera</h6>
+                            <div id="daily_trends_chart"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <h6>Daily Peak Summary</h6>
+                            <div class="table-responsive">
+                                <table class="table table-bordered table-striped" id="daily_summary_table">
+                                    <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            {% for camera in analysis_data.cameras %}
+                                                <th colspan="3" class="text-center">{{ camera.name }}</th>
+                                            {% endfor %}
+                                        </tr>
+                                        <tr>
+                                            <th></th>
+                                            {% for camera in analysis_data.cameras %}
+                                                <th class="bg-light">In</th>
+                                                <th class="bg-light">Out</th>
+                                                <th class="bg-light">Total</th>
+                                            {% endfor %}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for trend in analysis_data.daily_trends %}
+                                            {% for daily_data in trend.daily_data %}
+                                                <tr>
+                                                    {% if forloop.first %}
+                                                        <td rowspan="{{ trend.daily_data|length }}">
+                                                            <strong>{{ daily_data.date }}</strong>
+                                                        </td>
+                                                    {% endif %}
+                                                    <td>{{ daily_data.peak_in_count }}</td>
+                                                    <td>{{ daily_data.peak_out_count }}</td>
+                                                    <td>{{ daily_data.peak_total_count }}</td>
+                                                </tr>
+                                            {% endfor %}
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block analysis_js %}
+    <script>
+        {% if analysis_data.daily_trends %}
+            var dailyTrendsData = {{ analysis_data.daily_trends|safe }};
+            
+            if (dailyTrendsData && dailyTrendsData.length > 0) {
+                var series = [];
+                
+                dailyTrendsData.forEach(function(camera) {
+                    var data = camera.daily_data.map(function(item) {
+                        return {
+                            x: new Date(item.date).getTime(),
+                            y: item.peak_total_count
+                        };
+                    });
+                    
+                    series.push({
+                        name: camera.camera_name,
+                        data: data
+                    });
+                });
+                
+                var options = {
+                    series: series,
+                    chart: {
+                        type: 'line',
+                        height: 400,
+                        toolbar: { show: true }
+                    },
+                    xaxis: {
+                        type: 'datetime',
+                        title: { text: 'Date' }
+                    },
+                    yaxis: {
+                        title: { text: 'Peak Total Count' }
+                    },
+                    title: {
+                        text: 'Daily Peak Trends by Camera',
+                        align: 'center'
+                    },
+                    stroke: {
+                        curve: 'smooth',
+                        width: 3
+                    },
+                    markers: {
+                        size: 5
+                    },
+                    grid: {
+                        borderColor: '#f1f1f1'
+                    },
+                    legend: {
+                        position: 'top'
+                    }
+                };
+                
+                var chart = new ApexCharts(document.querySelector("#daily_trends_chart"), options);
+                chart.render();
+            }
+            
+            $('#daily_summary_table').DataTable({
+                responsive: true,
+                pageLength: 10,
+                order: [[0, 'desc']]
+            });
+        {% endif %}
+    </script>
+{% endblock %}

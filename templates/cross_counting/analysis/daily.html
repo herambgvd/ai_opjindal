@@ -1,0 +1,202 @@
+{% extends "cross_counting/analysis/base.html" %}
+{% load static %}
+
+{% block title %}Daily Analysis{% endblock title %}
+
+{% block analysis_form %}
+    <form method="get" class="row g-3">
+        <div class="col-md-6">
+            <label for="{{ form.region.id_for_label }}" class="form-label">Region</label>
+            {{ form.region }}
+            {% if form.region.errors %}
+                <div class="invalid-feedback d-block">{{ form.region.errors.0 }}</div>
+            {% endif %}
+        </div>
+        <div class="col-md-4">
+            <label for="{{ form.date.id_for_label }}" class="form-label">Date</label>
+            {{ form.date }}
+            {% if form.date.errors %}
+                <div class="invalid-feedback d-block">{{ form.date.errors.0 }}</div>
+            {% endif %}
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">&nbsp;</label>
+            <button type="submit" class="btn btn-primary d-block w-100 mb-2">
+                <i class="bx bx-search"></i> Analyze
+            </button>
+            {% if analysis_data %}
+                <a href="{% url 'cross_counting:daily_analysis_csv' %}?{{ request.GET.urlencode }}" 
+                   class="btn btn-success d-block w-100">
+                    <i class="bx bx-download"></i> Export CSV
+                </a>
+            {% endif %}
+        </div>
+    </form>
+{% endblock %}
+
+{% block analysis_results %}
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        Daily Analysis - {{ analysis_data.region.name }} ({{ analysis_data.date }})
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-4">
+                        <div class="col-md-3">
+                            <div class="card bg-primary text-white">
+                                <div class="card-body">
+                                    <div class="d-flex align-items-center">
+                                        <div class="flex-grow-1">
+                                            <p class="text-truncate font-size-14 mb-2">Total In</p>
+                                            <h4 class="mb-2">{{ analysis_data.summary.total_peak_in }}</h4>
+                                        </div>
+                                        <div class="flex-shrink-0">
+                                            <i class="mdi mdi-arrow-down-bold font-size-24"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-success text-white">
+                                <div class="card-body">
+                                    <div class="d-flex align-items-center">
+                                        <div class="flex-grow-1">
+                                            <p class="text-truncate font-size-14 mb-2">Total Out</p>
+                                            <h4 class="mb-2">{{ analysis_data.summary.total_peak_out }}</h4>
+                                        </div>
+                                        <div class="flex-shrink-0">
+                                            <i class="mdi mdi-arrow-up-bold font-size-24"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-info text-white">
+                                <div class="card-body">
+                                    <div class="d-flex align-items-center">
+                                        <div class="flex-grow-1">
+                                            <p class="text-truncate font-size-14 mb-2">Total Count</p>
+                                            <h4 class="mb-2">{{ analysis_data.summary.total_peak_total }}</h4>
+                                        </div>
+                                        <div class="flex-shrink-0">
+                                            <i class="mdi mdi-account-group font-size-24"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-warning text-white">
+                                <div class="card-body">
+                                    <div class="d-flex align-items-center">
+                                        <div class="flex-grow-1">
+                                            <p class="text-truncate font-size-14 mb-2">Active Cameras</p>
+                                            <h4 class="mb-2">{{ analysis_data.summary.active_cameras }}</h4>
+                                        </div>
+                                        <div class="flex-shrink-0">
+                                            <i class="mdi mdi-camera font-size-24"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-12">
+                            <h6>Camera-wise Peak Counts</h6>
+                            <table class="table table-bordered table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Camera</th>
+                                        <th>Peak In</th>
+                                        <th>Peak Out</th>
+                                        <th>Peak Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for camera in analysis_data.cameras %}
+                                        <tr>
+                                            <td>{{ camera.camera_name }}</td>
+                                            <td>{{ camera.peak_in }}</td>
+                                            <td>{{ camera.peak_out }}</td>
+                                            <td>{{ camera.peak_total }}</td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <h6>Hourly Trends</h6>
+                            <div id="hourly_trends_chart"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block analysis_js %}
+    <script>
+        {% if analysis_data.hourly_trends %}
+            var hourlyTrendsData = {{ analysis_data.hourly_trends|safe }};
+            
+            if (hourlyTrendsData && hourlyTrendsData.length > 0) {
+                var series = [];
+                
+                hourlyTrendsData.forEach(function(camera) {
+                    var data = camera.hourly_data.map(function(item) {
+                        return {
+                            x: new Date(item.hour).getTime(),
+                            y: item.max_total_count
+                        };
+                    });
+                    
+                    series.push({
+                        name: camera.camera_name,
+                        data: data
+                    });
+                });
+                
+                var options = {
+                    series: series,
+                    chart: {
+                        type: 'line',
+                        height: 350,
+                        toolbar: { show: true }
+                    },
+                    xaxis: {
+                        type: 'datetime',
+                        title: { text: 'Hour' }
+                    },
+                    yaxis: {
+                        title: { text: 'Count' }
+                    },
+                    title: {
+                        text: 'Hourly Peak Counts by Camera',
+                        align: 'center'
+                    },
+                    stroke: {
+                        curve: 'smooth',
+                        width: 2
+                    },
+                    markers: {
+                        size: 4
+                    }
+                };
+                
+                var chart = new ApexCharts(document.querySelector("#hourly_trends_chart"), options);
+                chart.render();
+            }
+        {% endif %}
+    </script>
+{% endblock %}

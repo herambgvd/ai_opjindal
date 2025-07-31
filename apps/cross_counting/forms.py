@@ -2,6 +2,7 @@ import re
 
 from django import forms
 from django.core.exceptions import ValidationError
+from django.utils import timezone
 
 from .models import Region, Camera
 
@@ -90,3 +91,92 @@ class CameraForm(forms.ModelForm):
             if not rtsp_link.startswith('rtsp://'):
                 raise ValidationError("RTSP link must start with 'rtsp://'")
         return rtsp_link
+
+
+class DailyAnalysisForm(forms.Form):
+    region = forms.ModelChoiceField(
+        queryset=Region.objects.all(),
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        empty_label="Select a region"
+    )
+    date = forms.DateField(
+        widget=forms.DateInput(attrs={
+            'class': 'form-control',
+            'type': 'date'
+        })
+    )
+    
+    def clean_date(self):
+        date = self.cleaned_data.get('date')
+        if date and date > timezone.now().date():
+            raise ValidationError("Date cannot be in the future.")
+        return date
+
+
+class ComparativeAnalysisForm(forms.Form):
+    region = forms.ModelChoiceField(
+        queryset=Region.objects.all(),
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        empty_label="Select a region"
+    )
+    base_date = forms.DateField(
+        widget=forms.DateInput(attrs={
+            'class': 'form-control',
+            'type': 'date'
+        })
+    )
+    compare_date = forms.DateField(
+        widget=forms.DateInput(attrs={
+            'class': 'form-control',
+            'type': 'date'
+        })
+    )
+    
+    def clean(self):
+        cleaned_data = super().clean()
+        base_date = cleaned_data.get('base_date')
+        compare_date = cleaned_data.get('compare_date')
+        
+        if base_date and compare_date:
+            if base_date == compare_date:
+                raise ValidationError("Base date and compare date must be different.")
+            if base_date > timezone.now().date() or compare_date > timezone.now().date():
+                raise ValidationError("Dates cannot be in the future.")
+        
+        return cleaned_data
+
+
+class ComprehensiveAnalysisForm(forms.Form):
+    region = forms.ModelChoiceField(
+        queryset=Region.objects.all(),
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        empty_label="Select a region"
+    )
+    from_date = forms.DateField(
+        widget=forms.DateInput(attrs={
+            'class': 'form-control',
+            'type': 'date'
+        })
+    )
+    to_date = forms.DateField(
+        widget=forms.DateInput(attrs={
+            'class': 'form-control',
+            'type': 'date'
+        })
+    )
+    
+    def clean(self):
+        cleaned_data = super().clean()
+        from_date = cleaned_data.get('from_date')
+        to_date = cleaned_data.get('to_date')
+        
+        if from_date and to_date:
+            if from_date > to_date:
+                raise ValidationError("From date must be before to date.")
+            if to_date > timezone.now().date():
+                raise ValidationError("To date cannot be in the future.")
+            
+            if (to_date - from_date).days > 7:
+                raise ValidationError("Date range cannot exceed 7 days.")
+        
+        return cleaned_data
