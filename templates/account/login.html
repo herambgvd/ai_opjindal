@@ -1,0 +1,76 @@
+{% extends 'account/base.html' %}
+{% load widget_tweaks %}
+{% load static %}
+{% load account %}
+{% block title %}Sign In{% endblock title %}
+
+{% block content %}
+    <div class="p-lg-5 p-4">
+        <div>
+            <h5 class="text-primary">Welcome Back !</h5>
+            <p class="text-muted">Sign in to continue to Clarify.</p>
+        </div>
+
+        <div class="mt-4">
+            <div class="mt-4">
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert alert-danger alert-dismissible fade show mb-4" role="alert">
+                            <strong>{{ message }}</strong>
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+                <form class="needs-validation" novalidate method="POST" action="{% url 'account_login' %}">
+                    {% if form.errors %}
+                        {% for field in form %}
+                            {% for error in field.errors %}
+                                <div class="alert alert-danger alert-dismissible fade show mb-4" role="alert">
+                                    <strong>{{ error|escape }}</strong>
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert"
+                                            aria-label="Close"></button>
+                                </div>
+                            {% endfor %}
+                        {% endfor %}
+                        {% for error in form.non_field_errors %}
+                            <div class="alert alert-danger alert-dismissible fade show mb-4" role="alert">
+                                <strong>{{ error|escape }}</strong>
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"
+                                        aria-label="Close"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        {% render_field form.login class="form-control" %}
+                    </div>
+
+                    <div class="mb-3 position-relative auth-pass-inputgroup">
+                        <!-- <div class="float-end">
+                            <a href="{% url 'account_reset_password' %}" class="text-muted">Forgot password?</a>
+                        </div> -->
+                        {% render_field form.password class="form-control password-input" placeholder="Password" %}
+                        <button class="btn btn-link position-absolute mt-4 end-0 top-0 text-decoration-none text-muted password-addon"
+                                type="button" id="password-addon">
+                            <i class="ri-eye-fill align-middle"></i>
+                        </button>
+                    </div>
+
+                    <!-- <div class="form-check">
+                        {{ form.remember }} <span class="text text-muted">Remember Password</span>
+                    </div> -->
+
+                    <div class="mt-4">
+                        <button class="btn btn-success w-100" type="submit">Sign In</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+{% endblock content %}
+
+{% block extra_js %}
+    <!-- password-addon init -->
+    <script src="{% static 'js/pages/password-addon.init.js' %}"></script>
+{% endblock extra_js %}
+    

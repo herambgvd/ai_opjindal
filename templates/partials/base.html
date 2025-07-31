@@ -1,0 +1,134 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en" {% block html %}data-layout="horizontal" data-sidebar-visibility="show" data-topbar="light"
+      data-sidebar="light" data-sidebar-size="lg" data-sidebar-image="none" data-bs-theme="light"
+      data-preloader="disable" {% endblock html %}>
+<head>
+    <meta charset="utf-8"/>
+    <title>{% block title %}{% endblock title %} | Clarify - Integrated Video Analytics Platform </title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta content="Clarify - Integrated Video Analytics Platform" name="description"/>
+    <meta content="Genius Vision Digital" name="author"/>
+    <!-- App favicon -->
+    <link rel="shortcut icon" href="{% static 'images/business/neubit.svg' %}">
+
+    {% block css %}
+        {% block extra_css %}
+        {% endblock extra_css %}
+
+        <!-- Layout config Js -->
+        <script src="{% static 'js/layout.js' %}"></script>
+        <!-- Bootstrap Css -->
+        <link href="{% static 'css/bootstrap.min.css' %}" id="bootstrap-style" rel="stylesheet" type="text/css"/>
+        <!-- Icons Css -->
+        <link href="{% static 'css/icons.min.css' %}" rel="stylesheet" type="text/css"/>
+        <!-- App Css-->
+        <link href="{% static 'css/app.min.css' %}" id="app-style" rel="stylesheet" type="text/css"/>
+        <!-- custom Css-->
+        <link href="{% static 'css/custom.min.css' %}" id="app-style" rel="stylesheet" type="text/css"/>
+
+        <link href="{% static 'libs/toastify-js/src/toastify.css' %}" rel="stylesheet" type="text/css">
+
+        <!-- Dashboard Custom Styles -->
+        <style>
+        .bg-low { background-color: #28a745 !important; }
+        .bg-medium { background-color: #ffc107 !important; }
+        .bg-high { background-color: #fd7e14 !important; }
+        .bg-critical { background-color: #dc3545 !important; }
+
+        .text-low { color: #28a745 !important; }
+        .text-medium { color: #ffc107 !important; }
+        .text-high { color: #fd7e14 !important; }
+        .text-critical { color: #dc3545 !important; }
+
+        .card-hover:hover {
+            transform: translateY(-2px);
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+        }
+
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        </style>
+    {% endblock css %}
+</head>
+
+<body>
+
+<!-- Begin page -->
+<div id="layout-wrapper">
+    {% block header %}
+        {% include "partials/topbar.html" %}
+    {% endblock header %}
+    {% block sidebar %}
+        {% include "partials/sidebar.html" %}
+    {% endblock sidebar %}
+    {% block content %}
+        {% block pagetitle %}
+        {% endblock pagetitle %}
+        {% block footer %}
+        {% endblock footer %}
+    {% endblock content %}
+</div>
+
+{% block extra_content %}
+{% endblock extra_content %}
+
+<!-- END layout-wrapper -->
+{% block right_sidebar %}
+{#    {% include "partials/customizer.html" %}#}
+{% endblock right_sidebar %}
+
+{% block javascript %}
+    <!-- JAVASCRIPT -->
+    <script src="{% static 'libs/bootstrap/dist/js/bootstrap.bundle.min.js' %}"></script>
+    <script src="{% static 'libs/simplebar/dist/simplebar.min.js' %}"></script>
+    <script src="{% static 'libs/node-waves/dist/waves.min.js' %}"></script>
+    <script src="{% static 'libs/feather-icons/dist/feather.min.js' %}"></script>
+    <script src="{% static 'js/pages/plugins/lord-icon-2.1.0.js' %}"></script>
+    <script src="{% static 'js/plugins.js' %}"></script>
+    <script src="{% static 'libs/toastify-js/src/toastify.js' %}"></script>
+    <script>
+        {% if messages %}
+            {% for message in messages %}
+                let offsetValue = 0; // Adjust this if you want offset between multiple toasts.
+                Toastify({
+                    text: "{{ message }}",
+                    duration: 3000,
+                    gravity: "top", // `top` or `bottom`
+                    position: 'center', // `left`, `center`, or `right`
+                    backgroundColor: "{% if message.tags == 'alert-danger' %}red{% else %}green{% endif %}",
+                    close: true,
+                    offset: {
+                        y: offsetValue
+                    }
+                }).showToast();
+                offsetValue += 75; // Increment the offset for the next toast
+            {% endfor %}
+        {%  endif %}
+    </script>
+    {% block extra_js %}
+    {% endblock extra_js %}
+
+    <!-- App js -->
+    <script src="{% static 'js/app.js' %}"></script>
+{% endblock javascript %}
+
+</body>
+
+</html>

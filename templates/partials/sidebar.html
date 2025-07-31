@@ -1,0 +1,110 @@
+{% load static %}
+{% load cache %}
+{% block sidebar %}
+    <!-- ========== App Menu ========== -->
+    <div class="app-menu navbar-menu">
+        <!-- LOGO -->
+        <div class="navbar-brand-box">
+            <!-- Dark Logo-->
+            <a href="#" class="logo logo-dark">
+                    <span class="logo-sm">
+                        <img src="{% static 'images/business/clarify.png' %}" alt="Logo" height="22">
+                    </span>
+                <span class="logo-lg">
+                        <img src="{% static 'images/business/clarify.png' %}" alt="Logo" height="22">
+                    </span>
+            </a>
+            <!-- Light Logo-->
+            <a href="#" class="logo logo-light">
+                    <span class="logo-sm">
+                         <img src="{% static 'images/business/clarify.png' %}" alt="Logo" height="22">
+                    </span>
+                <span class="logo-lg">
+                         <img src="{% static 'images/business/clarify.png' %}" alt="Logo" height="22">
+                    </span>
+            </a>
+            <button type="button" class="btn btn-sm p-0 fs-20 header-item float-end btn-vertical-sm-hover"
+                    id="vertical-hover">
+                <i class="ri-record-circle-line"></i>
+            </button>
+        </div>
+
+        <div id="scrollbar">
+            <div class="container-fluid">
+
+                <div id="two-column-menu">
+                </div>
+                <ul class="navbar-nav" id="navbar-nav">
+                    <!-- ########## Dashboard  ########## -->
+                    <li class="menu-title"><span data-key="t-main">Main</span></li>
+                    <li class="nav-item">
+                        <a class="nav-link menu-link {% if request.resolver_match.url_name == 'Dashboard' %}active{% endif %}"
+                           href="#">
+                            <i class="ri-dashboard-line"></i> <span data-key="t-dashboard">Dashboard</span>
+                        </a>
+                    </li>
+
+                    <li class="menu-title"><span data-key="t-clarify">Clarify</span></li>
+                    <li class="nav-item">
+                        <a class="nav-link menu-link {% if request.resolver_match.url_name in 'DailyAnalysis,ComparativeAnalysis,ComprehensiveAnalysis' %}active{% endif %}"
+                           href="#sidebarAnalysis" data-bs-toggle="collapse"
+                           role="button" aria-expanded="{% if request.resolver_match.url_name in 'DailyAnalysis,ComparativeAnalysis,ComprehensiveAnalysis' %}true{% else %}false{% endif %}"
+                           aria-controls="sidebarAnalysis">
+                            <i class="mdi mdi-chart-line"></i> <span data-key="t-analysis">Analysis</span>
+                        </a>
+                        <div class="collapse menu-dropdown {% if request.resolver_match.url_name in 'DailyAnalysis,ComparativeAnalysis,ComprehensiveAnalysis' %}show{% endif %}"
+                             id="sidebarAnalysis">
+                            <ul class="nav nav-sm flex-column">
+                                <li class="nav-item">
+                                    <a href="#"
+                                       class="nav-link {% if request.resolver_match.url_name == 'DailyAnalysis' %}active{% endif %}"
+                                       data-key="t-daily">Daily</a>
+                                </li>
+                                <li class="nav-item">
+                                    <a href="#"
+                                       class="nav-link {% if request.resolver_match.url_name == 'ComparativeAnalysis' %}active{% endif %}"
+                                       data-key="t-comparative">Comparative</a>
+                                </li>
+                                <li class="nav-item">
+                                    <a href="#"
+                                       class="nav-link {% if request.resolver_match.url_name == 'ComprehensiveAnalysis' %}active{% endif %}"
+                                       data-key="t-comprehensive">Comprehensive</a>
+                                </li>
+                            </ul>
+                        </div>
+                    </li>
+                    <!-- ########## Configuration  ########## -->
+                    <li class="menu-title"><span data-key="t-settings">Setup</span></li>
+                    <li class="nav-item">
+                        <a class="nav-link menu-link {% if request.resolver_match.url_name in 'RegionList,RegionCreate,RegionUpdate,RegionDelete,RegionDetail,CameraList,CameraCreate,CameraUpdate,CameraDelete,CameraDetail' %}active{% endif %}"
+                           href="#sidebarSettings" data-bs-toggle="collapse" role="button"
+                           aria-expanded="{% if request.resolver_match.url_name in 'RegionList,RegionCreate,RegionUpdate,RegionDelete,RegionDetail,CameraList,CameraCreate,CameraUpdate,CameraDelete,CameraDetail' %}true{% else %}false{% endif %}"
+                           aria-controls="sidebarSettings">
+                            <i class="bx bxs-cog"></i> <span data-key="t-settings">Settings</span>
+                        </a>
+                        <div class="collapse menu-dropdown {% if request.resolver_match.url_name in 'RegionList,RegionCreate,RegionUpdate,RegionDelete,RegionDetail,CameraList,CameraCreate,CameraUpdate,CameraDelete,CameraDetail' %}show{% endif %}"
+                             id="sidebarSettings">
+                            <ul class="nav nav-sm flex-column">
+                                <li class="nav-item">
+                                    <a href="{% url 'cross_counting:region_list' %}"
+                                       class="nav-link {% if request.resolver_match.url_name in 'RegionList,RegionCreate,RegionUpdate,RegionDelete,RegionDetail' %}active{% endif %}"
+                                       data-key="t-regions">Regions</a>
+                                </li>
+                                <li class="nav-item">
+                                    <a href="{% url 'cross_counting:camera_list' %}"
+                                       class="nav-link {% if request.resolver_match.url_name in 'CameraList,CameraCreate,CameraUpdate,CameraDelete,CameraDetail' %}active{% endif %}"
+                                       data-key="t-camera">Cameras</a>
+                                </li>
+                            </ul>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+            <!-- Sidebar -->
+        </div>
+        <div class="sidebar-background"></div>
+    </div>
+    <!-- Left Sidebar End -->
+    <!-- Vertical Overlay-->
+    <div class="vertical-overlay"></div>
+{% endblock sidebar %}

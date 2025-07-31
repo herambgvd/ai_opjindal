@@ -5,9 +5,18 @@ description = "Add your description here"
 requires-python = ">=3.11"
 dependencies = [
     "django>=5.2.4",
+    "django-allauth>=65.10.0",
     "django-environ>=0.12.0",
+    "django-otp>=1.6.1",
+    "django-redis>=6.0.0",
+    "django-widget-tweaks>=1.5.0",
+    "djangorestframework>=3.16.0",
+    "drf-spectacular>=0.28.0",
+    "fido2>=2.0.0",
     "openpyxl>=3.1.5",
     "pandas>=2.3.1",
     "pillow>=11.3.0",
-    "psycopg2>=2.9.10",
+    "psycopg2-binary>=2.9.10",
+    "redis>=6.2.0",
+    "requests>=2.32.4",
 ]

@@ -1,0 +1,63 @@
+{% extends "partials/base.html" %}
+{% load static %}
+{% load widget_tweaks %}
+{% block title %}Cameras{% endblock title %}
+{% block extra_css %}
+{% endblock extra_css %}
+{% block content %}
+    <!-- ============================================================== -->
+    <!-- Start right Content here -->
+    <!-- ============================================================== -->
+    <div class="main-content">
+
+        <div class="page-content">
+            <div class="container-fluid">
+
+                {% block pagetitle %}
+                    {% include "partials/page-title.html" with pagetitle="Camera" title="Camera" subtitle="Delete" %}
+                {% endblock pagetitle %}
+                <div class="row">
+                    <div class="col m-2">
+                        <div class="text-sm-end">
+                            <a href="{% url 'cross_counting:camera_list' %}">
+                                <button type="button" class="btn btn-outline-primary">
+                                    <i class="mdi mdi-arrow-left"></i> Back To Main
+                                </button>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+
+                <div class="row justify-content-center">
+                    <div class="col-md-6">
+                        <div class="card text-center">
+                            <div class="card-body m-4">
+                                <h2>Are you sure you want to delete {{ object.name }}?</h2>
+                                <form method="post">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-danger m-4">Delete</button>
+                                    <a href="{% url 'cross_counting:camera_list' %}">
+                                        <button type="button" class="btn btn-outline-primary m-4">
+                                            Cancel
+                                        </button>
+                                    </a>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+            <!-- container-fluid -->
+        </div>
+        <!-- End Page-content -->
+
+        {% block footer %}
+            {% include "partials/footer.html" %}
+        {% endblock footer %}
+    </div>
+    <!-- end main content-->
+{% endblock content %}
+{% block extra_js %}
+{% endblock extra_js %}
