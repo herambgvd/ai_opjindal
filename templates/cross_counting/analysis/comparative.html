@@ -4,336 +4,212 @@
 {% block title %}Comparative Analysis{% endblock title %}
 
 {% block analysis_form %}
-    <form method="get" class="row g-3">
-        <div class="col-md-4">
-            <label for="{{ form.region.id_for_label }}" class="form-label">Region</label>
+    <form method="get" class="space-y-4">
+        <div>
+            <label>Region</label>
             {{ form.region }}
             {% if form.region.errors %}
-                <div class="invalid-feedback d-block">{{ form.region.errors.0 }}</div>
+                <p class="error">{{ form.region.errors.0 }}</p>
             {% endif %}
         </div>
-        <div class="col-md-3">
-            <label for="{{ form.base_date.id_for_label }}" class="form-label">Base Date</label>
+        <div>
+            <label>Base Date</label>
             {{ form.base_date }}
             {% if form.base_date.errors %}
-                <div class="invalid-feedback d-block">{{ form.base_date.errors.0 }}</div>
+                <p class="error">{{ form.base_date.errors.0 }}</p>
             {% endif %}
         </div>
-        <div class="col-md-3">
-            <label for="{{ form.compare_date.id_for_label }}" class="form-label">Compare Date</label>
+        <div>
+            <label>Compare Date</label>
             {{ form.compare_date }}
             {% if form.compare_date.errors %}
-                <div class="invalid-feedback d-block">{{ form.compare_date.errors.0 }}</div>
+                <p class="error">{{ form.compare_date.errors.0 }}</p>
             {% endif %}
         </div>
-        <div class="col-md-2">
-            <label class="form-label">&nbsp;</label>
-            <button type="submit" class="btn btn-primary d-block w-100 mb-2">
-                <i class="bx bx-search"></i> Compare
-            </button>
+        <div>
+            <button type="submit">Compare</button>
             {% if analysis_data %}
-                <a href="{% url 'cross_counting:comparative_analysis_csv' %}?{{ request.GET.urlencode }}"
-                   class="btn btn-success d-block w-100">
-                    <i class="bx bx-download"></i> Export CSV
-                </a>
+                <a href="{% url 'cross_counting:comparative_analysis_csv' %}?region={{ form.region.value }}&base_date={{ form.base_date.value }}&compare_date={{ form.compare_date.value }}">Export CSV</a>
             {% endif %}
         </div>
         {% if form.non_field_errors %}
-            <div class="col-12">
-                <div class="alert alert-danger">{{ form.non_field_errors.0 }}</div>
-            </div>
+            <p class="error">{{ form.non_field_errors.0 }}</p>
         {% endif %}
     </form>
 {% endblock %}
 
 {% block analysis_results %}
-    <div class="row mt-4">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="card-title mb-0">
-                        Comparative Analysis - {{ analysis_data.region.name }}
-                        <small class="text-muted">({{ analysis_data.base_date }} vs {{ analysis_data.compare_date }})</small>
-                    </h5>
+    {% if analysis_data %}
+        <div>
+            <h2>Comparative Analysis - {{ analysis_data.region.name }} ({{ analysis_data.base_date }} vs {{ analysis_data.compare_date }})</h2>
+            <div class="grid">
+                <div>
+                    <h3>Base Date: {{ analysis_data.base_date }}</h3>
+                    <div>
+                        <p>{{ analysis_data.base_summary.total_peak_in }}</p>
+                        <p>Total In</p>
+                    </div>
+                    <div>
+                        <p>{{ analysis_data.base_summary.total_peak_out }}</p>
+                        <p>Total Out</p>
+                    </div>
+                    <div>
+                        <p>{{ analysis_data.base_summary.active_cameras }}</p>
+                        <p>Active Cameras</p>
+                    </div>
                 </div>
-                <div class="card-body">
-                    <div class="row mb-4">
-                        <div class="col-md-6">
-                            <div class="card border-primary">
-                                <div class="card-header bg-primary text-white">
-                                    <h6 class="mb-0">Base Date: {{ analysis_data.base_date }}</h6>
-                                </div>
-                                <div class="card-body">
-                                    <div class="row text-center">
-                                        <div class="col-4">
-                                            <h5 class="text-primary">{{ analysis_data.base_summary.total_peak_in }}</h5>
-                                            <p class="mb-0">Total In</p>
-                                        </div>
-                                        <div class="col-4">
-                                            <h5 class="text-success">{{ analysis_data.base_summary.total_peak_out }}</h5>
-                                            <p class="mb-0">Total Out</p>
-                                        </div>
-                                        <div class="col-4">
-                                            <h5 class="text-info">{{ analysis_data.base_summary.total_peak_total }}</h5>
-                                            <p class="mb-0">Total Count</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="card border-success">
-                                <div class="card-header bg-success text-white">
-                                    <h6 class="mb-0">Compare Date: {{ analysis_data.compare_date }}</h6>
-                                </div>
-                                <div class="card-body">
-                                    <div class="row text-center">
-                                        <div class="col-4">
-                                            <h5 class="text-primary">{{ analysis_data.compare_summary.total_peak_in }}</h5>
-                                            <p class="mb-0">Total In</p>
-                                        </div>
-                                        <div class="col-4">
-                                            <h5 class="text-success">{{ analysis_data.compare_summary.total_peak_out }}</h5>
-                                            <p class="mb-0">Total Out</p>
-                                        </div>
-                                        <div class="col-4">
-                                            <h5 class="text-info">{{ analysis_data.compare_summary.total_peak_total }}</h5>
-                                            <p class="mb-0">Total Count</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                <div>
+                    <h3>Compare Date: {{ analysis_data.compare_date }}</h3>
+                    <div>
+                        <p>{{ analysis_data.compare_summary.total_peak_in }}</p>
+                        <p>Total In</p>
                     </div>
-
-                    <div class="row">
-                        <div class="col-12">
-                            <h6>Camera-wise Comparison</h6>
-                            <div class="table-responsive">
-                                <table class="table table-bordered table-striped">
-                                    <thead>
-                                        <tr>
-                                            <th rowspan="2">Camera</th>
-                                            <th colspan="3" class="text-center bg-primary text-white">Base Date</th>
-                                            <th colspan="3" class="text-center bg-success text-white">Compare Date</th>
-                                            <th colspan="3" class="text-center bg-warning">Difference</th>
-                                        </tr>
-                                        <tr>
-                                            <th class="bg-light">In</th>
-                                            <th class="bg-light">Out</th>
-                                            <th class="bg-light">Total</th>
-                                            <th class="bg-light">In</th>
-                                            <th class="bg-light">Out</th>
-                                            <th class="bg-light">Total</th>
-                                            <th class="bg-light">In</th>
-                                            <th class="bg-light">Out</th>
-                                            <th class="bg-light">Total</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for camera in analysis_data.comparison %}
-                                            <tr>
-                                                <td><strong>{{ camera.camera_name }}</strong></td>
-                                                <td>{{ camera.base_in }}</td>
-                                                <td>{{ camera.base_out }}</td>
-                                                <td>{{ camera.base_total }}</td>
-                                                <td>{{ camera.compare_in }}</td>
-                                                <td>{{ camera.compare_out }}</td>
-                                                <td>{{ camera.compare_total }}</td>
-                                                <td class="{% if camera.diff_in > 0 %}text-success{% elif camera.diff_in < 0 %}text-danger{% endif %}">
-                                                    {% if camera.diff_in > 0 %}+{% endif %}{{ camera.diff_in }}
-                                                </td>
-                                                <td class="{% if camera.diff_out > 0 %}text-success{% elif camera.diff_out < 0 %}text-danger{% endif %}">
-                                                    {% if camera.diff_out > 0 %}+{% endif %}{{ camera.diff_out }}
-                                                </td>
-                                                <td class="{% if camera.diff_total > 0 %}text-success{% elif camera.diff_total < 0 %}text-danger{% endif %}">
-                                                    {% if camera.diff_total > 0 %}+{% endif %}{{ camera.diff_total }}
-                                                </td>
-                                            </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
+                    <div>
+                        <p>{{ analysis_data.compare_summary.total_peak_out }}</p>
+                        <p>Total Out</p>
                     </div>
-
-                    <div class="row mt-4">
-                        <div class="col-12">
-                            <h6>Camera-wise Total Count Comparison</h6>
-                            <div id="comparison_chart"></div>
-                        </div>
-                    </div>
-
-                    <div class="row mt-4">
-                        <div class="col-12">
-                            <h6>Hourly In/Out Comparison (24-Hour Timeline)</h6>
-                            <div id="hourly_comparison_chart"></div>
-                        </div>
+                    <div>
+                        <p>{{ analysis_data.compare_summary.active_cameras }}</p>
+                        <p>Active Cameras</p>
                     </div>
                 </div>
             </div>
         </div>
-    </div>
+
+        <div>
+            <h2>Camera-wise Comparison</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Camera</th>
+                        <th colspan="2">Base Date</th>
+                        <th colspan="2">Compare Date</th>
+                        <th colspan="2">Difference</th>
+                    </tr>
+                    <tr>
+                        <th></th>
+                        <th>In</th>
+                        <th>Out</th>
+                        <th>In</th>
+                        <th>Out</th>
+                        <th>In</th>
+                        <th>Out</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for camera in analysis_data.comparison %}
+                        <tr>
+                            <td>{{ camera.camera_name }}</td>
+                            <td>{{ camera.base_in }}</td>
+                            <td>{{ camera.base_out }}</td>
+                            <td>{{ camera.compare_in }}</td>
+                            <td>{{ camera.compare_out }}</td>
+                            <td>{% if camera.diff_in > 0 %}+{% endif %}{{ camera.diff_in }}</td>
+                            <td>{% if camera.diff_out > 0 %}+{% endif %}{{ camera.diff_out }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div>
+            <h2>Camera-wise Total Count Comparison</h2>
+            <canvas id="cameraComparisonChart"></canvas>
+        </div>
+
+        <div>
+            <h2>Hourly In/Out Comparison (24-Hour Timeline)</h2>
+            <canvas id="hourlyComparisonChart"></canvas>
+        </div>
+    {% endif %}
 {% endblock %}
 
 {% block analysis_js %}
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
-        // Camera-wise Comparison Chart
+        // Camera-wise Total Count Comparison Chart
         {% if analysis_data.comparison %}
-            var cameraNames = [];
-            var baseData = [];
-            var compareData = [];
-
-            {% for camera in analysis_data.comparison %}
-                cameraNames.push('{{ camera.camera_name }}');
-                baseData.push({{ camera.base_total }});
-                compareData.push({{ camera.compare_total }});
-            {% endfor %}
-
-            var comparisonOptions = {
-                series: [{
-                    name: '{{ analysis_data.base_date }}',
-                    data: baseData,
-                    color: '#007bff'
-                }, {
-                    name: '{{ analysis_data.compare_date }}',
-                    data: compareData,
-                    color: '#28a745'
-                }],
-                chart: {
-                    type: 'bar',
-                    height: 400,
-                    toolbar: { show: true }
+            const comparisonData = {{ analysis_data.comparison_json | safe }};
+            new Chart(document.getElementById('cameraComparisonChart'), {
+                type: 'bar',
+                data: {
+                    labels: comparisonData.map(data => data.camera_name),
+                    datasets: [
+                        {
+                            label: 'Base Date In',
+                            data: comparisonData.map(data => data.base_in),
+                            backgroundColor: '#4CAF50',
+                        },
+                        {
+                            label: 'Base Date Out',
+                            data: comparisonData.map(data => data.base_out),
+                            backgroundColor: '#81C784',
+                        },
+                        {
+                            label: 'Compare Date In',
+                            data: comparisonData.map(data => data.compare_in),
+                            backgroundColor: '#F44336',
+                        },
+                        {
+                            label: 'Compare Date Out',
+                            data: comparisonData.map(data => data.compare_out),
+                            backgroundColor: '#E57373',
+                        }
+                    ]
                 },
-                plotOptions: {
-                    bar: {
-                        horizontal: false,
-                        columnWidth: '55%',
-                        endingShape: 'rounded'
-                    },
-                },
-                dataLabels: {
-                    enabled: true,
-                    style: { fontSize: '12px' }
-                },
-                stroke: {
-                    show: true,
-                    width: 2,
-                    colors: ['transparent']
-                },
-                xaxis: {
-                    categories: cameraNames,
-                    title: {
-                        text: 'Cameras',
-                        style: { fontSize: '14px', fontWeight: 600 }
+                options: {
+                    responsive: true,
+                    scales: {
+                        x: { title: { display: true, text: 'Camera' } },
+                        y: { title: { display: true, text: 'Count' }, beginAtZero: true }
                     }
-                },
-                yaxis: {
-                    title: {
-                        text: 'Total Count',
-                        style: { fontSize: '14px', fontWeight: 600 }
-                    }
-                },
-                fill: { opacity: 1 },
-                tooltip: {
-                    y: { formatter: function (val) { return val + " count" } }
-                },
-                title: {
-                    text: 'Camera-wise Total Count Comparison',
-                    align: 'center',
-                    style: { fontSize: '16px', fontWeight: 600 }
-                },
-                legend: {
-                    position: 'top',
-                    horizontalAlign: 'center'
                 }
-            };
-
-            var comparisonChart = new ApexCharts(document.querySelector("#comparison_chart"), comparisonOptions);
-            comparisonChart.render();
+            });
         {% endif %}
 
-        // Hourly Comparison Chart
-        {% if analysis_data.base_hourly_aggregates.hourly_data and analysis_data.compare_hourly_aggregates.hourly_data %}
-            var baseInData = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
-            var baseOutData = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
-            var compareInData = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
-            var compareOutData = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
-
-            // Populate base date data
-            {% for hour_data in analysis_data.base_hourly_aggregates.hourly_data %}
-                baseInData[{{ hour_data.hour }}] = {{ hour_data.total_in_count|default:0 }};
-                baseOutData[{{ hour_data.hour }}] = {{ hour_data.total_out_count|default:0 }};
-            {% endfor %}
-
-            // Populate compare date data
-            {% for hour_data in analysis_data.compare_hourly_aggregates.hourly_data %}
-                compareInData[{{ hour_data.hour }}] = {{ hour_data.total_in_count|default:0 }};
-                compareOutData[{{ hour_data.hour }}] = {{ hour_data.total_out_count|default:0 }};
-            {% endfor %}
-
-            var hourlyComparisonOptions = {
-                series: [{
-                    name: '{{ analysis_data.base_date }} - In',
-                    data: baseInData,
-                    color: '#007bff'
-                }, {
-                    name: '{{ analysis_data.base_date }} - Out',
-                    data: baseOutData,
-                    color: '#6c757d'
-                }, {
-                    name: '{{ analysis_data.compare_date }} - In',
-                    data: compareInData,
-                    color: '#28a745'
-                }, {
-                    name: '{{ analysis_data.compare_date }} - Out',
-                    data: compareOutData,
-                    color: '#dc3545'
-                }],
-                chart: {
-                    type: 'line',
-                    height: 450,
-                    toolbar: { show: true }
+        // Hourly In/Out Comparison Chart
+        {% if analysis_data.base_hourly_aggregates and analysis_data.compare_hourly_aggregates %}
+            const baseHourlyData = {{ analysis_data.base_hourly_json | safe }};
+            const compareHourlyData = {{ analysis_data.compare_hourly_json | safe }};
+            new Chart(document.getElementById('hourlyComparisonChart'), {
+                type: 'line',
+                data: {
+                    labels: baseHourlyData.map(data => data.hour + ':00'),
+                    datasets: [
+                        {
+                            label: 'Base Date In',
+                            data: baseHourlyData.map(data => data.total_in_count),
+                            borderColor: '#4CAF50',
+                            fill: false
+                        },
+                        {
+                            label: 'Base Date Out',
+                            data: baseHourlyData.map(data => data.total_out_count),
+                            borderColor: '#81C784',
+                            fill: false
+                        },
+                        {
+                            label: 'Compare Date In',
+                            data: compareHourlyData.map(data => data.total_in_count),
+                            borderColor: '#F44336',
+                            fill: false
+                        },
+                        {
+                            label: 'Compare Date Out',
+                            data: compareHourlyData.map(data => data.total_out_count),
+                            borderColor: '#E57373',
+                            fill: false
+                        }
+                    ]
                 },
-                xaxis: {
-                    categories: [
-                        '00:00', '01:00', '02:00', '03:00', '04:00', '05:00',
-                        '06:00', '07:00', '08:00', '09:00', '10:00', '11:00',
-                        '12:00', '13:00', '14:00', '15:00', '16:00', '17:00',
-                        '18:00', '19:00', '20:00', '21:00', '22:00', '23:00'
-                    ],
-                    title: {
-                        text: 'Hour (24-hour format)',
-                        style: { fontSize: '14px', fontWeight: 600 }
-                    },
-                    labels: { rotate: -45 }
-                },
-                yaxis: {
-                    title: {
-                        text: 'Cumulative Count',
-                        style: { fontSize: '14px', fontWeight: 600 }
-                    },
-                    min: 0
-                },
-                title: {
-                    text: 'Hourly In/Out Count Comparison (24-Hour Timeline)',
-                    align: 'center',
-                    style: { fontSize: '16px', fontWeight: 600 }
-                },
-                stroke: { curve: 'smooth', width: 3 },
-                markers: { size: 4, strokeWidth: 2 },
-                legend: {
-                    position: 'top',
-                    horizontalAlign: 'center'
-                },
-                grid: { borderColor: '#e7e7e7', strokeDashArray: 3 },
-                tooltip: {
-                    y: { formatter: function (val) { return val + " count" } }
+                options: {
+                    responsive: true,
+                    scales: {
+                        x: { title: { display: true, text: 'Hour' } },
+                        y: { title: { display: true, text: 'Count' }, beginAtZero: true }
+                    }
                 }
-            };
-
-            var hourlyCompChart = new ApexCharts(document.querySelector("#hourly_comparison_chart"), hourlyComparisonOptions);
-            hourlyCompChart.render();
+            });
         {% endif %}
     </script>
 {% endblock %}
