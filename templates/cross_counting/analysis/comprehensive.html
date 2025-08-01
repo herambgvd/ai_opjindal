@@ -4,167 +4,297 @@
 {% block title %}Comprehensive Analysis{% endblock title %}
 
 {% block analysis_form %}
-    <form method="get" class="space-y-4">
-        <div>
-            <label>Region</label>
+    <form method="get" class="row g-3">
+        <div class="col-md-4">
+            <label for="{{ form.region.id_for_label }}" class="form-label">Region</label>
             {{ form.region }}
             {% if form.region.errors %}
-                <p class="error">{{ form.region.errors.0 }}</p>
+                <div class="invalid-feedback d-block">{{ form.region.errors.0 }}</div>
             {% endif %}
         </div>
-        <div>
-            <label>From Date</label>
+        <div class="col-md-3">
+            <label for="{{ form.from_date.id_for_label }}" class="form-label">From Date</label>
             {{ form.from_date }}
             {% if form.from_date.errors %}
-                <p class="error">{{ form.from_date.errors.0 }}</p>
+                <div class="invalid-feedback d-block">{{ form.from_date.errors.0 }}</div>
             {% endif %}
         </div>
-        <div>
-            <label>To Date</label>
+        <div class="col-md-3">
+            <label for="{{ form.to_date.id_for_label }}" class="form-label">To Date</label>
             {{ form.to_date }}
             {% if form.to_date.errors %}
-                <p class="error">{{ form.to_date.errors.0 }}</p>
+                <div class="invalid-feedback d-block">{{ form.to_date.errors.0 }}</div>
             {% endif %}
         </div>
-        <div>
-            <button type="submit">Analyze</button>
+        <div class="col-md-2">
+            <label class="form-label">&nbsp;</label>
+            <button type="submit" class="btn btn-primary d-block w-100 mb-2">
+                <i class="bx bx-search"></i> Analyze
+            </button>
             {% if analysis_data %}
-                <a href="{% url 'cross_counting:comprehensive_analysis_csv' %}?region={{ form.region.value }}&from_date={{ form.from_date.value }}&to_date={{ form.to_date.value }}">Export CSV</a>
+                <a href="{% url 'cross_counting:comprehensive_analysis_csv' %}?{{ request.GET.urlencode }}"
+                   class="btn btn-success d-block w-100">
+                    <i class="bx bx-download"></i> Export CSV
+                </a>
             {% endif %}
         </div>
         {% if form.non_field_errors %}
-            <p class="error">{{ form.non_field_errors.0 }}</p>
+            <div class="col-12">
+                <div class="alert alert-danger">{{ form.non_field_errors.0 }}</div>
+            </div>
         {% endif %}
     </form>
 {% endblock %}
 
 {% block analysis_results %}
-    {% if analysis_data %}
-        <div>
-            <h2>Comprehensive Analysis - {{ analysis_data.region.name }} ({{ analysis_data.from_date }} to {{ analysis_data.to_date }} - {{ analysis_data.total_days }} days)</h2>
-            <div class="grid">
-                <div>
-                    <p>{{ analysis_data.total_days }}</p>
-                    <p>Date Range</p>
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        Comprehensive Analysis - {{ analysis_data.region.name }}
+                        <small class="text-muted">({{ analysis_data.from_date }} to {{ analysis_data.to_date }} - {{ analysis_data.total_days }} days)</small>
+                    </h5>
                 </div>
-                <div>
-                    <p>{{ analysis_data.cameras|length }}</p>
-                    <p>Active Cameras</p>
-                </div>
-                <div>
-                    <p>{{ analysis_data.from_date|date:"M d" }} - {{ analysis_data.to_date|date:"M d" }}</p>
-                    <p>Analysis Period</p>
+                <div class="card-body">
+                    <div class="row mb-4">
+                        <div class="col-md-4">
+                            <div class="card bg-info text-white">
+                                <div class="card-body">
+                                    <div class="d-flex align-items-center">
+                                        <div class="flex-grow-1">
+                                            <p class="text-truncate font-size-14 mb-2">Date Range</p>
+                                            <h5 class="mb-2">{{ analysis_data.total_days }} Days</h5>
+                                        </div>
+                                        <div class="flex-shrink-0">
+                                            <i class="mdi mdi-calendar-range font-size-24"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card bg-success text-white">
+                                <div class="card-body">
+                                    <div class="d-flex align-items-center">
+                                        <div class="flex-grow-1">
+                                            <p class="text-truncate font-size-14 mb-2">Active Cameras</p>
+                                            <h5 class="mb-2">{{ analysis_data.cameras|length }}</h5>
+                                        </div>
+                                        <div class="flex-shrink-0">
+                                            <i class="mdi mdi-camera font-size-24"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card bg-warning text-white">
+                                <div class="card-body">
+                                    <div class="d-flex align-items-center">
+                                        <div class="flex-grow-1">
+                                            <p class="text-truncate font-size-14 mb-2">Analysis Period</p>
+                                            <h6 class="mb-2">{{ analysis_data.from_date|date:"M d" }} - {{ analysis_data.to_date|date:"M d" }}</h6>
+                                        </div>
+                                        <div class="flex-shrink-0">
+                                            <i class="mdi mdi-chart-timeline-variant font-size-24"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-12">
+                            <h6>Daily Peak Trends by Camera</h6>
+                            <div id="daily_trends_chart"></div>
+                        </div>
+                    </div>
+
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <h6>Region Hourly In/Out Trends (24-Hour Timeline)</h6>
+                            <div id="region_hourly_trends_chart"></div>
+                        </div>
+                    </div>
+
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <h6>Daily Peak Summary</h6>
+                            <div class="table-responsive">
+                                <table class="table table-bordered table-striped" id="daily_summary_table">
+                                    <thead>
+                                        <tr>
+                                            <th>Camera</th>
+                                            <th>Date</th>
+                                            <th>Peak In</th>
+                                            <th>Peak Out</th>
+                                            <th>Peak Total</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for trend in analysis_data.daily_trends %}
+                                            {% for daily_data in trend.daily_data %}
+                                                <tr>
+                                                    <td><strong>{{ trend.camera_name }}</strong></td>
+                                                    <td>{{ daily_data.date }}</td>
+                                                    <td>{{ daily_data.peak_in_count }}</td>
+                                                    <td>{{ daily_data.peak_out_count }}</td>
+                                                    <td>{{ daily_data.peak_total_count }}</td>
+                                                </tr>
+                                            {% endfor %}
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
-
-        <div>
-            <h2>Daily Peak Trends by Camera</h2>
-            <canvas id="dailyPeakTrendsChart"></canvas>
-        </div>
-
-        <div>
-            <h2>Region Hourly In/Out Trends (24-Hour Timeline)</h2>
-            <canvas id="regionHourlyTrendsChart"></canvas>
-        </div>
-
-        <div>
-            <h2>Daily Peak Summary</h2>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Camera</th>
-                        <th>Date</th>
-                        <th>Peak In</th>
-                        <th>Peak Out</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for trend in analysis_data.daily_trends %}
-                        {% for daily_data in trend.daily_data %}
-                            <tr>
-                                <td>{{ trend.camera_name }}</td>
-                                <td>{{ daily_data.date }}</td>
-                                <td>{{ daily_data.peak_in_count }}</td>
-                                <td>{{ daily_data.peak_out_count }}</td>
-                            </tr>
-                        {% endfor %}
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    {% endif %}
+    </div>
 {% endblock %}
 
 {% block analysis_js %}
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
-        // Daily Peak Trends by Camera Chart
+        // Daily Trends Chart
         {% if analysis_data.daily_trends %}
-            const dailyTrendsData = {{ analysis_data.daily_trends | safe }};
-            const dailyLabels = [...new Set(dailyTrendsData.flatMap(trend => trend.daily_data.map(data => data.date)))];
-            new Chart(document.getElementById('dailyPeakTrendsChart'), {
-                type: 'line',
-                data: {
-                    labels: dailyLabels,
-                    datasets: dailyTrendsData.map(trend => ({
-                        label: `${trend.camera_name} In`,
-                        data: dailyLabels.map(date => {
-                            const data = trend.daily_data.find(d => d.date === date);
-                            return data ? data.peak_in_count : 0;
-                        }),
-                        borderColor: '#4CAF50',
-                        fill: false
-                    })).concat(dailyTrendsData.map(trend => ({
-                        label: `${trend.camera_name} Out`,
-                        data: dailyLabels.map(date => {
-                            const data = trend.daily_data.find(d => d.date === date);
-                            return data ? data.peak_out_count : 0;
-                        }),
-                        borderColor: '#F44336',
-                        fill: false
-                    })))
+            var dailyTrendsSeries = [];
+            var colors = ['#007bff', '#28a745', '#dc3545', '#ffc107', '#17a2b8', '#6f42c1', '#e83e8c', '#fd7e14'];
+            var colorIndex = 0;
+
+            {% for camera in analysis_data.daily_trends %}
+                var cameraData = [];
+                {% for daily_data in camera.daily_data %}
+                    cameraData.push({
+                        x: new Date('{{ daily_data.date }}').getTime(),
+                        y: {{ daily_data.peak_total_count|default:0 }}
+                    });
+                {% endfor %}
+
+                dailyTrendsSeries.push({
+                    name: '{{ camera.camera_name }}',
+                    data: cameraData,
+                    color: colors[colorIndex % colors.length]
+                });
+                colorIndex++;
+            {% endfor %}
+
+            var dailyTrendsOptions = {
+                series: dailyTrendsSeries,
+                chart: {
+                    type: 'line',
+                    height: 450,
+                    toolbar: { show: true }
                 },
-                options: {
-                    responsive: true,
-                    scales: {
-                        x: { title: { display: true, text: 'Date' } },
-                        y: { title: { display: true, text: 'Count' }, beginAtZero: true }
+                xaxis: {
+                    type: 'datetime',
+                    title: {
+                        text: 'Date',
+                        style: { fontSize: '14px', fontWeight: 600 }
                     }
+                },
+                yaxis: {
+                    title: {
+                        text: 'Peak Total Count',
+                        style: { fontSize: '14px', fontWeight: 600 }
+                    },
+                    min: 0
+                },
+                title: {
+                    text: 'Daily Peak Trends by Camera',
+                    align: 'center',
+                    style: { fontSize: '16px', fontWeight: 600 }
+                },
+                stroke: { curve: 'smooth', width: 3 },
+                markers: { size: 5, strokeWidth: 2 },
+                grid: { borderColor: '#e7e7e7', strokeDashArray: 3 },
+                legend: {
+                    position: 'top',
+                    horizontalAlign: 'center'
+                },
+                tooltip: {
+                    y: { formatter: function (val) { return val + " count" } }
                 }
-            });
+            };
+
+            var dailyTrendsChart = new ApexCharts(document.querySelector("#daily_trends_chart"), dailyTrendsOptions);
+            dailyTrendsChart.render();
         {% endif %}
 
-        // Region Hourly In/Out Trends Chart
+        // Region Hourly Trends Chart
         {% if analysis_data.region_hourly_aggregates.hourly_data %}
-            const regionHourlyData = {{ analysis_data.region_hourly_json | safe }};
-            new Chart(document.getElementById('regionHourlyTrendsChart'), {
-                type: 'line',
-                data: {
-                    labels: regionHourlyData.map(data => data.hour + ':00'),
-                    datasets: [
-                        {
-                            label: 'In Count',
-                            data: regionHourlyData.map(data => data.total_in_count),
-                            borderColor: '#4CAF50',
-                            fill: false
-                        },
-                        {
-                            label: 'Out Count',
-                            data: regionHourlyData.map(data => data.total_out_count),
-                            borderColor: '#F44336',
-                            fill: false
-                        }
-                    ]
+            var regionInData = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
+            var regionOutData = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
+
+            {% for hour_data in analysis_data.region_hourly_aggregates.hourly_data %}
+                regionInData[{{ hour_data.hour }}] = {{ hour_data.total_in_count|default:0 }};
+                regionOutData[{{ hour_data.hour }}] = {{ hour_data.total_out_count|default:0 }};
+            {% endfor %}
+
+            var regionTrendOptions = {
+                series: [{
+                    name: 'Total In Count',
+                    data: regionInData,
+                    color: '#28a745'
+                }, {
+                    name: 'Total Out Count',
+                    data: regionOutData,
+                    color: '#dc3545'
+                }],
+                chart: {
+                    type: 'line',
+                    height: 450,
+                    toolbar: { show: true }
                 },
-                options: {
-                    responsive: true,
-                    scales: {
-                        x: { title: { display: true, text: 'Hour' } },
-                        y: { title: { display: true, text: 'Count' }, beginAtZero: true }
-                    }
+                xaxis: {
+                    categories: [
+                        '00:00', '01:00', '02:00', '03:00', '04:00', '05:00',
+                        '06:00', '07:00', '08:00', '09:00', '10:00', '11:00',
+                        '12:00', '13:00', '14:00', '15:00', '16:00', '17:00',
+                        '18:00', '19:00', '20:00', '21:00', '22:00', '23:00'
+                    ],
+                    title: {
+                        text: 'Hour (24-hour format)',
+                        style: { fontSize: '14px', fontWeight: 600 }
+                    },
+                    labels: { rotate: -45 }
+                },
+                yaxis: {
+                    title: {
+                        text: 'Cumulative Count',
+                        style: { fontSize: '14px', fontWeight: 600 }
+                    },
+                    min: 0
+                },
+                title: {
+                    text: 'Region Hourly In/Out Trends (All Cameras Combined)',
+                    align: 'center',
+                    style: { fontSize: '16px', fontWeight: 600 }
+                },
+                stroke: { curve: 'smooth', width: 3 },
+                markers: { size: 5, strokeWidth: 2 },
+                legend: {
+                    position: 'top',
+                    horizontalAlign: 'center'
+                },
+                grid: { borderColor: '#e7e7e7', strokeDashArray: 3 },
+                tooltip: {
+                    y: { formatter: function (val) { return val + " count" } }
                 }
-            });
+            };
+
+            var regionTrendChart = new ApexCharts(document.querySelector("#region_hourly_trends_chart"), regionTrendOptions);
+            regionTrendChart.render();
         {% endif %}
+
+        // Initialize DataTable for daily summary
+        $('#daily_summary_table').DataTable({
+            responsive: true,
+            pageLength: 10,
+            order: [[1, 'desc']],
+            scrollX: true
+        });
     </script>
 {% endblock %}
