@@ -117,197 +117,52 @@
 
 {% block analysis_js %}
     <script>
-        // IMPROVED: Enhanced chart configurations for better visualization
+        {% if analysis_data.simplified_analysis %}
+            // Define hours array
+            var hours = ['00:00', '01:00', '02:00', '03:00', '04:00', '05:00', '06:00', '07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00', '22:00', '23:00'];
 
-        // Define hours array first
-        var hours = ['00:00', '01:00', '02:00', '03:00', '04:00', '05:00', '06:00', '07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00', '22:00', '23:00'];
+            // 1. REGIONAL HOURLY CHART - Fixed with proper cumulative totals
+            {% if analysis_data.simplified_analysis.regional_hourly_data %}
+                var regionalInData = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+                var regionalOutData = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+                var occupancyData = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 
-        // 1. REGIONAL HOURLY CHART - Now shows cumulative increasing pattern
-        {% if analysis_data.simplified_analysis.regional_hourly_data %}
-            var regionalInData = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-            var regionalOutData = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-            var occupancyData = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+                {% for hour_data in analysis_data.simplified_analysis.regional_hourly_data %}
+                    regionalInData[{{ hour_data.hour }}] = {{ hour_data.total_in_count|default:0 }};
+                    regionalOutData[{{ hour_data.hour }}] = {{ hour_data.total_out_count|default:0 }};
+                    occupancyData[{{ hour_data.hour }}] = {{ hour_data.current_occupancy|default:0 }};
+                {% endfor %}
 
-            {% for hour_data in analysis_data.simplified_analysis.regional_hourly_data %}
-                regionalInData[{{ hour_data.hour }}] = {{ hour_data.total_in_count|default:0 }};
-                regionalOutData[{{ hour_data.hour }}] = {{ hour_data.total_out_count|default:0 }};
-                occupancyData[{{ hour_data.hour }}] = {{ hour_data.current_occupancy|default:0 }};
-            {% endfor %}
-
-            var regionalOptions = {
-                series: [{
-                    name: 'Regional Total In (Cumulative)',
-                    data: regionalInData,
-                    color: '#28a745',
-                    type: 'line'
-                }, {
-                    name: 'Regional Total Out (Cumulative)',
-                    data: regionalOutData,
-                    color: '#dc3545',
-                    type: 'line'
-                }, {
-                    name: 'Current Occupancy',
-                    data: occupancyData,
-                    color: '#007bff',
-                    type: 'area'
-                }],
-                chart: {
-                    type: 'line',
-                    height: 450,  // Increased height
-                    toolbar: {show: true},
-                    zoom: {enabled: true}
-                },
-                xaxis: {
-                    categories: hours,
-                    title: {
-                        text: 'Hour (24-hour format)',
-                        style: {fontSize: '14px', fontWeight: 600}
-                    },
-                    labels: {rotate: -45}
-                },
-                yaxis: {
-                    title: {
-                        text: 'Cumulative Count',
-                        style: {fontSize: '14px', fontWeight: 600}
-                    },
-                    min: 0
-                },
-                title: {
-                    text: 'Regional Hourly Totals (Cumulative with Carry-Forward) - {{ analysis_data.analysis_date }}',
-                    align: 'center',
-                    style: {fontSize: '16px', fontWeight: 600}
-                },
-                stroke: {
-                    curve: 'smooth',
-                    width: [4, 4, 2]  // Thicker lines for better visibility
-                },
-                fill: {
-                    type: ['solid', 'solid', 'gradient'],
-                    gradient: {
-                        shadeIntensity: 1,
-                        opacityFrom: 0.4,
-                        opacityTo: 0.1
-                    }
-                },
-                markers: {
-                    size: [5, 5, 0],  // Larger markers
-                    strokeWidth: 2
-                },
-                legend: {
-                    position: 'top',
-                    fontSize: '13px'
-                },
-                grid: {
-                    borderColor: '#e7e7e7',
-                    strokeDashArray: 3
-                },
-                tooltip: {
-                    y: {
-                        formatter: function (val, opts) {
-                            if (opts.seriesIndex === 2) {
-                                return val + " people currently";
-                            }
-                            return val + " total cumulative count";
-                        }
-                    }
-                },
-                annotations: {
-                    xaxis: [{
-                        x: '12:00',
-                        borderColor: '#00E396',
-                        label: {
-                            borderColor: '#00E396',
-                            style: {
-                                color: '#fff',
-                                background: '#00E396',
-                            },
-                            text: 'Data starts'
-                        }
-                    }]
-                }
-            };
-
-            var regionalChart = new ApexCharts(document.querySelector("#regional_hourly_chart"), regionalOptions);
-            regionalChart.render();
-        {% endif %}
-
-        // 2. IMPROVED INDIVIDUAL CAMERA CHARTS - Better organization and visualization
-        {% if analysis_data.simplified_analysis.individual_camera_data %}
-            var colors = ['#007bff', '#28a745', '#dc3545', '#ffc107', '#17a2b8', '#6f42c1', '#e83e8c', '#fd7e14', '#20c997', '#6610f2'];
-            var cameraInSeries = [];
-            var cameraOutSeries = [];
-
-            {% for camera in analysis_data.simplified_analysis.individual_camera_data %}
-                {% if camera.data_points %}
-                    // Prepare time series data for {{ camera.camera_name }}
-                    var cameraInData_{{ forloop.counter0 }} = [];
-                    var cameraOutData_{{ forloop.counter0 }} = [];
-
-                    {% for point in camera.data_points %}
-                        cameraInData_{{ forloop.parentloop.counter0 }}.push({
-                            x: {{ forloop.counter0 }},  // Use index as X
-                            y: {{ point.cc_in_count }},
-                            timestamp: '{{ point.created_at }}'
-                        });
-                        cameraOutData_{{ forloop.parentloop.counter0 }}.push({
-                            x: {{ forloop.counter0 }},  // Use index as X
-                            y: {{ point.cc_out_count }},
-                            timestamp: '{{ point.created_at }}'
-                        });
-                    {% endfor %}
-
-                    // Add In count series
-                    cameraInSeries.push({
-                        name: '{{ camera.camera_name }} - In',
-                        data: cameraInData_{{ forloop.counter0 }},
-                        color: colors[{{ forloop.counter0 }} % colors.length],
+                var regionalOptions = {
+                    series: [{
+                        name: 'Regional Total In (Cumulative)',
+                        data: regionalInData,
+                        color: '#28a745',
                         type: 'line'
-                    });
-
-                    // Add Out count series with dashed line
-                    cameraOutSeries.push({
-                        name: '{{ camera.camera_name }} - Out',
-                        data: cameraOutData_{{ forloop.counter0 }},
-                        color: colors[{{ forloop.counter0 }} % colors.length],
+                    }, {
+                        name: 'Regional Total Out (Cumulative)',
+                        data: regionalOutData,
+                        color: '#dc3545',
                         type: 'line'
-                    });
-                {% endif %}
-            {% endfor %}
-
-            // Combine all series
-            var allCameraSeries = [...cameraInSeries, ...cameraOutSeries];
-
-            if (allCameraSeries.length > 0) {
-                var individualCameraOptions = {
-                    series: allCameraSeries,
+                    }, {
+                        name: 'Current Occupancy',
+                        data: occupancyData,
+                        color: '#007bff',
+                        type: 'area'
+                    }],
                     chart: {
                         type: 'line',
-                        height: 700,  // Increased height for better visibility
-                        toolbar: {
-                            show: true,
-                            tools: {
-                                download: true,
-                                selection: true,
-                                zoom: true,
-                                zoomin: true,
-                                zoomout: true,
-                                pan: true,
-                                reset: true
-                            }
-                        },
+                        height: 500,
+                        toolbar: {show: true},
                         zoom: {enabled: true}
                     },
                     xaxis: {
-                        type: 'numeric',
+                        categories: hours,
                         title: {
-                            text: 'Data Point Index (Chronological Order)',
+                            text: 'Hour (24-hour format)',
                             style: {fontSize: '14px', fontWeight: 600}
                         },
-                        labels: {
-                            formatter: function (val) {
-                                return Math.floor(val);
-                            }
-                        }
+                        labels: {rotate: -45}
                     },
                     yaxis: {
                         title: {
@@ -317,56 +172,227 @@
                         min: 0
                     },
                     title: {
-                        text: 'Individual Camera Data - All Points (Chronological) - {{ analysis_data.analysis_date }}',
+                        text: 'Regional Hourly Analysis (Cumulative with Carry-Forward) - {{ analysis_data.analysis_date }}',
                         align: 'center',
                         style: {fontSize: '16px', fontWeight: 600}
                     },
                     stroke: {
                         curve: 'smooth',
-                        width: 2
+                        width: [4, 4, 2]
+                    },
+                    fill: {
+                        type: ['solid', 'solid', 'gradient'],
+                        gradient: {
+                            shadeIntensity: 1,
+                            opacityFrom: 0.4,
+                            opacityTo: 0.1
+                        }
                     },
                     markers: {
-                        size: 0  // No markers for cleaner lines
+                        size: [5, 5, 0],
+                        strokeWidth: 2
                     },
                     legend: {
                         position: 'top',
-                        fontSize: '11px',
-                        markers: {width: 12, height: 12},
-                        itemMargin: {horizontal: 8}
+                        fontSize: '13px'
                     },
                     grid: {
                         borderColor: '#e7e7e7',
                         strokeDashArray: 3
                     },
                     tooltip: {
-                        shared: false,
-                        intersect: false,
-                        x: {
-                            formatter: function (val) {
-                                return "Point " + Math.floor(val);
-                            }
-                        },
                         y: {
                             formatter: function (val, opts) {
-                                var seriesName = opts.series[opts.seriesIndex].name;
-                                var dataPoint = opts.series[opts.seriesIndex].data[opts.dataPointIndex];
-                                if (dataPoint && dataPoint.timestamp) {
-                                    return val + " count at " + dataPoint.timestamp;
+                                if (opts.seriesIndex === 2) {
+                                    return val + " people currently";
                                 }
-                                return val + " count";
+                                return val + " total cumulative count";
                             }
                         }
-                    },
-                    dataLabels: {
-                        enabled: false
                     }
                 };
 
-                var individualChart = new ApexCharts(document.querySelector("#individual_cameras_chart"), individualCameraOptions);
-                individualChart.render();
-            } else {
-                document.querySelector("#individual_cameras_chart").innerHTML = '<div class="alert alert-info">No individual camera data available.</div>';
-            }
+                var regionalChart = new ApexCharts(document.querySelector("#regional_hourly_chart"), regionalOptions);
+                regionalChart.render();
+            {% else %}
+                document.querySelector("#regional_hourly_chart").innerHTML = '<div class="alert alert-info">No regional hourly data available.</div>';
+            {% endif %}
+
+            // 2. INDIVIDUAL CAMERA CHARTS - Same design as regional chart
+            {% if analysis_data.simplified_analysis.individual_camera_data %}
+                var colors = ['#007bff', '#28a745', '#dc3545', '#ffc107', '#17a2b8', '#6f42c1', '#e83e8c', '#fd7e14', '#20c997', '#6610f2'];
+                var cameraInSeries = [];
+                var cameraOutSeries = [];
+
+                {% for camera in analysis_data.simplified_analysis.individual_camera_data %}
+                    {% if camera.data_points %}
+                        // Prepare time series data for {{ camera.camera_name }}
+                        var cameraInData_{{ forloop.counter0 }} = [];
+                        var cameraOutData_{{ forloop.counter0 }} = [];
+
+                        {% for point in camera.data_points %}
+                            cameraInData_{{ forloop.parentloop.counter0 }}.push({{ point.cc_in_count }});
+                            cameraOutData_{{ forloop.parentloop.counter0 }}.push({{ point.cc_out_count }});
+                        {% endfor %}
+
+                        // Add In count series
+                        cameraInSeries.push({
+                            name: '{{ camera.camera_name }} - In',
+                            data: cameraInData_{{ forloop.counter0 }},
+                            color: colors[{{ forloop.counter0 }} % colors.length],
+                            type: 'line'
+                        });
+
+                        // Add Out count series
+                        cameraOutSeries.push({
+                            name: '{{ camera.camera_name }} - Out',
+                            data: cameraOutData_{{ forloop.counter0 }},
+                            color: colors[{{ forloop.counter0 }} % colors.length],
+                            type: 'line'
+                        });
+                    {% endif %}
+                {% endfor %}
+
+                // Combine all series
+                var allCameraSeries = [...cameraInSeries, ...cameraOutSeries];
+
+                if (allCameraSeries.length > 0) {
+                    // Create time categories (use indices for simplicity)
+                    var maxDataPoints = Math.max(
+                        {% for camera in analysis_data.simplified_analysis.individual_camera_data %}
+                            {{ camera.total_points|default:0 }}{% if not forloop.last %},{% endif %}
+                        {% endfor %}
+                    );
+
+                    var timeCategories = [];
+                    for (var i = 1; i <= maxDataPoints; i++) {
+                        timeCategories.push(i);
+                    }
+
+                    var individualCameraOptions = {
+                        series: allCameraSeries,
+                        chart: {
+                            type: 'line',
+                            height: 600,
+                            toolbar: {
+                                show: true,
+                                tools: {
+                                    download: true,
+                                    selection: true,
+                                    zoom: true,
+                                    zoomin: true,
+                                    zoomout: true,
+                                    pan: true,
+                                    reset: true
+                                }
+                            },
+                            zoom: {enabled: true}
+                        },
+                        xaxis: {
+                            type: 'numeric',
+                            title: {
+                                text: 'Data Point Index (Chronological Order)',
+                                style: {fontSize: '14px', fontWeight: 600}
+                            },
+                            labels: {
+                                formatter: function (val) {
+                                    return Math.floor(val);
+                                }
+                            }
+                        },
+                        yaxis: {
+                            title: {
+                                text: 'Cumulative Count',
+                                style: {fontSize: '14px', fontWeight: 600}
+                            },
+                            min: 0
+                        },
+                        title: {
+                            text: 'Individual Camera Data - All Points (Same Design as Regional) - {{ analysis_data.analysis_date }}',
+                            align: 'center',
+                            style: {fontSize: '16px', fontWeight: 600}
+                        },
+                        stroke: {
+                            curve: 'smooth',
+                            width: 3
+                        },
+                        markers: {
+                            size: 0
+                        },
+                        legend: {
+                            position: 'top',
+                            fontSize: '11px',
+                            markers: {width: 12, height: 12},
+                            itemMargin: {horizontal: 8}
+                        },
+                        grid: {
+                            borderColor: '#e7e7e7',
+                            strokeDashArray: 3
+                        },
+                        tooltip: {
+                            shared: false,
+                            intersect: false,
+                            x: {
+                                formatter: function (val) {
+                                    return "Point " + Math.floor(val);
+                                }
+                            },
+                            y: {
+                                formatter: function (val) {
+                                    return val + " count";
+                                }
+                            }
+                        },
+                        dataLabels: {
+                            enabled: false
+                        }
+                    };
+
+                    var individualChart = new ApexCharts(document.querySelector("#individual_cameras_chart"), individualCameraOptions);
+                    individualChart.render();
+                } else {
+                    document.querySelector("#individual_cameras_chart").innerHTML = '<div class="alert alert-info">No individual camera data available.</div>';
+                }
+            {% else %}
+                document.querySelector("#individual_cameras_chart").innerHTML = '<div class="alert alert-info">No camera data available.</div>';
+            {% endif %}
+
+            // Add camera info summary with improved styling
+            {% if analysis_data.simplified_analysis.individual_camera_data %}
+                var summaryHtml = '<div class="mt-4"><h6 class="mb-3">Camera Data Summary:</h6><div class="row">';
+
+                {% for camera in analysis_data.simplified_analysis.individual_camera_data %}
+                    summaryHtml += `
+                <div class="col-md-3 mb-3">
+                    <div class="card border-primary h-100">
+                        <div class="card-body p-3">
+                            <h6 class="card-title text-primary mb-2">{{ camera.camera_name }}</h6>
+                            <div class="small text-muted">
+                                <div class="row">
+                                    <div class="col-6"><strong>Points:</strong> {{ camera.total_points }}</div>
+                                    <div class="col-6"><strong>Max In:</strong> {{ camera.max_in }}</div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-6"><strong>Max Out:</strong> {{ camera.max_out }}</div>
+                                    <div class="col-6"><strong>Occupancy:</strong> {{ camera.max_in|add:camera.max_out|floatformat:0 }}</div>
+                                </div>
+                                <div class="mt-1">
+                                    <strong>Time:</strong> {{ camera.first_time }} - {{ camera.last_time }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+                {% endfor %}
+
+                summaryHtml += '</div></div>';
+                document.querySelector("#individual_cameras_chart").insertAdjacentHTML('afterend', summaryHtml);
+            {% endif %}
+
+        {% else %}
+            document.querySelector("#regional_hourly_chart").innerHTML = '<div class="alert alert-warning">No analysis data available.</div>';
+            document.querySelector("#individual_cameras_chart").innerHTML = '<div class="alert alert-warning">No camera data available.</div>';
         {% endif %}
     </script>
 {% endblock %}
