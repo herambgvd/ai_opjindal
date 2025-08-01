@@ -1017,7 +1017,8 @@ class TablePartitioningManager:
                                   cc_in_count,
                                   cc_out_count,
                                   cc_total_count,
-                                  created_at
+                                  created_at,
+                                  EXTRACT(HOUR FROM created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata') as hour
                            FROM cross_counting_data_timeseries
                            WHERE camera_id = ANY (%s)
                              AND DATE (created_at) = %s
@@ -1073,7 +1074,7 @@ class TablePartitioningManager:
             cc_in_count = row[1]
             cc_out_count = row[2]
             created_at = row[4]
-            hour = created_at.hour if created_at else 0
+            hour = int(row[5]) if row[5] is not None else 0
 
             camera_hour_data[camera_id][hour].append({
                 'cc_in_count': cc_in_count,
