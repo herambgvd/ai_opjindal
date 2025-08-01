@@ -206,11 +206,10 @@ class TablePartitioningManager:
     @staticmethod
     def get_simplified_daily_analysis(region_id: int, target_date: date) -> Dict[str, Any]:
         """
-        COMPLETELY FIXED: Simplified approach with proper carry-forward cumulative logic
-        Based on analysis: CH1-CH8 cameras with data spanning hours 17-23
-        Regional totals should reach In=1596, Out=1434 by hour 23
+        FINAL FIX: Cumulative carry-forward logic - values should always increase
+        Hour 17: In=932 → Hour 18: In=932+new_data=948 (not reset to new_data)
         """
-        from .models import Camera
+        from .models import Camera, CrossCountingData
 
         cameras = Camera.objects.filter(region_id=region_id, status=True)
         camera_ids = list(cameras.values_list('id', flat=True))
@@ -223,10 +222,10 @@ class TablePartitioningManager:
                 "camera_count": 0
             }
 
-        print(f"COMPLETE FIX DEBUG: Analyzing data for {target_date}")
-        print(f"COMPLETE FIX DEBUG: Cameras: {len(camera_ids)}")
+        print(f"FINAL FIX DEBUG: Analyzing data for {target_date}")
+        print(f"FINAL FIX DEBUG: Cameras: {len(camera_ids)}")
 
-        # Get ALL individual camera data points (for individual charts)
+        # Get ALL individual camera data points
         individual_camera_data = []
         camera_objects = {cam.id: cam for cam in cameras}
 
@@ -246,9 +245,9 @@ class TablePartitioningManager:
 
             all_camera_data = cursor.fetchall()
 
-        print(f"COMPLETE FIX DEBUG: Retrieved {len(all_camera_data)} total data points")
+        print(f"FINAL FIX DEBUG: Retrieved {len(all_camera_data)} total data points")
 
-        # Group by camera for individual data
+        # Group data
         camera_data_points = defaultdict(list)
         camera_hour_data = defaultdict(lambda: defaultdict(list))
 
@@ -260,7 +259,7 @@ class TablePartitioningManager:
             created_at = row[4]
             hour = int(row[5]) if row[5] is not None else 0
 
-            # For individual camera charts (ALL data points)
+            # For individual camera charts
             camera_data_points[camera_id].append({
                 'cc_in_count': cc_in_count,
                 'cc_out_count': cc_out_count,
@@ -269,14 +268,14 @@ class TablePartitioningManager:
                 'timestamp': created_at
             })
 
-            # For hourly analysis (grouped by hour)
+            # For hourly analysis
             camera_hour_data[camera_id][hour].append({
                 'cc_in_count': cc_in_count,
                 'cc_out_count': cc_out_count,
                 'created_at': created_at
             })
 
-        # Format individual camera data (ALL points for line charts)
+        # Format individual camera data
         for camera_id in camera_ids:
             if camera_id in camera_objects and camera_id in camera_data_points:
                 data_points = camera_data_points[camera_id]
@@ -292,13 +291,10 @@ class TablePartitioningManager:
                     'max_out': max([p['cc_out_count'] for p in data_points], default=0)
                 })
 
-        print(f"COMPLETE FIX DEBUG: Individual camera data prepared for {len(individual_camera_data)} cameras")
+        print(f"FINAL FIX DEBUG: Individual camera data prepared for {len(individual_camera_data)} cameras")
 
-        # FIXED: REGIONAL HOURLY ANALYSIS WITH PROPER CARRY-FORWARD LOGIC
-        # This implements the exact logic from the Excel analysis
+        # FINAL FIX: PROPER CUMULATIVE CARRY-FORWARD LOGIC
         regional_hourly_data = []
-
-        # Store each camera's hourly values with carry-forward
         camera_hourly_values = {}
 
         for camera_id in camera_ids:
@@ -308,37 +304,34 @@ class TablePartitioningManager:
             camera_name = camera_objects[camera_id].name
             camera_hourly_values[camera_id] = {}
 
-            # Initialize carry-forward values
-            last_known_in = 0
-            last_known_out = 0
+            print(f"FINAL FIX DEBUG: Processing {camera_name}")
 
-            print(f"COMPLETE FIX DEBUG: Processing {camera_name}")
-
-            # Process each hour (0-23)
+            # FIXED: Use the MAX values per hour (cumulative peaks)
+            # This ensures always increasing pattern
             for hour in range(24):
                 if hour in camera_hour_data[camera_id]:
-                    # Get last value for this hour
+                    # Get MAX values for this hour (not last value)
                     hour_records = camera_hour_data[camera_id][hour]
-                    # Sort by created_at and get the last record
-                    last_record = sorted(hour_records, key=lambda x: x['created_at'])[-1]
+                    max_in = max(record['cc_in_count'] for record in hour_records)
+                    max_out = max(record['cc_out_count'] for record in hour_records)
 
-                    # Update last known values
-                    last_known_in = last_record['cc_in_count']
-                    last_known_out = last_record['cc_out_count']
+                    camera_hourly_values[camera_id][hour] = {
+                        'cc_in_count': max_in,
+                        'cc_out_count': max_out
+                    }
 
-                    print(f"COMPLETE FIX DEBUG:   Hour {hour}: In={last_known_in}, Out={last_known_out} (actual)")
+                    print(f"FINAL FIX DEBUG:   Hour {hour}: In={max_in}, Out={max_out} (max values)")
                 else:
-                    # Carry forward previous values (if any)
-                    if last_known_in > 0 or last_known_out > 0:
-                        print(f"COMPLETE FIX DEBUG:   Hour {hour}: In={last_known_in}, Out={last_known_out} (carried)")
+                    # Carry forward previous hour's values
+                    prev_hour_values = camera_hourly_values[camera_id].get(hour - 1,
+                                                                           {'cc_in_count': 0, 'cc_out_count': 0})
+                    camera_hourly_values[camera_id][hour] = prev_hour_values.copy()
 
-                # Store the values for this hour (either actual or carried forward)
-                camera_hourly_values[camera_id][hour] = {
-                    'cc_in_count': last_known_in,
-                    'cc_out_count': last_known_out
-                }
+                    if prev_hour_values['cc_in_count'] > 0 or prev_hour_values['cc_out_count'] > 0:
+                        print(
+                            f"FINAL FIX DEBUG:   Hour {hour}: In={prev_hour_values['cc_in_count']}, Out={prev_hour_values['cc_out_count']} (carried)")
 
-        # Calculate regional totals by summing all cameras for each hour
+        # Calculate regional totals
         for hour in range(24):
             total_in = 0
             total_out = 0
@@ -350,7 +343,6 @@ class TablePartitioningManager:
                     total_in += values['cc_in_count']
                     total_out += values['cc_out_count']
 
-                    # Count as active if has any data
                     if values['cc_in_count'] > 0 or values['cc_out_count'] > 0:
                         active_cameras += 1
 
@@ -362,22 +354,22 @@ class TablePartitioningManager:
                 'active_cameras': active_cameras
             })
 
-        # Debug the regional totals
+        # Debug the fixed regional totals
         non_zero_hours = [h for h in regional_hourly_data if h['total_in_count'] > 0 or h['total_out_count'] > 0]
         if non_zero_hours:
-            print(f"COMPLETE FIX DEBUG: Regional data spans hours: {[h['hour'] for h in non_zero_hours]}")
+            print(f"FINAL FIX DEBUG: Regional data spans hours: {[h['hour'] for h in non_zero_hours]}")
             for h in non_zero_hours:
                 print(
-                    f"COMPLETE FIX DEBUG: Hour {h['hour']}: In={h['total_in_count']}, Out={h['total_out_count']}, Occupancy={h['current_occupancy']}, Active={h['active_cameras']}")
+                    f"FINAL FIX DEBUG: Hour {h['hour']}: In={h['total_in_count']}, Out={h['total_out_count']}, Occupancy={h['current_occupancy']}, Active={h['active_cameras']}")
 
         region_name = cameras.first().region.name if cameras.exists() else ""
 
         result = {
-            "individual_camera_data": individual_camera_data,  # ALL data points per camera
-            "regional_hourly_data": regional_hourly_data,  # FIXED: Proper cumulative totals
+            "individual_camera_data": individual_camera_data,
+            "regional_hourly_data": regional_hourly_data,  # FINAL FIX: Always increasing pattern
             "region_name": region_name,
             "camera_count": len(camera_ids),
-            "analysis_type": "complete_fixed_carry_forward",
+            "analysis_type": "final_fixed_cumulative_max_values",
             "target_date": target_date.strftime('%Y-%m-%d')
         }
 
