@@ -192,7 +192,7 @@ class TablePartitioningManager:
     @staticmethod
     def get_simplified_daily_analysis(region_id: int, target_date: date) -> Dict[str, Any]:
         """
-        FIXED: Use Django ORM, cumulative max logic, limit hours for today, show only In and Out
+        FIXED: Use Django ORM, cumulative max logic, proper date handling
         """
         from .models import Camera, CrossCountingData
         from django.db.models.functions import TruncHour
@@ -218,7 +218,8 @@ class TablePartitioningManager:
             created_at__date=target_date
         ).order_by('camera_id', 'created_at')
 
-        all_camera_data = list(data_qs.values('camera_id', 'cc_in_count', 'cc_out_count', 'cc_total_count', 'created_at'))
+        all_camera_data = list(
+            data_qs.values('camera_id', 'cc_in_count', 'cc_out_count', 'cc_total_count', 'created_at'))
 
         print(f"FIXED CUMULATIVE DEBUG: Retrieved {len(all_camera_data)} total data points")
 
@@ -230,13 +231,21 @@ class TablePartitioningManager:
                 "camera_count": 0
             }
 
-        # Determine max_hour
-        is_today = target_date == timezone.now().date()
+        # FIXED: Determine max_hour properly
+        current_date = timezone.now().date()
         current_local = localtime(timezone.now())
         max_data_hour = max(localtime(d['created_at']).hour for d in all_camera_data)
-        max_hour = current_local.hour if is_today else max_data_hour
 
-        print(f"FIXED CUMULATIVE DEBUG: Max hour: {max_hour}, Max data hour: {max_data_hour}")
+        # Only limit to current hour if target_date is TODAY (not yesterday)
+        if target_date == current_date:
+            max_hour = current_local.hour
+            print(f"FIXED CUMULATIVE DEBUG: Today's analysis - limiting to current hour: {max_hour}")
+        else:
+            max_hour = max_data_hour
+            print(f"FIXED CUMULATIVE DEBUG: Historical analysis - using all available hours up to: {max_hour}")
+
+        print(
+            f"FIXED CUMULATIVE DEBUG: Max hour: {max_hour}, Max data hour: {max_data_hour}, Current date: {current_date}, Target date: {target_date}")
 
         # Individual camera raw data
         individual_camera_data = []
@@ -303,7 +312,8 @@ class TablePartitioningManager:
                     print(f"FIXED CUMULATIVE DEBUG:   Hour {hour}: In={cumulative_in}, Out={cumulative_out} (updated)")
                 else:
                     if cumulative_in > 0 or cumulative_out > 0:
-                        print(f"FIXED CUMULATIVE DEBUG:   Hour {hour}: In={cumulative_in}, Out={cumulative_out} (carried forward)")
+                        print(
+                            f"FIXED CUMULATIVE DEBUG:   Hour {hour}: In={cumulative_in}, Out={cumulative_out} (carried forward)")
                 camera_hourly_values[camera_id][hour] = {
                     'cc_in_count': cumulative_in,
                     'cc_out_count': cumulative_out
