@@ -206,8 +206,8 @@ class TablePartitioningManager:
     @staticmethod
     def get_simplified_daily_analysis(region_id: int, target_date: date) -> Dict[str, Any]:
         """
-        FINAL FIX: Cumulative carry-forward logic - values should always increase
-        Hour 17: In=932 → Hour 18: In=932+new_data=948 (not reset to new_data)
+        TRUE CUMULATIVE FIX: Each hour shows the highest cumulative value reached so far
+        Hour 17: In=1584 → Hour 18: In=1584 (carry forward) → Hour 19: In=1584 (always increasing)
         """
         from .models import Camera, CrossCountingData
 
@@ -222,8 +222,8 @@ class TablePartitioningManager:
                 "camera_count": 0
             }
 
-        print(f"FINAL FIX DEBUG: Analyzing data for {target_date}")
-        print(f"FINAL FIX DEBUG: Cameras: {len(camera_ids)}")
+        print(f"TRUE CUMULATIVE DEBUG: Analyzing data for {target_date}")
+        print(f"TRUE CUMULATIVE DEBUG: Cameras: {len(camera_ids)}")
 
         # Get ALL individual camera data points
         individual_camera_data = []
@@ -245,7 +245,7 @@ class TablePartitioningManager:
 
             all_camera_data = cursor.fetchall()
 
-        print(f"FINAL FIX DEBUG: Retrieved {len(all_camera_data)} total data points")
+        print(f"TRUE CUMULATIVE DEBUG: Retrieved {len(all_camera_data)} total data points")
 
         # Group data
         camera_data_points = defaultdict(list)
@@ -291,9 +291,9 @@ class TablePartitioningManager:
                     'max_out': max([p['cc_out_count'] for p in data_points], default=0)
                 })
 
-        print(f"FINAL FIX DEBUG: Individual camera data prepared for {len(individual_camera_data)} cameras")
+        print(f"TRUE CUMULATIVE DEBUG: Individual camera data prepared for {len(individual_camera_data)} cameras")
 
-        # FINAL FIX: PROPER CUMULATIVE CARRY-FORWARD LOGIC
+        # TRUE CUMULATIVE LOGIC: Always use the highest value seen so far
         regional_hourly_data = []
         camera_hourly_values = {}
 
@@ -304,34 +304,38 @@ class TablePartitioningManager:
             camera_name = camera_objects[camera_id].name
             camera_hourly_values[camera_id] = {}
 
-            print(f"FINAL FIX DEBUG: Processing {camera_name}")
+            print(f"TRUE CUMULATIVE DEBUG: Processing {camera_name}")
 
-            # FIXED: Use the MAX values per hour (cumulative peaks)
-            # This ensures always increasing pattern
+            # Track the highest values seen so far (true cumulative)
+            cumulative_max_in = 0
+            cumulative_max_out = 0
+
             for hour in range(24):
                 if hour in camera_hour_data[camera_id]:
-                    # Get MAX values for this hour (not last value)
+                    # Get max values for this hour
                     hour_records = camera_hour_data[camera_id][hour]
-                    max_in = max(record['cc_in_count'] for record in hour_records)
-                    max_out = max(record['cc_out_count'] for record in hour_records)
+                    hour_max_in = max(record['cc_in_count'] for record in hour_records)
+                    hour_max_out = max(record['cc_out_count'] for record in hour_records)
 
-                    camera_hourly_values[camera_id][hour] = {
-                        'cc_in_count': max_in,
-                        'cc_out_count': max_out
-                    }
+                    # Update cumulative maximums (always increasing)
+                    cumulative_max_in = max(cumulative_max_in, hour_max_in)
+                    cumulative_max_out = max(cumulative_max_out, hour_max_out)
 
-                    print(f"FINAL FIX DEBUG:   Hour {hour}: In={max_in}, Out={max_out} (max values)")
+                    print(
+                        f"TRUE CUMULATIVE DEBUG:   Hour {hour}: In={cumulative_max_in}, Out={cumulative_max_out} (cumulative max)")
                 else:
-                    # Carry forward previous hour's values
-                    prev_hour_values = camera_hourly_values[camera_id].get(hour - 1,
-                                                                           {'cc_in_count': 0, 'cc_out_count': 0})
-                    camera_hourly_values[camera_id][hour] = prev_hour_values.copy()
-
-                    if prev_hour_values['cc_in_count'] > 0 or prev_hour_values['cc_out_count'] > 0:
+                    # No data for this hour, keep previous maximums
+                    if cumulative_max_in > 0 or cumulative_max_out > 0:
                         print(
-                            f"FINAL FIX DEBUG:   Hour {hour}: In={prev_hour_values['cc_in_count']}, Out={prev_hour_values['cc_out_count']} (carried)")
+                            f"TRUE CUMULATIVE DEBUG:   Hour {hour}: In={cumulative_max_in}, Out={cumulative_max_out} (carried forward)")
 
-        # Calculate regional totals
+                # Store cumulative values
+                camera_hourly_values[camera_id][hour] = {
+                    'cc_in_count': cumulative_max_in,
+                    'cc_out_count': cumulative_max_out
+                }
+
+        # Calculate regional totals (sum of all camera cumulative values)
         for hour in range(24):
             total_in = 0
             total_out = 0
@@ -354,22 +358,22 @@ class TablePartitioningManager:
                 'active_cameras': active_cameras
             })
 
-        # Debug the fixed regional totals
+        # Debug the TRUE cumulative regional totals
         non_zero_hours = [h for h in regional_hourly_data if h['total_in_count'] > 0 or h['total_out_count'] > 0]
         if non_zero_hours:
-            print(f"FINAL FIX DEBUG: Regional data spans hours: {[h['hour'] for h in non_zero_hours]}")
+            print(f"TRUE CUMULATIVE DEBUG: Regional data spans hours: {[h['hour'] for h in non_zero_hours]}")
             for h in non_zero_hours:
                 print(
-                    f"FINAL FIX DEBUG: Hour {h['hour']}: In={h['total_in_count']}, Out={h['total_out_count']}, Occupancy={h['current_occupancy']}, Active={h['active_cameras']}")
+                    f"TRUE CUMULATIVE DEBUG: Hour {h['hour']}: In={h['total_in_count']}, Out={h['total_out_count']}, Occupancy={h['current_occupancy']}")
 
         region_name = cameras.first().region.name if cameras.exists() else ""
 
         result = {
             "individual_camera_data": individual_camera_data,
-            "regional_hourly_data": regional_hourly_data,  # FINAL FIX: Always increasing pattern
+            "regional_hourly_data": regional_hourly_data,  # TRUE CUMULATIVE: Always increasing
             "region_name": region_name,
             "camera_count": len(camera_ids),
-            "analysis_type": "final_fixed_cumulative_max_values",
+            "analysis_type": "true_cumulative_always_increasing",
             "target_date": target_date.strftime('%Y-%m-%d')
         }
 

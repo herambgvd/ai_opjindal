@@ -121,7 +121,7 @@
             // Define hours array
             var hours = ['00:00', '01:00', '02:00', '03:00', '04:00', '05:00', '06:00', '07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00', '22:00', '23:00'];
 
-            // 1. REGIONAL HOURLY CHART - Fixed with proper cumulative totals
+            // 1. REGIONAL HOURLY CHART - Fixed cumulative totals
             {% if analysis_data.simplified_analysis.regional_hourly_data %}
                 var regionalInData = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
                 var regionalOutData = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
@@ -132,6 +132,9 @@
                     regionalOutData[{{ hour_data.hour }}] = {{ hour_data.total_out_count|default:0 }};
                     occupancyData[{{ hour_data.hour }}] = {{ hour_data.current_occupancy|default:0 }};
                 {% endfor %}
+
+                console.log("Regional In Data:", regionalInData);
+                console.log("Regional Out Data:", regionalOutData);
 
                 var regionalOptions = {
                     series: [{
@@ -172,7 +175,7 @@
                         min: 0
                     },
                     title: {
-                        text: 'Regional Hourly Analysis (Cumulative with Carry-Forward) - {{ analysis_data.analysis_date }}',
+                        text: 'Regional Hourly Analysis (True Cumulative - Always Increasing) - {{ analysis_data.analysis_date }}',
                         align: 'center',
                         style: {fontSize: '16px', fontWeight: 600}
                     },
@@ -218,176 +221,131 @@
                 document.querySelector("#regional_hourly_chart").innerHTML = '<div class="alert alert-info">No regional hourly data available.</div>';
             {% endif %}
 
-            // 2. INDIVIDUAL CAMERA CHARTS - Same design as regional chart
+            // 2. IMPROVED INDIVIDUAL CAMERA CHARTS - Separate chart per camera
             {% if analysis_data.simplified_analysis.individual_camera_data %}
-                var colors = ['#007bff', '#28a745', '#dc3545', '#ffc107', '#17a2b8', '#6f42c1', '#e83e8c', '#fd7e14', '#20c997', '#6610f2'];
-                var cameraInSeries = [];
-                var cameraOutSeries = [];
+
+                // Create container for individual camera charts
+                var cameraChartsHtml = '<div class="row">';
 
                 {% for camera in analysis_data.simplified_analysis.individual_camera_data %}
                     {% if camera.data_points %}
-                        // Prepare time series data for {{ camera.camera_name }}
+                        cameraChartsHtml += `
+                        <div class="col-md-6 mb-4">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6 class="mb-0">{{ camera.camera_name }} - Individual Data Points</h6>
+                                    <small class="text-muted">{{ camera.total_points }} data points | {{ camera.first_time }} - {{ camera.last_time }}</small>
+                                </div>
+                                <div class="card-body">
+                                    <div id="camera_chart_{{ forloop.counter0 }}"></div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    {% endif %}
+                {% endfor %}
+
+                cameraChartsHtml += '</div>';
+                document.querySelector("#individual_cameras_chart").innerHTML = cameraChartsHtml;
+
+                // Create individual charts for each camera
+                {% for camera in analysis_data.simplified_analysis.individual_camera_data %}
+                    {% if camera.data_points %}
                         var cameraInData_{{ forloop.counter0 }} = [];
                         var cameraOutData_{{ forloop.counter0 }} = [];
+                        var timeLabels_{{ forloop.counter0 }} = [];
 
                         {% for point in camera.data_points %}
                             cameraInData_{{ forloop.parentloop.counter0 }}.push({{ point.cc_in_count }});
                             cameraOutData_{{ forloop.parentloop.counter0 }}.push({{ point.cc_out_count }});
+                            timeLabels_{{ forloop.parentloop.counter0 }}.push('{{ point.created_at }}');
                         {% endfor %}
 
-                        // Add In count series
-                        cameraInSeries.push({
-                            name: '{{ camera.camera_name }} - In',
-                            data: cameraInData_{{ forloop.counter0 }},
-                            color: colors[{{ forloop.counter0 }} % colors.length],
-                            type: 'line'
-                        });
+                        var camera{{ forloop.counter0 }}Options = {
+                            series: [{
+                                name: 'In Count',
+                                data: cameraInData_{{ forloop.counter0 }},
+                                color: '#28a745',
+                                type: 'line'
+                            }, {
+                                name: 'Out Count',
+                                data: cameraOutData_{{ forloop.counter0 }},
+                                color: '#dc3545',
+                                type: 'line'
+                            }],
+                            chart: {
+                                type: 'line',
+                                height: 300,
+                                toolbar: {show: true},
+                                zoom: {enabled: true}
+                            },
+                            xaxis: {
+                                type: 'numeric',
+                                title: {
+                                    text: 'Data Point Index',
+                                    style: {fontSize: '12px'}
+                                },
+                                labels: {
+                                    formatter: function (val) {
+                                        return Math.floor(val);
+                                    }
+                                }
+                            },
+                            yaxis: {
+                                title: {
+                                    text: 'Count',
+                                    style: {fontSize: '12px'}
+                                },
+                                min: 0
+                            },
+                            title: {
+                                text: '{{ camera.camera_name }} - Timeline Data',
+                                align: 'center',
+                                style: {fontSize: '14px', fontWeight: 600}
+                            },
+                            stroke: {
+                                curve: 'smooth',
+                                width: 3
+                            },
+                            markers: {
+                                size: 3
+                            },
+                            legend: {
+                                position: 'top',
+                                fontSize: '12px'
+                            },
+                            grid: {
+                                borderColor: '#e7e7e7',
+                                strokeDashArray: 3
+                            },
+                            tooltip: {
+                                x: {
+                                    formatter: function (val) {
+                                        var index = Math.floor(val) - 1;
+                                        if (index >= 0 && index < timeLabels_{{ forloop.counter0 }}.length) {
+                                            return "Time: " + timeLabels_{{ forloop.counter0 }}[index];
+                                        }
+                                        return "Point " + Math.floor(val);
+                                    }
+                                },
+                                y: {
+                                    formatter: function (val) {
+                                        return val + " count";
+                                    }
+                                }
+                            }
+                        };
 
-                        // Add Out count series
-                        cameraOutSeries.push({
-                            name: '{{ camera.camera_name }} - Out',
-                            data: cameraOutData_{{ forloop.counter0 }},
-                            color: colors[{{ forloop.counter0 }} % colors.length],
-                            type: 'line'
-                        });
+                        var camera{{ forloop.counter0 }}Chart = new ApexCharts(
+                            document.querySelector("#camera_chart_{{ forloop.counter0 }}"),
+                            camera{{ forloop.counter0 }}Options
+                        );
+                        camera{{ forloop.counter0 }}Chart.render();
                     {% endif %}
                 {% endfor %}
 
-                // Combine all series
-                var allCameraSeries = [...cameraInSeries, ...cameraOutSeries];
-
-                if (allCameraSeries.length > 0) {
-                    // Create time categories (use indices for simplicity)
-                    var maxDataPoints = Math.max(
-                        {% for camera in analysis_data.simplified_analysis.individual_camera_data %}
-                            {{ camera.total_points|default:0 }}{% if not forloop.last %},{% endif %}
-                        {% endfor %}
-                    );
-
-                    var timeCategories = [];
-                    for (var i = 1; i <= maxDataPoints; i++) {
-                        timeCategories.push(i);
-                    }
-
-                    var individualCameraOptions = {
-                        series: allCameraSeries,
-                        chart: {
-                            type: 'line',
-                            height: 600,
-                            toolbar: {
-                                show: true,
-                                tools: {
-                                    download: true,
-                                    selection: true,
-                                    zoom: true,
-                                    zoomin: true,
-                                    zoomout: true,
-                                    pan: true,
-                                    reset: true
-                                }
-                            },
-                            zoom: {enabled: true}
-                        },
-                        xaxis: {
-                            type: 'numeric',
-                            title: {
-                                text: 'Data Point Index (Chronological Order)',
-                                style: {fontSize: '14px', fontWeight: 600}
-                            },
-                            labels: {
-                                formatter: function (val) {
-                                    return Math.floor(val);
-                                }
-                            }
-                        },
-                        yaxis: {
-                            title: {
-                                text: 'Cumulative Count',
-                                style: {fontSize: '14px', fontWeight: 600}
-                            },
-                            min: 0
-                        },
-                        title: {
-                            text: 'Individual Camera Data - All Points (Same Design as Regional) - {{ analysis_data.analysis_date }}',
-                            align: 'center',
-                            style: {fontSize: '16px', fontWeight: 600}
-                        },
-                        stroke: {
-                            curve: 'smooth',
-                            width: 3
-                        },
-                        markers: {
-                            size: 0
-                        },
-                        legend: {
-                            position: 'top',
-                            fontSize: '11px',
-                            markers: {width: 12, height: 12},
-                            itemMargin: {horizontal: 8}
-                        },
-                        grid: {
-                            borderColor: '#e7e7e7',
-                            strokeDashArray: 3
-                        },
-                        tooltip: {
-                            shared: false,
-                            intersect: false,
-                            x: {
-                                formatter: function (val) {
-                                    return "Point " + Math.floor(val);
-                                }
-                            },
-                            y: {
-                                formatter: function (val) {
-                                    return val + " count";
-                                }
-                            }
-                        },
-                        dataLabels: {
-                            enabled: false
-                        }
-                    };
-
-                    var individualChart = new ApexCharts(document.querySelector("#individual_cameras_chart"), individualCameraOptions);
-                    individualChart.render();
-                } else {
-                    document.querySelector("#individual_cameras_chart").innerHTML = '<div class="alert alert-info">No individual camera data available.</div>';
-                }
             {% else %}
                 document.querySelector("#individual_cameras_chart").innerHTML = '<div class="alert alert-info">No camera data available.</div>';
-            {% endif %}
-
-            // Add camera info summary with improved styling
-            {% if analysis_data.simplified_analysis.individual_camera_data %}
-                var summaryHtml = '<div class="mt-4"><h6 class="mb-3">Camera Data Summary:</h6><div class="row">';
-
-                {% for camera in analysis_data.simplified_analysis.individual_camera_data %}
-                    summaryHtml += `
-                <div class="col-md-3 mb-3">
-                    <div class="card border-primary h-100">
-                        <div class="card-body p-3">
-                            <h6 class="card-title text-primary mb-2">{{ camera.camera_name }}</h6>
-                            <div class="small text-muted">
-                                <div class="row">
-                                    <div class="col-6"><strong>Points:</strong> {{ camera.total_points }}</div>
-                                    <div class="col-6"><strong>Max In:</strong> {{ camera.max_in }}</div>
-                                </div>
-                                <div class="row">
-                                    <div class="col-6"><strong>Max Out:</strong> {{ camera.max_out }}</div>
-                                    <div class="col-6"><strong>Occupancy:</strong> {{ camera.max_in|add:camera.max_out|floatformat:0 }}</div>
-                                </div>
-                                <div class="mt-1">
-                                    <strong>Time:</strong> {{ camera.first_time }} - {{ camera.last_time }}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `;
-                {% endfor %}
-
-                summaryHtml += '</div></div>';
-                document.querySelector("#individual_cameras_chart").insertAdjacentHTML('afterend', summaryHtml);
             {% endif %}
 
         {% else %}
