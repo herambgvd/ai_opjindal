@@ -11,6 +11,7 @@ from typing import List, Dict, Any
 
 from django.db import connection
 from django.utils import timezone
+from django.utils.timezone import localtime
 
 logger = logging.getLogger(__name__)
 
@@ -206,13 +207,12 @@ class TablePartitioningManager:
     @staticmethod
     def get_simplified_daily_analysis(region_id: int, target_date: date) -> Dict[str, Any]:
         """
-        FIXED: Use last value per hour with proper carry-forward. Limit hours for current day. Show only In and Out, no occupancy.
+        FIXED: Use Django ORM, localtime for hours, cumulative max logic, show only up to current hour for today with carry forward.
+        Only In and Out, no occupancy.
         """
         from .models import Camera, CrossCountingData
-        from django.utils import timezone
 
-        is_today = target_date == timezone.now().date()
-        max_hour = timezone.now().hour if is_today else 23
+        local_tz = timezone.get_current_timezone()
 
         cameras = Camera.objects.filter(region_id=region_id, status=True)
         camera_ids = list(cameras.values_list('id', flat=True))
@@ -225,64 +225,55 @@ class TablePartitioningManager:
                 "camera_count": 0
             }
 
-        print(f"FIXED CUMULATIVE DEBUG: Analyzing data for {target_date}, up to hour {max_hour}")
+        print(f"FIXED CUMULATIVE DEBUG: Analyzing data for {target_date}")
         print(f"FIXED CUMULATIVE DEBUG: Cameras: {len(camera_ids)}")
 
-        # Get ALL individual camera data points
-        individual_camera_data = []
-        camera_objects = {cam.id: cam for cam in cameras}
+        # Fetch all data using ORM
+        data_qs = CrossCountingData.objects.filter(
+            camera_id__in=camera_ids,
+            created_at__date=target_date
+        ).order_by('camera_id', 'created_at')
 
-        with connection.cursor() as cursor:
-            cursor.execute("""
-                           SELECT camera_id,
-                                  cc_in_count,
-                                  cc_out_count,
-                                  cc_total_count,
-                                  created_at,
-                                  EXTRACT(HOUR FROM created_at) as hour
-                           FROM cross_counting_data_timeseries
-                           WHERE camera_id = ANY (%s)
-                             AND DATE (created_at) = %s
-                           ORDER BY camera_id, created_at
-                           """, [camera_ids, target_date])
-
-            all_camera_data = cursor.fetchall()
+        all_camera_data = list(data_qs.values('camera_id', 'cc_in_count', 'cc_out_count', 'cc_total_count', 'created_at'))
 
         print(f"FIXED CUMULATIVE DEBUG: Retrieved {len(all_camera_data)} total data points")
 
-        # Group data
+        if not all_camera_data:
+            return {
+                "individual_camera_data": [],
+                "regional_hourly_data": [],
+                "region_name": "",
+                "camera_count": 0
+            }
+
+        # Determine max_hour
+        is_today = target_date == timezone.now().date()
+        current_local = localtime(timezone.now())
+        max_data_hour = max(localtime(d['created_at']).hour for d in all_camera_data)
+        if is_today:
+            max_hour = current_local.hour
+        else:
+            max_hour = 23
+
+        print(f"FIXED CUMULATIVE DEBUG: Max hour: {max_hour}, Max data hour: {max_data_hour}")
+
+        # Individual camera raw data
+        individual_camera_data = []
+        camera_objects = {cam.id: cam for cam in cameras}
         camera_data_points = defaultdict(list)
-        camera_hour_data = defaultdict(lambda: defaultdict(list))
-
         for row in all_camera_data:
-            camera_id = row[0]
-            cc_in_count = row[1]
-            cc_out_count = row[2]
-            cc_total_count = row[3]
-            created_at = row[4]
-            hour = int(row[5]) if row[5] is not None else 0
-
-            # For individual camera charts (all raw points)
-            camera_data_points[camera_id].append({
-                'cc_in_count': cc_in_count,
-                'cc_out_count': cc_out_count,
-                'cc_total_count': cc_total_count,
-                'created_at': created_at.strftime('%H:%M:%S') if created_at else '',
-                'timestamp': created_at
+            created_at_local = localtime(row['created_at'])
+            camera_data_points[row['camera_id']].append({
+                'cc_in_count': row['cc_in_count'],
+                'cc_out_count': row['cc_out_count'],
+                'cc_total_count': row['cc_total_count'],
+                'created_at': created_at_local.strftime('%H:%M:%S'),
+                'timestamp': created_at_local
             })
 
-            # For hourly analysis (group records per hour)
-            camera_hour_data[camera_id][hour].append({
-                'cc_in_count': cc_in_count,
-                'cc_out_count': cc_out_count,
-                'created_at': created_at
-            })
-
-        # Format individual camera data (raw points only)
         for camera_id in camera_ids:
             if camera_id in camera_objects and camera_id in camera_data_points:
                 data_points = camera_data_points[camera_id]
-
                 individual_camera_data.append({
                     'camera_id': str(camera_id),
                     'camera_name': camera_objects[camera_id].name,
@@ -296,42 +287,49 @@ class TablePartitioningManager:
 
         print(f"FIXED CUMULATIVE DEBUG: Individual camera data prepared for {len(individual_camera_data)} cameras")
 
-        # Process hourly values with carry-forward using last known value
-        camera_hourly_values = {}
+        # Group for hourly max
+        camera_hour_data = defaultdict(lambda: defaultdict(list))
+        for row in all_camera_data:
+            created_at_local = localtime(row['created_at'])
+            hour = created_at_local.hour
+            camera_hour_data[row['camera_id']][hour].append({
+                'cc_in_count': row['cc_in_count'],
+                'cc_out_count': row['cc_out_count'],
+                'created_at': created_at_local
+            })
 
+        # Cumulative max per camera
+        camera_hourly_values = {}
         for camera_id in camera_ids:
             if camera_id not in camera_objects:
                 continue
 
             camera_name = camera_objects[camera_id].name
             camera_hourly_values[camera_id] = {}
-            last_known_in = 0
-            last_known_out = 0
+            cumulative_in = 0
+            cumulative_out = 0
 
             print(f"FIXED CUMULATIVE DEBUG: Processing {camera_name}")
 
             for hour in range(max_hour + 1):
                 if hour in camera_hour_data[camera_id]:
-                    # Get last record in this hour
                     hour_records = camera_hour_data[camera_id][hour]
-                    last_record = sorted(hour_records, key=lambda x: x['created_at'])[-1]
-                    last_known_in = last_record['cc_in_count']
-                    last_known_out = last_record['cc_out_count']
-                    print(f"FIXED CUMULATIVE DEBUG:   Hour {hour}: In={last_known_in}, Out={last_known_out} (updated)")
+                    hour_max_in = max(record['cc_in_count'] for record in hour_records)
+                    hour_max_out = max(record['cc_out_count'] for record in hour_records)
+                    cumulative_in = max(cumulative_in, hour_max_in)
+                    cumulative_out = max(cumulative_out, hour_max_out)
+                    print(f"FIXED CUMULATIVE DEBUG:   Hour {hour}: In={cumulative_in}, Out={cumulative_out} (updated)")
                 else:
-                    # Carry forward if previous data exists
-                    if last_known_in > 0 or last_known_out > 0:
-                        print(f"FIXED CUMULATIVE DEBUG:   Hour {hour}: In={last_known_in}, Out={last_known_out} (carried forward)")
+                    if cumulative_in > 0 or cumulative_out > 0:
+                        print(f"FIXED CUMULATIVE DEBUG:   Hour {hour}: In={cumulative_in}, Out={cumulative_out} (carried forward)")
 
-                # Store
                 camera_hourly_values[camera_id][hour] = {
-                    'cc_in_count': last_known_in,
-                    'cc_out_count': last_known_out
+                    'cc_in_count': cumulative_in,
+                    'cc_out_count': cumulative_out
                 }
 
-        # Calculate regional totals (sum of camera last known values per hour)
+        # Regional totals
         regional_hourly_data = []
-
         for hour in range(max_hour + 1):
             total_in = 0
             total_out = 0
@@ -353,13 +351,12 @@ class TablePartitioningManager:
                 'active_cameras': active_cameras
             })
 
-        # Debug the regional totals
+        # Debug regional
         non_zero_hours = [h for h in regional_hourly_data if h['total_in_count'] > 0 or h['total_out_count'] > 0]
         if non_zero_hours:
             print(f"FIXED CUMULATIVE DEBUG: Regional data spans hours: {[h['hour'] for h in non_zero_hours]}")
             for h in non_zero_hours:
-                print(
-                    f"FIXED CUMULATIVE DEBUG: Hour {h['hour']}: In={h['total_in_count']}, Out={h['total_out_count']}")
+                print(f"FIXED CUMULATIVE DEBUG: Hour {h['hour']}: In={h['total_in_count']}, Out={h['total_out_count']}")
 
         region_name = cameras.first().region.name if cameras.exists() else ""
 
@@ -368,7 +365,7 @@ class TablePartitioningManager:
             "regional_hourly_data": regional_hourly_data,
             "region_name": region_name,
             "camera_count": len(camera_ids),
-            "analysis_type": "last_value_carry_forward_no_occupancy",
+            "analysis_type": "cumulative_max_carry_forward_no_occupancy",
             "target_date": target_date.strftime('%Y-%m-%d')
         }
 
