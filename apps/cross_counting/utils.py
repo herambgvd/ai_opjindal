@@ -231,21 +231,38 @@ class TablePartitioningManager:
                 "camera_count": 0
             }
 
-        # FIXED: Determine max_hour properly
-        current_date = timezone.now().date()
-        current_local = localtime(timezone.now())
+        # ULTRA-ROBUST FIX: Force historical analysis for any date that has complete 24-hour data
         max_data_hour = max(localtime(d['created_at']).hour for d in all_camera_data)
 
-        # Only limit to current hour if target_date is TODAY (not yesterday)
-        if target_date == current_date:
-            max_hour = current_local.hour
-            print(f"FIXED CUMULATIVE DEBUG: Today's analysis - limiting to current hour: {max_hour}")
-        else:
-            max_hour = max_data_hour
-            print(f"FIXED CUMULATIVE DEBUG: Historical analysis - using all available hours up to: {max_hour}")
+        # Get current time in the application's configured timezone
+        now_aware = timezone.now()
+        current_local = localtime(now_aware)
+        current_date = current_local.date()
+        current_hour = current_local.hour
 
-        print(
-            f"FIXED CUMULATIVE DEBUG: Max hour: {max_hour}, Max data hour: {max_data_hour}, Current date: {current_date}, Target date: {target_date}")
+        # If we have data spanning close to a full day (22+ hours), treat it as historical
+        # This prevents timezone issues from limiting the analysis incorrectly
+        has_near_full_day_data = max_data_hour >= 22
+        is_clearly_historical = target_date < current_date
+        is_current_date_but_has_full_data = (target_date == current_date and has_near_full_day_data)
+
+        if is_clearly_historical or is_current_date_but_has_full_data:
+            max_hour = max_data_hour  # Show all available data
+            print(
+                f"FIXED CUMULATIVE DEBUG: Historical/Complete day analysis - using all available hours up to: {max_hour}")
+            if is_clearly_historical:
+                print(f"FIXED CUMULATIVE DEBUG: Date is clearly in the past")
+            if is_current_date_but_has_full_data:
+                print(f"FIXED CUMULATIVE DEBUG: Current date but has near-complete day data ({max_data_hour}+ hours)")
+        else:
+            # Only limit for truly current/incomplete days
+            max_hour = current_hour
+            print(f"FIXED CUMULATIVE DEBUG: Current incomplete day - limiting to current hour: {max_hour}")
+
+        print(f"FIXED CUMULATIVE DEBUG: Max hour: {max_hour}, Max data hour: {max_data_hour}")
+        print(f"FIXED CUMULATIVE DEBUG: Current datetime: {now_aware} (hour {current_hour})")
+        print(f"FIXED CUMULATIVE DEBUG: Current local date: {current_date}, Target date: {target_date}")
+        print(f"FIXED CUMULATIVE DEBUG: Has near full day data: {has_near_full_day_data}")
 
         # Individual camera raw data
         individual_camera_data = []
