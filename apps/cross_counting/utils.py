@@ -206,10 +206,13 @@ class TablePartitioningManager:
     @staticmethod
     def get_simplified_daily_analysis(region_id: int, target_date: date) -> Dict[str, Any]:
         """
-        TRUE CUMULATIVE FIX: Each hour shows the highest cumulative value reached so far
-        Hour 17: In=1584 → Hour 18: In=1584 (carry forward) → Hour 19: In=1584 (always increasing)
+        FIXED: Use last value per hour with proper carry-forward. Limit hours for current day. Show only In and Out, no occupancy.
         """
         from .models import Camera, CrossCountingData
+        from django.utils import timezone
+
+        is_today = target_date == timezone.now().date()
+        max_hour = timezone.now().hour if is_today else 23
 
         cameras = Camera.objects.filter(region_id=region_id, status=True)
         camera_ids = list(cameras.values_list('id', flat=True))
@@ -222,8 +225,8 @@ class TablePartitioningManager:
                 "camera_count": 0
             }
 
-        print(f"TRUE CUMULATIVE DEBUG: Analyzing data for {target_date}")
-        print(f"TRUE CUMULATIVE DEBUG: Cameras: {len(camera_ids)}")
+        print(f"FIXED CUMULATIVE DEBUG: Analyzing data for {target_date}, up to hour {max_hour}")
+        print(f"FIXED CUMULATIVE DEBUG: Cameras: {len(camera_ids)}")
 
         # Get ALL individual camera data points
         individual_camera_data = []
@@ -245,7 +248,7 @@ class TablePartitioningManager:
 
             all_camera_data = cursor.fetchall()
 
-        print(f"TRUE CUMULATIVE DEBUG: Retrieved {len(all_camera_data)} total data points")
+        print(f"FIXED CUMULATIVE DEBUG: Retrieved {len(all_camera_data)} total data points")
 
         # Group data
         camera_data_points = defaultdict(list)
@@ -259,7 +262,7 @@ class TablePartitioningManager:
             created_at = row[4]
             hour = int(row[5]) if row[5] is not None else 0
 
-            # For individual camera charts
+            # For individual camera charts (all raw points)
             camera_data_points[camera_id].append({
                 'cc_in_count': cc_in_count,
                 'cc_out_count': cc_out_count,
@@ -268,14 +271,14 @@ class TablePartitioningManager:
                 'timestamp': created_at
             })
 
-            # For hourly analysis
+            # For hourly analysis (group records per hour)
             camera_hour_data[camera_id][hour].append({
                 'cc_in_count': cc_in_count,
                 'cc_out_count': cc_out_count,
                 'created_at': created_at
             })
 
-        # Format individual camera data
+        # Format individual camera data (raw points only)
         for camera_id in camera_ids:
             if camera_id in camera_objects and camera_id in camera_data_points:
                 data_points = camera_data_points[camera_id]
@@ -291,10 +294,9 @@ class TablePartitioningManager:
                     'max_out': max([p['cc_out_count'] for p in data_points], default=0)
                 })
 
-        print(f"TRUE CUMULATIVE DEBUG: Individual camera data prepared for {len(individual_camera_data)} cameras")
+        print(f"FIXED CUMULATIVE DEBUG: Individual camera data prepared for {len(individual_camera_data)} cameras")
 
-        # TRUE CUMULATIVE LOGIC: Always use the highest value seen so far
-        regional_hourly_data = []
+        # Process hourly values with carry-forward using last known value
         camera_hourly_values = {}
 
         for camera_id in camera_ids:
@@ -303,40 +305,34 @@ class TablePartitioningManager:
 
             camera_name = camera_objects[camera_id].name
             camera_hourly_values[camera_id] = {}
+            last_known_in = 0
+            last_known_out = 0
 
-            print(f"TRUE CUMULATIVE DEBUG: Processing {camera_name}")
+            print(f"FIXED CUMULATIVE DEBUG: Processing {camera_name}")
 
-            # Track the highest values seen so far (true cumulative)
-            cumulative_max_in = 0
-            cumulative_max_out = 0
-
-            for hour in range(24):
+            for hour in range(max_hour + 1):
                 if hour in camera_hour_data[camera_id]:
-                    # Get max values for this hour
+                    # Get last record in this hour
                     hour_records = camera_hour_data[camera_id][hour]
-                    hour_max_in = max(record['cc_in_count'] for record in hour_records)
-                    hour_max_out = max(record['cc_out_count'] for record in hour_records)
-
-                    # Update cumulative maximums (always increasing)
-                    cumulative_max_in = max(cumulative_max_in, hour_max_in)
-                    cumulative_max_out = max(cumulative_max_out, hour_max_out)
-
-                    print(
-                        f"TRUE CUMULATIVE DEBUG:   Hour {hour}: In={cumulative_max_in}, Out={cumulative_max_out} (cumulative max)")
+                    last_record = sorted(hour_records, key=lambda x: x['created_at'])[-1]
+                    last_known_in = last_record['cc_in_count']
+                    last_known_out = last_record['cc_out_count']
+                    print(f"FIXED CUMULATIVE DEBUG:   Hour {hour}: In={last_known_in}, Out={last_known_out} (updated)")
                 else:
-                    # No data for this hour, keep previous maximums
-                    if cumulative_max_in > 0 or cumulative_max_out > 0:
-                        print(
-                            f"TRUE CUMULATIVE DEBUG:   Hour {hour}: In={cumulative_max_in}, Out={cumulative_max_out} (carried forward)")
+                    # Carry forward if previous data exists
+                    if last_known_in > 0 or last_known_out > 0:
+                        print(f"FIXED CUMULATIVE DEBUG:   Hour {hour}: In={last_known_in}, Out={last_known_out} (carried forward)")
 
-                # Store cumulative values
+                # Store
                 camera_hourly_values[camera_id][hour] = {
-                    'cc_in_count': cumulative_max_in,
-                    'cc_out_count': cumulative_max_out
+                    'cc_in_count': last_known_in,
+                    'cc_out_count': last_known_out
                 }
 
-        # Calculate regional totals (sum of all camera cumulative values)
-        for hour in range(24):
+        # Calculate regional totals (sum of camera last known values per hour)
+        regional_hourly_data = []
+
+        for hour in range(max_hour + 1):
             total_in = 0
             total_out = 0
             active_cameras = 0
@@ -354,26 +350,25 @@ class TablePartitioningManager:
                 'hour': hour,
                 'total_in_count': total_in,
                 'total_out_count': total_out,
-                'current_occupancy': max(0, total_in - total_out),
                 'active_cameras': active_cameras
             })
 
-        # Debug the TRUE cumulative regional totals
+        # Debug the regional totals
         non_zero_hours = [h for h in regional_hourly_data if h['total_in_count'] > 0 or h['total_out_count'] > 0]
         if non_zero_hours:
-            print(f"TRUE CUMULATIVE DEBUG: Regional data spans hours: {[h['hour'] for h in non_zero_hours]}")
+            print(f"FIXED CUMULATIVE DEBUG: Regional data spans hours: {[h['hour'] for h in non_zero_hours]}")
             for h in non_zero_hours:
                 print(
-                    f"TRUE CUMULATIVE DEBUG: Hour {h['hour']}: In={h['total_in_count']}, Out={h['total_out_count']}, Occupancy={h['current_occupancy']}")
+                    f"FIXED CUMULATIVE DEBUG: Hour {h['hour']}: In={h['total_in_count']}, Out={h['total_out_count']}")
 
         region_name = cameras.first().region.name if cameras.exists() else ""
 
         result = {
             "individual_camera_data": individual_camera_data,
-            "regional_hourly_data": regional_hourly_data,  # TRUE CUMULATIVE: Always increasing
+            "regional_hourly_data": regional_hourly_data,
             "region_name": region_name,
             "camera_count": len(camera_ids),
-            "analysis_type": "true_cumulative_always_increasing",
+            "analysis_type": "last_value_carry_forward_no_occupancy",
             "target_date": target_date.strftime('%Y-%m-%d')
         }
 
