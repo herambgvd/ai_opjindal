@@ -774,6 +774,7 @@ class TablePartitioningManager:
             occupancy_percentage = (region_current_occupancy / region.occupancy * 100) if region.occupancy > 0 else 0.0
             occupancy_percentage = min(occupancy_percentage, 100.0)
 
+            occupancy_by_in_out = max(0, region_total_in - region_total_out)
             enhanced_data.append({
                 'region_name': region.name,
                 'region_id': region.id,
@@ -782,6 +783,7 @@ class TablePartitioningManager:
                 'occupancy_percentage': round(occupancy_percentage, 1),
                 'total_in_count': region_total_in,
                 'total_out_count': region_total_out,
+                'occupancy_by_in_out': occupancy_by_in_out,
                 'cameras': camera_data,
                 'camera_count': len(camera_data)
             })
