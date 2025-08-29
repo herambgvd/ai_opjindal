@@ -720,15 +720,16 @@ class TablePartitioningManager:
     @staticmethod
     def get_enhanced_dashboard_data() -> List[Dict[str, Any]]:
         """
-        Get region cards data with cameras and their latest counts
+        Get region cards data with cameras and their latest counts, always using the latest data (regardless of age).
+        Shows last known In/Out, never zero unless no data, and displays 'minutes ago' for each camera.
+        Ensures region occupancy is never negative and logic is robust for auto-refresh.
         """
         from .models import Region, Camera, CrossCountingData
         from django.utils import timezone
-        from datetime import timedelta
 
         regions = Region.objects.prefetch_related('cameras').all()
         enhanced_data = []
-        recent_time = timezone.now() - timedelta(minutes=5)
+        now = timezone.now()
 
         for region in regions:
             cameras = Camera.objects.filter(region=region, status=True)
@@ -739,18 +740,19 @@ class TablePartitioningManager:
 
             for camera in cameras:
                 latest_data = CrossCountingData.objects.filter(
-                    camera=camera,
-                    created_at__gte=recent_time
+                    camera=camera
                 ).order_by('-created_at').first()
 
                 if latest_data:
                     camera_occupancy = max(0, latest_data.cc_in_count - latest_data.cc_out_count)
+                    minutes_ago = int((now - latest_data.created_at).total_seconds() // 60)
                     camera_info = {
                         'name': camera.name,
                         'latest_in_count': latest_data.cc_in_count,
                         'latest_out_count': latest_data.cc_out_count,
                         'current_occupancy': camera_occupancy,
                         'last_updated': latest_data.created_at,
+                        'minutes_ago': minutes_ago,
                         'status': 'active'
                     }
                     region_total_in += latest_data.cc_in_count
@@ -759,16 +761,18 @@ class TablePartitioningManager:
                 else:
                     camera_info = {
                         'name': camera.name,
-                        'latest_in_count': 0,
-                        'latest_out_count': 0,
+                        'latest_in_count': None,
+                        'latest_out_count': None,
                         'current_occupancy': 0,
                         'last_updated': None,
+                        'minutes_ago': '-',
                         'status': 'no_data'
                     }
-
                 camera_data.append(camera_info)
 
+            region_current_occupancy = max(0, region_current_occupancy)
             occupancy_percentage = (region_current_occupancy / region.occupancy * 100) if region.occupancy > 0 else 0.0
+            occupancy_percentage = min(occupancy_percentage, 100.0)
 
             enhanced_data.append({
                 'region_name': region.name,
