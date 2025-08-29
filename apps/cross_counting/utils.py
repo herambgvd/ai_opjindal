@@ -627,6 +627,7 @@ class TablePartitioningManager:
     def get_current_occupancy_data() -> List[Dict[str, Any]]:
         """
         Get current occupancy percentage for all regions for public display
+        Uses the latest CrossCountingData for each camera, regardless of age.
         """
         from .models import Region, Camera, CrossCountingData
         from django.utils import timezone
@@ -647,12 +648,10 @@ class TablePartitioningManager:
                 continue
 
             current_total = 0
-            recent_time = timezone.now() - timedelta(minutes=5)
-
+            # For each camera, fetch the latest CrossCountingData (no time filter)
             for camera in cameras:
                 latest_data = CrossCountingData.objects.filter(
-                    camera=camera,
-                    created_at__gte=recent_time
+                    camera=camera
                 ).order_by('-created_at').first()
 
                 if latest_data:
