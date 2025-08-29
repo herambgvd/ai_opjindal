@@ -15,7 +15,7 @@ urlpatterns = [
     
     path('dashboard/', dashboard.enhanced_dashboard, name='enhanced_dashboard'),
     
-    path('public/occupancy/', dashboard.public_occupancy_display, name='public_occupancy_display'),
+    
     path('public/occupancy/api/', dashboard.public_occupancy_api, name='public_occupancy_api'),
     
     # Region Management

@@ -2,10 +2,12 @@ from django.urls import path
 from django.views.generic import TemplateView
 
 from . import views
+from apps.cross_counting.views import dashboard
 
 app_name = "web"
 urlpatterns = [
     path("", views.home, name="home"),
+    path('floor/detail/', dashboard.public_occupancy_display, name='public_occupancy_display'),
     path("terms/", TemplateView.as_view(template_name="web/terms.html"), name="terms"),
     path("robots.txt", TemplateView.as_view(template_name="robots.txt", content_type="text/plain"), name="robots.txt"),
     path("400/", TemplateView.as_view(template_name="400.html"), name="400"),
