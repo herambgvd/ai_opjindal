@@ -139,13 +139,17 @@
                 <div class="details mt-2">
                     <div class="detail inside">
                         <div class="icon" style="color: white;"><i class="ri-user-fill"></i></div>
-                        <div class="value">{{ region.occupancy_by_in_out }}</div>
+                        <div class="value">{{ region.current_count }}</div>
                         <div>Inside</div>
                     </div>
                     <div class="detail available">
                         <div class="icon" style="color: white;"><i class="ri-door-open-line"></i></div>
-                        <div class="value">{{ region.max_occupancy|subtract:region.occupancy_by_in_out }}</div>
+                        <!-- <div class="value">{{ region.max_occupancy}}</div> -->
+                        <div class="value">{{ region.max_occupancy|subtract:region.current_count|default_if_none:0|floatformat:0|add:'0'|yesno:'0,0' }}</div>
                         <div>Available</div>
+                        {% if region.max_occupancy|subtract:region.current_count <= 0 %}
+                            <div style="color: #ed2121; font-weight: bold; margin-top: 4px;">Full</div>
+                        {% endif %}
                     </div>
                 </div>
                 

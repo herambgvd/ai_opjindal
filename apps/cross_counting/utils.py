@@ -626,12 +626,11 @@ class TablePartitioningManager:
     @staticmethod
     def get_current_occupancy_data() -> List[Dict[str, Any]]:
         """
-        Get current occupancy percentage for all regions for public display
-        Uses the latest CrossCountingData for each camera, regardless of age.
+        Get current occupancy percentage for all regions for public display.
+        Now also returns total_in_count, total_out_count, and occupancy_by_in_out (max(0, in-out)).
         """
         from .models import Region, Camera, CrossCountingData
         from django.utils import timezone
-        from datetime import timedelta
 
         regions = Region.objects.all()
         occupancy_data = []
@@ -643,29 +642,37 @@ class TablePartitioningManager:
                     "region_name": region.name,
                     "current_count": 0,
                     "max_occupancy": region.occupancy,
-                    "occupancy_percentage": 0.0
+                    "occupancy_percentage": 0.0,
+                    "total_in_count": 0,
+                    "total_out_count": 0,
+                    "occupancy_by_in_out": 0
                 })
                 continue
 
-            current_total = 0
-            # For each camera, fetch the latest CrossCountingData (no time filter)
+            total_in_count = 0
+            total_out_count = 0
             for camera in cameras:
                 latest_data = CrossCountingData.objects.filter(
                     camera=camera
                 ).order_by('-created_at').first()
-
                 if latest_data:
-                    camera_occupancy = max(0, latest_data.cc_in_count - latest_data.cc_out_count)
-                    current_total += camera_occupancy
+                    total_in_count += latest_data.cc_in_count
+                    total_out_count += latest_data.cc_out_count
 
-            occupancy_percentage = (current_total / region.occupancy * 100) if region.occupancy > 0 else 0.0
+            occupancy_by_in_out = max(0, total_in_count - total_out_count)
+            # Cap current_count at max_occupancy for display
+            current_count = min(occupancy_by_in_out, region.occupancy)
+            occupancy_percentage = (current_count / region.occupancy * 100) if region.occupancy > 0 else 0.0
             occupancy_percentage = min(occupancy_percentage, 100.0)
 
             occupancy_data.append({
                 "region_name": region.name,
-                "current_count": current_total,
+                "current_count": current_count,  # for backward compatibility
                 "max_occupancy": region.occupancy,
-                "occupancy_percentage": round(occupancy_percentage, 1)
+                "occupancy_percentage": round(occupancy_percentage, 1),
+                "total_in_count": total_in_count,
+                "total_out_count": total_out_count,
+                "occupancy_by_in_out": occupancy_by_in_out
             })
 
         return occupancy_data
