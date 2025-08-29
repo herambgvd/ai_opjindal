@@ -14,7 +14,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Security settings
 SECRET_KEY = env('DJANGO_SECRET_KEY', default='your-secret-key-here')
 DEBUG = env.bool('DEBUG', default=True)
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0','172.17.41.234']
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0','172.17.41.234', 'mydining.jgu.edu.in']
 
 # Application definition
 SYSTEM_APPS = [
@@ -84,11 +84,11 @@ WSGI_APPLICATION = 'opjindal.wsgi.application'
 DATABASES = {
     "default": {
         "ENGINE": "timescale.db.backends.postgresql",
-        "NAME": env("DJANGO_DATABASE_NAME", default="op_jindal"),
+        "NAME": env("DJANGO_DATABASE_NAME", default="ai_op_jindal"),
         "USER": env("DJANGO_DATABASE_USER", default="postgres"),
         "PASSWORD": env("DJANGO_DATABASE_PASSWORD", default="Gvd@6001"),
         "HOST": env("DJANGO_DATABASE_HOST", default="localhost"),
-        "PORT": env("DJANGO_DATABASE_PORT", default="5432"),
+        "PORT": env("DJANGO_DATABASE_PORT", default="5433"),
     }
 }
 
