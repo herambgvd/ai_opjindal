@@ -5,7 +5,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="refresh" content="20">
+    <meta http-equiv="refresh" content="10">
+    <script>
+        setTimeout(function(){ window.location.reload(); }, 10000);
+    </script>
     <title>Vidya Devi Jindal Dining Block</title>
     <link href="https://cdn.jsdelivr.net/npm/remixicon/fonts/remixicon.css" rel="stylesheet">
     <style>
@@ -145,7 +148,7 @@
                     <div class="detail available">
                         <div class="icon" style="color: white;"><i class="ri-door-open-line"></i></div>
                         <!-- <div class="value">{{ region.max_occupancy}}</div> -->
-                        <div class="value">{{ region.max_occupancy|subtract:region.current_count|default_if_none:0|floatformat:0|add:'0'|yesno:'0,0' }}</div>
+                        <div class="value">{{ region.max_occupancy|subtract:region.current_count|default_if_none:0|floatformat:0 }}</div>
                         <div>Available</div>
                         {% if region.max_occupancy|subtract:region.current_count <= 0 %}
                             <div style="color: #ed2121; font-weight: bold; margin-top: 4px;">Full</div>
