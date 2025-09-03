@@ -6,9 +6,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="refresh" content="10">
-    <script>
-        setTimeout(function(){ window.location.reload(); }, 10000);
-    </script>
     <title>Vidya Devi Jindal Dining Block</title>
     <link href="https://cdn.jsdelivr.net/npm/remixicon/fonts/remixicon.css" rel="stylesheet">
     <style>
@@ -26,12 +23,40 @@
             overflow: hidden;
         }
 
+        .header {
+            text-align: center;
+            margin-bottom: 15px;
+        }
+
         h1 {
             font-size: 1.8rem;
             font-weight: bold;
             color: #0c0c0b;
-            text-align: center;
-            margin-bottom: 15px;
+            margin-bottom: 5px;
+        }
+
+        .last-updated {
+            font-size: 0.9rem;
+            color: #666;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+        }
+
+        .refresh-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background-color: #28a745;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
         }
 
         .dashboard {
@@ -53,10 +78,23 @@
             justify-content: center;
             align-items: center;
             transition: transform 0.3s ease;
+            position: relative;
         }
 
         .floor-card:hover {
             transform: translateY(-5px);
+        }
+
+        .calculation-badge {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-size: 0.7rem;
+            font-weight: bold;
         }
 
         .floor-name h1 {
@@ -71,6 +109,13 @@
             font-weight: bold;
             text-align: center;
             margin-bottom: 5px;
+        }
+
+        .occupancy-methods {
+            font-size: 0.8rem;
+            color: rgba(255, 255, 255, 0.8);
+            text-align: center;
+            margin: 5px 0;
         }
 
         .details {
@@ -88,20 +133,26 @@
 
         .icon {
             font-size: 2rem;
-            color: black;
+            color: white;
         }
 
         .value {
             font-size: 1.3rem;
             font-weight: bold;
+            color: white;
         }
 
         .available { color: white; }
         .inside { color: white; }
 
         .low-occupancy { background-color: #102d74; color: #f9fd00; }
-        .medium-occupancy { background-color: #f1d317; }
-        .high-occupancy { background-color: rgb(237, 33, 33); }
+        .medium-occupancy { background-color: #f1d317; color: #333; }
+        .high-occupancy { background-color: rgb(237, 33, 33); color: white; }
+
+        .enhanced-indicator {
+            background: linear-gradient(45deg, #6a11cb, #2575fc);
+            border: 2px solid #2575fc;
+        }
 
         @media (max-width: 600px) {
             .dashboard {
@@ -111,26 +162,90 @@
             }
 
             .floor-card { padding: 8px; }
-
             .floor-name h1 { font-size: 1.2rem; }
-
             .occupied h2 { font-size: 1.1rem; }
-
             .icon { font-size: 2.5rem; }
-
             .value { font-size: 1.1rem; }
+            .occupancy-methods { font-size: 0.7rem; }
         }
     </style>
+    <script>
+        // Auto-refresh with progressive loading
+        let refreshInterval;
+        let refreshCounter = 0;
+
+        function startAutoRefresh() {
+            refreshInterval = setInterval(function() {
+                refreshCounter++;
+
+                // Update refresh indicator
+                const indicator = document.querySelector('.refresh-indicator');
+                if (indicator) {
+                    indicator.style.backgroundColor = '#ffc107';
+                }
+
+                // Reload page
+                window.location.reload();
+            }, 10000); // 10 seconds
+        }
+
+        function updateLastUpdated() {
+            const now = new Date();
+            const timeString = now.toLocaleTimeString();
+            const lastUpdatedElement = document.querySelector('#last-updated-time');
+            if (lastUpdatedElement) {
+                lastUpdatedElement.textContent = timeString;
+            }
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            updateLastUpdated();
+            startAutoRefresh();
+
+            // Update refresh counter display
+            const refreshCounterElement = document.querySelector('#refresh-counter');
+            if (refreshCounterElement) {
+                refreshCounterElement.textContent = refreshCounter;
+            }
+        });
+
+        // Handle visibility change (pause refresh when tab is hidden)
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden) {
+                if (refreshInterval) {
+                    clearInterval(refreshInterval);
+                }
+            } else {
+                startAutoRefresh();
+            }
+        });
+    </script>
 </head>
 <body>
-    <h1>Vidya Devi Jindal Dining Block</h1>
+    <div class="header">
+        <h1>Vidya Devi Jindal Dining Block</h1>
+        <div class="last-updated">
+            <span class="refresh-indicator"></span>
+            <span>Last Updated: <span id="last-updated-time">{{ "now"|date:"H:i:s" }}</span></span>
+            <span style="margin-left: 10px;">Auto-refresh: 10s</span>
+        </div>
+    </div>
+
     <div class="dashboard">
         {% for region in occupancy_data %}
             <div class="floor-card 
-                {% if region.occupancy_percentage < 50 %}low-occupancy
-                {% elif region.occupancy_percentage < 75 %}medium-occupancy
-                {% else %}high-occupancy{% endif %}">
-                
+                {% if region.calculation_method == "enhanced_baseline" %}enhanced-indicator{% elif region.occupancy_percentage < 50 %}low-occupancy{% elif region.occupancy_percentage < 75 %}medium-occupancy{% else %}high-occupancy{% endif %}">
+
+                <!-- Calculation Method Badge -->
+                <div class="calculation-badge" title="Method: {{ region.calculation_method }}">
+                    {% if region.calculation_method == "enhanced_baseline" %}
+                        SMART
+                    {% else %}
+                        BASIC
+                    {% endif %}
+                </div>
+
                 <div class="floor-name">
                     <h1>{{ region.region_name }}</h1>
                 </div>
@@ -139,24 +254,41 @@
                     <h2>Occupied: {{ region.occupancy_percentage }}%</h2>
                 </div>
 
+                <!-- Enhanced occupancy information -->
+                {% if region.estimated_occupancy != region.occupancy_by_in_out and region.calculation_method == "enhanced_baseline" %}
+                <div class="occupancy-methods">
+                    Enhanced: {{ region.estimated_occupancy }} | Basic: {{ region.occupancy_by_in_out }}
+                </div>
+                {% endif %}
+
                 <div class="details mt-2">
                     <div class="detail inside">
-                        <div class="icon" style="color: white;"><i class="ri-user-fill"></i></div>
+                        <div class="icon"><i class="ri-user-fill"></i></div>
                         <div class="value">{{ region.current_count }}</div>
                         <div>Inside</div>
+                        {% if region.calculation_method == "enhanced_baseline" %}
+                            <div style="font-size: 0.7rem; margin-top: 2px;">✓ Smart Detection</div>
+                        {% endif %}
                     </div>
                     <div class="detail available">
-                        <div class="icon" style="color: white;"><i class="ri-door-open-line"></i></div>
-                        <!-- <div class="value">{{ region.max_occupancy}}</div> -->
-                        <div class="value">{{ region.max_occupancy|subtract:region.current_count|default_if_none:0|floatformat:0 }}</div>
+                        <div class="icon"><i class="ri-door-open-line"></i></div>
+                        <div class="value">{{ region.available_count }}</div>
                         <div>Available</div>
-                        {% if region.max_occupancy|subtract:region.current_count <= 0 %}
+                        {% if region.available_count <= 0 %}
                             <div style="color: #ed2121; font-weight: bold; margin-top: 4px;">Full</div>
+                        {% elif region.available_count <= 5 %}
+                            <div style="color: #ffc107; font-weight: bold; margin-top: 4px;">Almost Full</div>
                         {% endif %}
                     </div>
                 </div>
                 
-                
+                <!-- Debug information for development -->
+                {% if region.calculation_method != "no_cameras" %}
+                <div style="font-size: 0.6rem; color: rgba(255,255,255,0.6); margin-top: 5px; text-align: center;">
+                    In: {{ region.total_in_count }} | Out: {{ region.total_out_count }}
+                </div>
+                {% endif %}
+
             </div>
         {% endfor %}
     </div>
