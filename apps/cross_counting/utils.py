@@ -683,7 +683,8 @@ class TablePartitioningManager:
             correction_applied = False
             corrected_total_in = total_in_count
 
-            if basic_occupancy_calculation < -32:
+            # More sensitive threshold for better accuracy (90% target)
+            if basic_occupancy_calculation < -20:  # Changed from -32 to -20 for better accuracy
                 # Apply constant correction: add half the number of cameras to in-count
                 camera_count = cameras.count()
                 constant_correction = max(4, camera_count // 2)  # Minimum 4, or half camera count
