@@ -101,7 +101,7 @@
             position: absolute;
             top: 5px;
             left: 5px;
-            background: rgba(255, 107, 107, 0.9);
+            background: rgba(132, 180, 134, 0.9);
             color: white;
             padding: 2px 6px;
             border-radius: 10px;
@@ -173,16 +173,6 @@
         }
         .high-occupancy {
             background-color: #dc3545;
-            color: white;
-        }
-
-        .enhanced-indicator {
-            background-color: #6f42c1;
-            color: white;
-        }
-
-        .auto-corrected {
-            background-color: #fd7e14;
             color: white;
         }
 
@@ -267,14 +257,14 @@
     <div class="dashboard">
         {% for region in occupancy_data %}
             <div class="floor-card 
-                {% if region.calculation_method == "auto_corrected" %}auto-corrected{% elif region.calculation_method == "enhanced_baseline" %}enhanced-indicator{% elif region.occupancy_percentage < 50 %}low-occupancy{% elif region.occupancy_percentage < 75 %}medium-occupancy{% else %}high-occupancy{% endif %}">
+                {% if region.occupancy_percentage < 50 %}low-occupancy{% elif region.occupancy_percentage < 75 %}medium-occupancy{% else %}high-occupancy{% endif %}">
 
                 <!-- Auto-Correction Badge -->
-                {% if region.correction_applied %}
-                <div class="correction-badge" title="Auto-corrected severe negative calculation">
-                    AUTO-FIX
-                </div>
-                {% endif %}
+{#                {% if region.correction_applied %}#}
+{#                <div class="correction-badge" title="Auto-corrected severe negative calculation">#}
+{#                    AUTO-FIX#}
+{#                </div>#}
+{#                {% endif %}#}
 
                 <!-- Calculation Method Badge -->
                 <div class="calculation-badge" title="Method: {{ region.calculation_method }}">
@@ -334,15 +324,15 @@
                     </div>
                 </div>
                 
-                <!-- Debug information for development -->
-                {% if region.calculation_method != "no_cameras" %}
-                <div style="font-size: 0.6rem; color: rgba(255,255,255,0.6); margin-top: 5px; text-align: center;">
-                    In: {{ region.total_in_count }} | Out: {{ region.total_out_count }}
-                    {% if region.correction_applied %}
-                        | <span style="color: #ffeb3b;">AUTO-FIXED</span>
-                    {% endif %}
-                </div>
-                {% endif %}
+{#                <!-- Debug information for development -->#}
+{#                {% if region.calculation_method != "no_cameras" %}#}
+{#                <div style="font-size: 0.6rem; color: rgba(255,255,255,0.6); margin-top: 5px; text-align: center;">#}
+{#                    In: {{ region.total_in_count }} | Out: {{ region.total_out_count }}#}
+{#                    {% if region.correction_applied %}#}
+{#                        | <span style="color: #ffeb3b;">AUTO-FIXED</span>#}
+{#                    {% endif %}#}
+{#                </div>#}
+{#                {% endif %}#}
 
             </div>
         {% endfor %}
