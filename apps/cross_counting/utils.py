@@ -877,5 +877,5 @@ class TablePartitioningManager:
 
         except Exception:
             return 0
-```
+
 
