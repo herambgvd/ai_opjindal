@@ -164,7 +164,7 @@
         }
 
         .low-occupancy {
-            background-color: #28a745;
+            background-color: #427ae6;
             color: white;
         }
         .medium-occupancy {
@@ -304,23 +304,23 @@
                         <div class="icon"><i class="ri-user-fill"></i></div>
                         <div class="value">{{ region.current_count }}</div>
                         <div>Inside</div>
-                        {% if region.calculation_method == "enhanced_baseline" %}
-                            <div style="font-size: 0.7rem; margin-top: 2px;">✓ Smart Detection</div>
-                        {% elif region.calculation_method == "auto_corrected" %}
-                            <div style="font-size: 0.7rem; margin-top: 2px;">🔧 Auto-Fixed</div>
-                        {% endif %}
+{#                        {% if region.calculation_method == "enhanced_baseline" %}#}
+{#                            <div style="font-size: 0.7rem; margin-top: 2px;">✓ Smart Detection</div>#}
+{#                        {% elif region.calculation_method == "auto_corrected" %}#}
+{#                            <div style="font-size: 0.7rem; margin-top: 2px;">🔧 Auto-Fixed</div>#}
+{#                        {% endif %}#}
                     </div>
                     <div class="detail available">
                         <div class="icon"><i class="ri-door-open-line"></i></div>
                         <div class="value available-highlight">{{ region.available_count }}</div>
                         <div>Available</div>
-                        {% if region.available_count <= 0 %}
-                            <div style="color: #ff4444; font-weight: bold; margin-top: 4px;">FULL</div>
-                        {% elif region.available_count <= 5 %}
-                            <div style="color: #ffc107; font-weight: bold; margin-top: 4px;">Almost Full</div>
-                        {% else %}
-                            <div style="color: #4CAF50; font-weight: bold; margin-top: 4px;">Open</div>
-                        {% endif %}
+{#                        {% if region.available_count <= 0 %}#}
+{#                            <div style="color: #ff4444; font-weight: bold; margin-top: 4px;">FULL</div>#}
+{#                        {% elif region.available_count <= 5 %}#}
+{#                            <div style="color: #ffc107; font-weight: bold; margin-top: 4px;">Almost Full</div>#}
+{#                        {% else %}#}
+{#                            <div style="color: #4CAF50; font-weight: bold; margin-top: 4px;">Open</div>#}
+{#                        {% endif %}#}
                     </div>
                 </div>
                 
