@@ -199,7 +199,7 @@
                                                                                         <small class="text-danger">Out: {{ camera.latest_out_count }}</small>
                                                                                     </div>
                                                                                     <div>
-                                                                                        <small class="text-primary">Now: {{ camera.current_occupancy }}</small>
+                                                                                        <small class="text-primary">Diff: {{ camera.latest_in_count|add:"-"|add:camera.latest_out_count }}</small>
                                                                                     </div>
                                                                                 </div>
                                                                             </div>
