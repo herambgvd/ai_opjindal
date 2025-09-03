@@ -128,14 +128,14 @@
                                                         </h6>
                                                         <div class="text-end">
                                                             <small class="text-muted">{{ region.camera_count }} camera{{ region.camera_count|pluralize }}</small>
-{#                                                            <div class="mt-1">#}
-{#                                                                <span class="badge #}
-{#                                                                    {% if region.occupancy_percentage < 50 %}bg-success#}
-{#                                                                    {% elif region.occupancy_percentage < 80 %}bg-warning#}
-{#                                                                    {% else %}bg-danger{% endif %}">#}
-{#                                                                    {{ region.occupancy_percentage }}% occupied#}
-{#                                                                </span>#}
-{#                                                            </div>#}
+                                                            <div class="mt-1">
+                                                                <span class="badge 
+                                                                    {% if region.occupancy_percentage < 50 %}bg-success
+                                                                    {% elif region.occupancy_percentage < 80 %}bg-warning
+                                                                    {% else %}bg-danger{% endif %}">
+                                                                    {{ region.occupancy_percentage }}% occupied
+                                                                </span>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </div>
