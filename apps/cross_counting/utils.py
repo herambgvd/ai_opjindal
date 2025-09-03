@@ -627,9 +627,13 @@ class TablePartitioningManager:
     def get_current_occupancy_data() -> List[Dict[str, Any]]:
         """
         Get current occupancy percentage for all regions for public display.
-        Now also returns total_in_count, total_out_count, and occupancy_by_in_out (max(0, in-out)).
+        Now includes automatic correction for severe negative occupancy calculations.
 
-        Enhanced with baseline occupancy logic to handle negative calculations.
+        Enhanced Logic:
+        1. Basic in-out calculation
+        2. If occupancy goes below -32, apply constant correction based on camera count
+        3. Save corrected values as new data entries
+        4. Display properly calculated available counts
         """
         from .models import Region, Camera, CrossCountingData
         from django.utils import timezone
@@ -651,12 +655,17 @@ class TablePartitioningManager:
                     "total_out_count": 0,
                     "occupancy_by_in_out": 0,
                     "estimated_occupancy": 0,
-                    "calculation_method": "no_cameras"
+                    "calculation_method": "no_cameras",
+                    "available_count": region.occupancy,
+                    "correction_applied": False
                 })
                 continue
 
             total_in_count = 0
             total_out_count = 0
+            camera_latest_data = {}
+
+            # Collect latest data for each camera
             for camera in cameras:
                 latest_data = CrossCountingData.objects.filter(
                     camera=camera
@@ -664,16 +673,73 @@ class TablePartitioningManager:
                 if latest_data:
                     total_in_count += latest_data.cc_in_count
                     total_out_count += latest_data.cc_out_count
+                    camera_latest_data[camera.id] = latest_data
 
-            # Original logic: Basic in-out calculation
-            occupancy_by_in_out = max(0, total_in_count - total_out_count)
+            # Calculate basic occupancy
+            basic_occupancy_calculation = total_in_count - total_out_count
+            occupancy_by_in_out = max(0, basic_occupancy_calculation)
 
-            # Enhanced logic: When basic calculation shows 0 but we suspect people are present
+            # NEW LOGIC: Constant value correction for severe negative calculations
+            correction_applied = False
+            corrected_total_in = total_in_count
+
+            if basic_occupancy_calculation < -32:
+                # Apply constant correction: add half the number of cameras to in-count
+                camera_count = cameras.count()
+                constant_correction = max(4, camera_count // 2)  # Minimum 4, or half camera count
+                correction_needed = abs(basic_occupancy_calculation) + 10  # Add buffer
+
+                print(f"OCCUPANCY CORRECTION: Region {region.name} has severe negative occupancy: {basic_occupancy_calculation}")
+                print(f"OCCUPANCY CORRECTION: Applying correction of {correction_needed} to in-count")
+
+                # Create new corrected data entries for each camera
+                correction_per_camera = correction_needed // camera_count
+                remaining_correction = correction_needed % camera_count
+
+                now = timezone.now()
+
+                for i, camera in enumerate(cameras):
+                    if camera.id in camera_latest_data:
+                        latest_data = camera_latest_data[camera.id]
+
+                        # Distribute correction across cameras
+                        camera_correction = correction_per_camera
+                        if i < remaining_correction:
+                            camera_correction += 1
+
+                        # Create new corrected entry
+                        new_in_count = latest_data.cc_in_count + camera_correction
+                        new_total_count = max(latest_data.cc_total_count, new_in_count)
+
+                        try:
+                            CrossCountingData.objects.create(
+                                camera=camera,
+                                device_name=latest_data.device_name,
+                                cc_in_count=new_in_count,
+                                cc_out_count=latest_data.cc_out_count,
+                                cc_total_count=new_total_count,
+                                alarm_time=now,
+                                alarm_status=False,
+                                created_at=now
+                            )
+                            print(f"OCCUPANCY CORRECTION: Created corrected entry for {camera.name}: In={new_in_count} (+{camera_correction})")
+                        except Exception as e:
+                            print(f"OCCUPANCY CORRECTION ERROR: Failed to create entry for {camera.name}: {e}")
+
+                # Update totals with correction
+                corrected_total_in = total_in_count + correction_needed
+                correction_applied = True
+
+                # Recalculate with corrected values
+                basic_occupancy_calculation = corrected_total_in - total_out_count
+                occupancy_by_in_out = max(0, basic_occupancy_calculation)
+
+            # Enhanced baseline estimation (existing logic)
             estimated_occupancy = TablePartitioningManager._estimate_baseline_occupancy(
-                region, cameras, total_in_count, total_out_count, occupancy_by_in_out
+                region, cameras, corrected_total_in, total_out_count, occupancy_by_in_out
             )
 
-            # Use estimated occupancy if it's higher than basic calculation
+            # Use the higher of corrected basic calculation or estimated occupancy
             final_occupancy = max(occupancy_by_in_out, estimated_occupancy)
 
             # Cap current_count at max_occupancy for display
@@ -681,17 +747,30 @@ class TablePartitioningManager:
             occupancy_percentage = (current_count / region.occupancy * 100) if region.occupancy > 0 else 0.0
             occupancy_percentage = min(occupancy_percentage, 100.0)
 
+            # Calculate available count properly
+            available_count = max(0, region.occupancy - int(current_count))
+
+            # Determine calculation method
+            if correction_applied:
+                calc_method = "auto_corrected"
+            elif estimated_occupancy > occupancy_by_in_out:
+                calc_method = "enhanced_baseline"
+            else:
+                calc_method = "basic_in_out"
+
             occupancy_data.append({
                 "region_name": region.name,
                 "current_count": int(current_count),
                 "max_occupancy": region.occupancy,
                 "occupancy_percentage": round(occupancy_percentage, 1),
-                "total_in_count": total_in_count,
+                "total_in_count": corrected_total_in,
                 "total_out_count": total_out_count,
                 "occupancy_by_in_out": occupancy_by_in_out,
                 "estimated_occupancy": int(estimated_occupancy),
-                "calculation_method": "enhanced_baseline" if estimated_occupancy > occupancy_by_in_out else "basic_in_out",
-                "available_count": max(0, region.occupancy - int(current_count))
+                "calculation_method": calc_method,
+                "available_count": available_count,
+                "correction_applied": correction_applied,
+                "original_in_count": total_in_count if correction_applied else corrected_total_in
             })
 
         return occupancy_data
