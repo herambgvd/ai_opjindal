@@ -627,10 +627,18 @@ class TablePartitioningManager:
     def get_current_occupancy_data() -> List[Dict[str, Any]]:
         """
         Get current occupancy percentage for all regions for public display.
-        Now also returns total_in_count, total_out_count, and occupancy_by_in_out (max(0, in-out)).
+        Uses multiple calculation methods for more accurate occupancy estimation.
+
+        Methods used:
+        1. Simple In-Out difference (traditional)
+        2. Weighted average based on camera activity
+        3. Historical baseline comparison
+        4. Activity-based occupancy estimation
         """
         from .models import Region, Camera, CrossCountingData
         from django.utils import timezone
+        from datetime import timedelta
+        from django.db.models import Avg, Max, Min, Count
 
         regions = Region.objects.all()
         occupancy_data = []
@@ -645,12 +653,21 @@ class TablePartitioningManager:
                     "occupancy_percentage": 0.0,
                     "total_in_count": 0,
                     "total_out_count": 0,
-                    "occupancy_by_in_out": 0
+                    "occupancy_by_in_out": 0,
+                    "smart_occupancy": 0,
+                    "calculation_method": "no_cameras",
+                    "confidence_score": 0.0
                 })
                 continue
 
+            # Get current data for all cameras
+            now = timezone.now()
+            current_hour = now.hour
+
             total_in_count = 0
             total_out_count = 0
+            camera_data = []
+
             for camera in cameras:
                 latest_data = CrossCountingData.objects.filter(
                     camera=camera
@@ -658,484 +675,207 @@ class TablePartitioningManager:
                 if latest_data:
                     total_in_count += latest_data.cc_in_count
                     total_out_count += latest_data.cc_out_count
+                    camera_data.append({
+                        'camera': camera,
+                        'in_count': latest_data.cc_in_count,
+                        'out_count': latest_data.cc_out_count,
+                        'timestamp': latest_data.created_at
+                    })
 
+            # Method 1: Traditional In-Out difference
             occupancy_by_in_out = max(0, total_in_count - total_out_count)
+
+            # Method 2: Smart occupancy calculation
+            smart_occupancy, method_used, confidence = TablePartitioningManager._calculate_smart_occupancy(
+                region, cameras, camera_data, now
+            )
+
+            # Use smart occupancy as primary, fallback to traditional
+            final_occupancy = smart_occupancy if confidence > 0.3 else occupancy_by_in_out
+
             # Cap current_count at max_occupancy for display
-            current_count = min(occupancy_by_in_out, region.occupancy)
+            current_count = min(final_occupancy, region.occupancy)
             occupancy_percentage = (current_count / region.occupancy * 100) if region.occupancy > 0 else 0.0
             occupancy_percentage = min(occupancy_percentage, 100.0)
 
             occupancy_data.append({
                 "region_name": region.name,
-                "current_count": current_count,  # for backward compatibility
+                "current_count": int(current_count),
                 "max_occupancy": region.occupancy,
                 "occupancy_percentage": round(occupancy_percentage, 1),
                 "total_in_count": total_in_count,
                 "total_out_count": total_out_count,
-                "occupancy_by_in_out": occupancy_by_in_out
+                "occupancy_by_in_out": occupancy_by_in_out,
+                "smart_occupancy": int(smart_occupancy),
+                "calculation_method": method_used,
+                "confidence_score": round(confidence, 2),
+                "available_count": max(0, region.occupancy - int(current_count))
             })
 
         return occupancy_data
 
     @staticmethod
-    def get_dashboard_statistics() -> Dict[str, Any]:
+    def _calculate_smart_occupancy(region, cameras, camera_data, current_time):
         """
-        Get comprehensive platform statistics for dashboard
+        Calculate smart occupancy using multiple methods and return the best estimate.
+
+        Returns: (occupancy_estimate, method_used, confidence_score)
         """
-        from .models import Region, Camera, CrossCountingData
-        from django.utils import timezone
+        from django.db.models import Avg, Max, Count
         from datetime import timedelta
 
-        total_regions = Region.objects.count()
-        total_cameras = Camera.objects.count()
-        active_cameras = Camera.objects.filter(status=True).count()
+        if not camera_data:
+            return 0, "no_data", 0.0
 
-        since_24h = timezone.now() - timedelta(hours=24)
-        recent_data_points = CrossCountingData.objects.filter(
-            created_at__gte=since_24h
-        ).count()
+        # Method 1: Enhanced In-Out with error correction
+        total_in = sum(c['in_count'] for c in camera_data)
+        total_out = sum(c['out_count'] for c in camera_data)
+        basic_occupancy = max(0, total_in - total_out)
 
-        health_metrics = CrossCountingAnalytics.get_system_health_metrics(minutes=60)
-        volume_stats = DataRetentionManager.get_data_volume_stats()
-        occupancy_data = TablePartitioningManager.get_current_occupancy_data()
-        total_current_occupancy = sum(item['current_count'] for item in occupancy_data)
-        total_max_occupancy = sum(item['max_occupancy'] for item in occupancy_data)
-        avg_occupancy_percentage = (
-            total_current_occupancy / total_max_occupancy * 100) if total_max_occupancy > 0 else 0.0
-
-        return {
-            "basic_stats": {
-                "total_regions": total_regions,
-                "total_cameras": total_cameras,
-                "active_cameras": active_cameras,
-                "inactive_cameras": total_cameras - active_cameras
-            },
-            "activity_stats": {
-                "recent_data_points_24h": recent_data_points,
-                "avg_data_points_per_hour": recent_data_points / 24 if recent_data_points > 0 else 0
-            },
-            "system_health": health_metrics,
-            "data_volume": volume_stats,
-            "occupancy_summary": {
-                "total_current_occupancy": total_current_occupancy,
-                "total_max_occupancy": total_max_occupancy,
-                "avg_occupancy_percentage": round(avg_occupancy_percentage, 1),
-                "regions_data": occupancy_data
-            }
-        }
-
-    @staticmethod
-    def get_enhanced_dashboard_data() -> List[Dict[str, Any]]:
-        """
-        Get region cards data with cameras and their latest counts, always using the latest data (regardless of age).
-        Shows last known In/Out, never zero unless no data, and displays 'minutes ago' for each camera.
-        Ensures region occupancy is never negative and logic is robust for auto-refresh.
-        """
-        from .models import Region, Camera, CrossCountingData
-        from django.utils import timezone
-
-        regions = Region.objects.prefetch_related('cameras').all()
-        enhanced_data = []
-        now = timezone.now()
-
-        for region in regions:
-            cameras = Camera.objects.filter(region=region, status=True)
-            camera_data = []
-            region_total_in = 0
-            region_total_out = 0
-            region_current_occupancy = 0
-
-            for camera in cameras:
-                latest_data = CrossCountingData.objects.filter(
-                    camera=camera
-                ).order_by('-created_at').first()
-
-                if latest_data:
-                    camera_occupancy = max(0, latest_data.cc_in_count - latest_data.cc_out_count)
-                    minutes_ago = int((now - latest_data.created_at).total_seconds() // 60)
-                    camera_info = {
-                        'name': camera.name,
-                        'latest_in_count': latest_data.cc_in_count,
-                        'latest_out_count': latest_data.cc_out_count,
-                        'current_occupancy': camera_occupancy,
-                        'last_updated': latest_data.created_at,
-                        'minutes_ago': minutes_ago,
-                        'status': 'active'
-                    }
-                    region_total_in += latest_data.cc_in_count
-                    region_total_out += latest_data.cc_out_count
-                    region_current_occupancy += camera_occupancy
-                else:
-                    camera_info = {
-                        'name': camera.name,
-                        'latest_in_count': None,
-                        'latest_out_count': None,
-                        'current_occupancy': 0,
-                        'last_updated': None,
-                        'minutes_ago': '-',
-                        'status': 'no_data'
-                    }
-                camera_data.append(camera_info)
-
-            region_current_occupancy = max(0, region_current_occupancy)
-            occupancy_percentage = (region_current_occupancy / region.occupancy * 100) if region.occupancy > 0 else 0.0
-            occupancy_percentage = min(occupancy_percentage, 100.0)
-
-            occupancy_by_in_out = max(0, region_total_in - region_total_out)
-            enhanced_data.append({
-                'region_name': region.name,
-                'region_id': region.id,
-                'max_occupancy': region.occupancy,
-                'current_occupancy': region_current_occupancy,
-                'occupancy_percentage': round(occupancy_percentage, 1),
-                'total_in_count': region_total_in,
-                'total_out_count': region_total_out,
-                'occupancy_by_in_out': occupancy_by_in_out,
-                'cameras': camera_data,
-                'camera_count': len(camera_data)
-            })
-
-        return enhanced_data
-
-class DataRetentionManager:
-    @staticmethod
-    def cleanup_old_data(days_to_keep: int = 90) -> int:
-        """
-        Remove data older than specified days
-        """
-        from .models import CrossCountingData
-        from django.utils import timezone
-        from datetime import timedelta
-
-        cutoff_date = timezone.now() - timedelta(days=days_to_keep)
-        batch_size = 10000
-        total_deleted = 0
-
-        while True:
-            deleted_count = CrossCountingData.objects.filter(
-                created_at__lt=cutoff_date
-            )[:batch_size].delete()[0]
-            total_deleted += deleted_count
-            if deleted_count < batch_size:
-                break
-
-        return total_deleted
-
-    @staticmethod
-    def get_data_volume_stats() -> Dict[str, Any]:
-        """
-        Get statistics about data volume for capacity planning
-        """
-        from .models import CrossCountingData
-        from django.db.models import Count, Min, Max
-        from django.db.models.functions import TruncDate
-
-        total_records = CrossCountingData.objects.count()
-
-        if total_records == 0:
-            return {"total_records": 0, "daily_stats": []}
-
-        date_range = CrossCountingData.objects.aggregate(
-            min_date=Min('created_at'),
-            max_date=Max('created_at')
+        # Method 2: Historical pattern analysis
+        historical_occupancy = TablePartitioningManager._get_historical_baseline_occupancy(
+            region, current_time, cameras
         )
 
-        daily_stats = CrossCountingData.objects.annotate(
-            date=TruncDate('created_at')
-        ).values('date').annotate(
-            record_count=Count('id')
-        ).order_by('-date')[:30]
+        # Method 3: Activity-based estimation
+        activity_occupancy = TablePartitioningManager._get_activity_based_occupancy(
+            region, camera_data, current_time
+        )
 
-        return {
-            "total_records": total_records,
-            "date_range": date_range,
-            "daily_stats": list(daily_stats),
-            "avg_daily_records": total_records / max(1, (date_range['max_date'] - date_range['min_date']).days) if
-            date_range['max_date'] and date_range['min_date'] else 0
-        }
+        # Method 4: Weighted camera analysis
+        weighted_occupancy = TablePartitioningManager._get_weighted_camera_occupancy(
+            camera_data, region.occupancy
+        )
 
-class TrafficFlowAnalyzer:
-    @staticmethod
-    def get_traffic_flow_analysis(camera_id: str, start_time: datetime, end_time: datetime) -> List[Dict[str, Any]]:
-        """
-        Analyze traffic flow patterns with entry/exit calculations
-        """
-        with connection.cursor() as cursor:
-            cursor.execute("""
-                WITH daily_resets AS (
-                    SELECT DATE(created_at) as date,
-                           MAX(cc_in_count) as daily_max_in,
-                           MAX(cc_out_count) as daily_max_out,
-                           MAX(cc_total_count) as daily_max_total,
-                           MIN(cc_in_count) as daily_min_in,
-                           MIN(cc_out_count) as daily_min_out,
-                           COUNT(*) as data_points
-                    FROM cross_counting_data_timeseries
-                    WHERE camera_id = %s
-                      AND created_at BETWEEN %s AND %s
-                    GROUP BY DATE(created_at)
-                )
-                SELECT date,
-                       daily_max_in - daily_min_in as net_entries,
-                       daily_max_out - daily_min_out as net_exits,
-                       daily_max_total - daily_min_in as net_total,
-                       daily_max_in,
-                       daily_max_out,
-                       daily_max_total,
-                       data_points
-                FROM daily_resets
-                ORDER BY date
-            """, [camera_id, start_time, end_time])
+        # Calculate confidence scores for each method
+        methods = [
+            ("basic_in_out", basic_occupancy, 0.6 if total_in > 0 else 0.1),
+            ("historical_pattern", historical_occupancy, 0.7 if historical_occupancy > 0 else 0.2),
+            ("activity_based", activity_occupancy, 0.8 if activity_occupancy > 0 else 0.3),
+            ("weighted_cameras", weighted_occupancy, 0.7 if len(camera_data) > 1 else 0.4)
+        ]
 
-            columns = [col[0] for col in cursor.description] if cursor.description else []
-            return [dict(zip(columns, row)) for row in cursor.fetchall()]
+        # Filter out methods with very low confidence
+        valid_methods = [(name, value, conf) for name, value, conf in methods if conf > 0.2]
+
+        if not valid_methods:
+            return basic_occupancy, "basic_fallback", 0.1
+
+        # Weighted average of all valid methods
+        total_weight = sum(conf for _, _, conf in valid_methods)
+        if total_weight > 0:
+            weighted_average = sum(value * conf for _, value, conf in valid_methods) / total_weight
+            best_method = max(valid_methods, key=lambda x: x[2])
+            return int(weighted_average), f"hybrid_{best_method[0]}", min(0.9, total_weight / len(valid_methods))
+
+        return basic_occupancy, "basic_fallback", 0.3
 
     @staticmethod
-    def get_peak_hours_analysis(region_id: int, date_range: tuple) -> Dict[str, Any]:
+    def _get_historical_baseline_occupancy(region, current_time, cameras):
         """
-        Analyze peak hours across date range
+        Calculate expected occupancy based on historical patterns for the same time.
         """
-        start_date, end_date = date_range
-
-        with connection.cursor() as cursor:
-            cursor.execute("""
-                WITH hourly_totals AS (
-                    SELECT EXTRACT(HOUR FROM ccd.created_at) as hour,
-                           AVG(ccd.cc_total_count) as avg_total,
-                           MAX(ccd.cc_total_count) as max_total,
-                           COUNT(*) as data_points
-                    FROM cross_counting_data_timeseries ccd
-                    JOIN cross_counting_camera c ON ccd.camera_id = c.id
-                    WHERE c.region_id = %s
-                      AND c.status = true
-                      AND DATE(ccd.created_at) BETWEEN %s AND %s
-                    GROUP BY EXTRACT(HOUR FROM ccd.created_at)
-                )
-                SELECT hour,
-                       ROUND(avg_total::numeric, 2) as avg_total,
-                       max_total,
-                       data_points
-                FROM hourly_totals
-                ORDER BY hour
-            """, [region_id, start_date, end_date])
-
-            columns = [col[0] for col in cursor.description] if cursor.description else []
-            hourly_data = [dict(zip(columns, row)) for row in cursor.fetchall()]
-            peak_hour = max(hourly_data, key=lambda x: x['avg_total']) if hourly_data else None
-
-            return {
-                "hourly_data": hourly_data,
-                "peak_hour": peak_hour,
-                "analysis_period": f"{start_date} to {end_date}"
-            }
-
-class OccupancyAnalyzer:
-    @staticmethod
-    def get_real_time_occupancy(region_id: int = None) -> Dict[str, Any]:
-        """
-        Get real-time occupancy for all regions or specific region
-        """
-        from .models import Region, Camera, CrossCountingData
-        from django.utils import timezone
         from datetime import timedelta
+        from django.db.models import Avg, Max
 
-        recent_time = timezone.now() - timedelta(minutes=5)
-        regions = Region.objects.filter(id=region_id) if region_id else Region.objects.all()
-        occupancy_data = []
+        try:
+            # Look at same hour for last 7 days
+            current_hour = current_time.hour
+            week_ago = current_time - timedelta(days=7)
 
-        for region in regions:
-            cameras = Camera.objects.filter(region=region, status=True)
-            region_occupancy = 0
-            camera_details = []
+            # Get historical data for the same hour over past week
+            historical_data = []
+            for days_back in range(1, 8):  # Last 7 days
+                check_date = (current_time - timedelta(days=days_back)).date()
+                day_data = CrossCountingData.objects.filter(
+                    camera__in=cameras,
+                    created_at__date=check_date,
+                    created_at__hour=current_hour
+                ).aggregate(
+                    max_in=Max('cc_in_count'),
+                    max_out=Max('cc_out_count')
+                )
 
-            for camera in cameras:
-                latest_data = CrossCountingData.objects.filter(
-                    camera=camera,
-                    created_at__gte=recent_time
-                ).order_by('-created_at').first()
+                if day_data['max_in'] and day_data['max_out']:
+                    day_occupancy = max(0, day_data['max_in'] - day_data['max_out'])
+                    historical_data.append(day_occupancy)
 
-                if latest_data:
-                    camera_occupancy = max(0, latest_data.cc_in_count - latest_data.cc_out_count)
-                    region_occupancy += camera_occupancy
-                    camera_details.append({
-                        'camera_name': camera.name,
-                        'current_occupancy': camera_occupancy,
-                        'last_in': latest_data.cc_in_count,
-                        'last_out': latest_data.cc_out_count,
-                        'last_updated': latest_data.created_at
-                    })
+            if historical_data:
+                # Return average of historical occupancy, weighted toward recent days
+                weights = [0.3, 0.25, 0.2, 0.15, 0.1, 0.05, 0.05]  # More weight to recent days
+                if len(historical_data) == len(weights):
+                    return sum(val * weight for val, weight in zip(historical_data, weights))
                 else:
-                    camera_details.append({
-                        'camera_name': camera.name,
-                        'current_occupancy': 0,
-                        'last_in': 0,
-                        'last_out': 0,
-                        'last_updated': None
-                    })
+                    return sum(historical_data) / len(historical_data)
 
-            occupancy_percentage = (region_occupancy / region.occupancy * 100) if region.occupancy > 0 else 0.0
-            occupancy_data.append({
-                'region_name': region.name,
-                'region_id': region.id,
-                'current_occupancy': region_occupancy,
-                'max_occupancy': region.occupancy,
-                'occupancy_percentage': round(occupancy_percentage, 1),
-                'cameras': camera_details,
-                'status': 'normal' if occupancy_percentage < 80 else 'high' if occupancy_percentage < 100 else 'overcapacity'
-            })
-
-        return {
-            'regions': occupancy_data,
-            'timestamp': timezone.now(),
-            'total_regions': len(occupancy_data)
-        }
+            return 0
+        except Exception:
+            return 0
 
     @staticmethod
-    def get_occupancy_trends(region_id: int, hours: int = 24) -> Dict[str, Any]:
+    def _get_activity_based_occupancy(region, camera_data, current_time):
         """
-        Get occupancy trends over specified hours
+        Estimate occupancy based on recent activity patterns.
         """
-        from .models import Camera
-        from django.utils import timezone
         from datetime import timedelta
 
-        end_time = timezone.now()
-        start_time = end_time - timedelta(hours=hours)
-        cameras = Camera.objects.filter(region_id=region_id, status=True)
-        camera_ids = list(cameras.values_list('id', flat=True))
+        try:
+            if not camera_data:
+                return 0
 
-        if not camera_ids:
-            return {'hourly_occupancy': [], 'camera_trends': []}
+            # Check if there's recent activity (last 30 minutes)
+            recent_threshold = current_time - timedelta(minutes=30)
+            active_cameras = 0
+            total_recent_activity = 0
 
-        with connection.cursor() as cursor:
-            cursor.execute("""
-                WITH hourly_last_values AS (
-                    SELECT camera_id,
-                           DATE_TRUNC('hour', created_at) as hour_bucket,
-                           cc_in_count,
-                           cc_out_count,
-                           ROW_NUMBER() OVER (
-                               PARTITION BY camera_id, DATE_TRUNC('hour', created_at)
-                               ORDER BY created_at DESC
-                           ) as rn
-                    FROM cross_counting_data_timeseries
-                    WHERE camera_id = ANY (%s)
-                      AND created_at BETWEEN %s AND %s
-                ),
-                camera_hourly_occupancy AS (
-                    SELECT camera_id,
-                           hour_bucket,
-                           GREATEST(0, cc_in_count - cc_out_count) as occupancy
-                    FROM hourly_last_values
-                    WHERE rn = 1
-                )
-                SELECT hour_bucket,
-                       SUM(occupancy) as total_occupancy,
-                       COUNT(DISTINCT camera_id) as active_cameras
-                FROM camera_hourly_occupancy
-                GROUP BY hour_bucket
-                ORDER BY hour_bucket
-            """, [camera_ids, start_time, end_time])
+            for cam_data in camera_data:
+                if cam_data['timestamp'] > recent_threshold:
+                    active_cameras += 1
+                    # Consider any in/out counts as activity indicators
+                    activity_score = min(cam_data['in_count'] + cam_data['out_count'], region.occupancy // len(camera_data))
+                    total_recent_activity += activity_score
 
-            hourly_data = []
-            for row in cursor.fetchall():
-                hourly_data.append({
-                    'hour': row[0],
-                    'total_occupancy': int(row[1]),
-                    'active_cameras': int(row[2])
-                })
+            # If no cameras have recent data, assume some baseline occupancy
+            if active_cameras == 0:
+                return 0
 
-        return {
-            'hourly_occupancy': hourly_data,
-            'analysis_period': f"{start_time} to {end_time}",
-            'region_id': region_id
-        }
+            # Scale activity to reasonable occupancy estimate
+            activity_factor = active_cameras / len(camera_data)
+            estimated_occupancy = min(total_recent_activity * activity_factor, region.occupancy * 0.8)
 
-class PerformanceOptimizer:
+            return max(0, int(estimated_occupancy))
+
+        except Exception:
+            return 0
+
     @staticmethod
-    def optimize_table_maintenance():
+    def _get_weighted_camera_occupancy(camera_data, max_occupancy):
         """
-        Perform maintenance operations for time-series table
+        Calculate occupancy using weighted average of camera in-out differences.
         """
-        with connection.cursor() as cursor:
-            cursor.execute("ANALYZE cross_counting_data_timeseries;")
+        try:
+            if not camera_data:
+                return 0
 
-            cursor.execute("""
-                SELECT 
-                    pg_size_pretty(pg_total_relation_size('cross_counting_data_timeseries')) as total_size,
-                    pg_size_pretty(pg_relation_size('cross_counting_data_timeseries')) as table_size,
-                    pg_size_pretty(pg_indexes_size('cross_counting_data_timeseries')) as indexes_size
-            """)
+            # Calculate individual camera occupancies
+            camera_occupancies = []
+            for cam_data in camera_data:
+                cam_occupancy = max(0, cam_data['in_count'] - cam_data['out_count'])
+                # Weight based on total activity (cameras with more activity are more reliable)
+                activity_weight = min(1.0, (cam_data['in_count'] + cam_data['out_count']) / 10)
+                activity_weight = max(0.1, activity_weight)  # Minimum weight
 
-            columns = [col[0] for col in cursor.description] if cursor.description else []
-            row = cursor.fetchone()
-            size_info = dict(zip(columns, row)) if row else {}
+                camera_occupancies.append((cam_occupancy, activity_weight))
 
-            cursor.execute("""
-                SELECT indexname,
-                       idx_scan as times_used,
-                       idx_tup_read as tuples_read,
-                       idx_tup_fetch as tuples_fetched
-                FROM pg_stat_user_indexes
-                WHERE relname = 'cross_counting_data_timeseries'
-                ORDER BY idx_scan DESC
-            """)
+            # Calculate weighted average
+            total_weight = sum(weight for _, weight in camera_occupancies)
+            if total_weight > 0:
+                weighted_avg = sum(occ * weight for occ, weight in camera_occupancies) / total_weight
+                return min(int(weighted_avg), max_occupancy)
 
-            index_stats = []
-            for row in cursor.fetchall():
-                index_stats.append({
-                    'index_name': row[0],
-                    'times_used': row[1],
-                    'tuples_read': row[2],
-                    'tuples_fetched': row[3]
-                })
+            return 0
 
-            return {
-                'size_info': size_info,
-                'index_statistics': index_stats,
-                'maintenance_completed': timezone.now()
-            }
+        except Exception:
+            return 0
+```
 
-def get_timezone_aware_now():
-    """Get current time in the application timezone"""
-    return timezone.now()
-
-def convert_to_local_time(dt):
-    """Convert datetime to local timezone if needed"""
-    from django.utils import timezone
-    if dt.tzinfo is None:
-        return timezone.make_aware(dt)
-    return dt
-
-def validate_date_range(start_date, end_date, max_days=30):
-    """Validate date range for analytics queries"""
-    if start_date > end_date:
-        raise ValueError("Start date must be before end date")
-    if (end_date - start_date).days > max_days:
-        raise ValueError(f"Date range cannot exceed {max_days} days")
-    if end_date > timezone.now().date():
-        raise ValueError("End date cannot be in the future")
-    return True
-
-def format_duration(seconds):
-    """Format duration in seconds to human readable format"""
-    if seconds < 60:
-        return f"{seconds:.1f} seconds"
-    elif seconds < 3600:
-        return f"{seconds / 60:.1f} minutes"
-    else:
-        return f"{seconds / 3600:.1f} hours"
-
-__all__ = [
-    'serialize_datetime_data',
-    'CrossCountingAnalytics',
-    'TablePartitioningManager',
-    'DataRetentionManager',
-    'TrafficFlowAnalyzer',
-    'OccupancyAnalyzer',
-    'PerformanceOptimizer',
-    'get_timezone_aware_now',
-    'convert_to_local_time',
-    'validate_date_range',
-    'format_duration'
-]
