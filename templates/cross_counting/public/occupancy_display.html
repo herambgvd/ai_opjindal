@@ -267,15 +267,15 @@
 {#                {% endif %}#}
 
                 <!-- Calculation Method Badge -->
-                <div class="calculation-badge" title="Method: {{ region.calculation_method }}">
-                    {% if region.calculation_method == "auto_corrected" %}
-                        CORRECTED
-                    {% elif region.calculation_method == "enhanced_baseline" %}
-                        SMART
-                    {% else %}
-                        BASIC
-                    {% endif %}
-                </div>
+{#                <div class="calculation-badge" title="Method: {{ region.calculation_method }}">#}
+{#                    {% if region.calculation_method == "auto_corrected" %}#}
+{#                        CORRECTED#}
+{#                    {% elif region.calculation_method == "enhanced_baseline" %}#}
+{#                        SMART#}
+{#                    {% else %}#}
+{#                        BASIC#}
+{#                    {% endif %}#}
+{#                </div>#}
 
                 <div class="floor-name">
                     <h1>{{ region.region_name }}</h1>
@@ -293,11 +293,11 @@
                 {% endif %}
 
                 <!-- Auto-correction information -->
-                {% if region.correction_applied %}
-                <div class="occupancy-methods">
-                    Original In: {{ region.original_in_count }} → Corrected: {{ region.total_in_count }}
-                </div>
-                {% endif %}
+{#                {% if region.correction_applied %}#}
+{#                <div class="occupancy-methods">#}
+{#                    Original In: {{ region.original_in_count }} → Corrected: {{ region.total_in_count }}#}
+{#                </div>#}
+{#                {% endif %}#}
 
                 <div class="details mt-2">
                     <div class="detail inside">
