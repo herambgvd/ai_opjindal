@@ -41,7 +41,7 @@
                                 <div class="d-flex align-items-center">
                                     <div class="flex-grow-1">
                                         <p class="text-truncate font-size-14 mb-2">Total Regions</p>
-                                        <h4 class="mb-2">{{ dashboard_data.basic_stats.total_regions }}</h4>
+                                        <h4 class="mb-2">{{ dashboard_data.total_regions|default:"0" }}</h4>
                                     </div>
                                     <div class="flex-shrink-0">
                                         <i class="mdi mdi-map-marker-multiple font-size-24 text-primary"></i>
@@ -57,9 +57,9 @@
                                 <div class="d-flex align-items-center">
                                     <div class="flex-grow-1">
                                         <p class="text-truncate font-size-14 mb-2">Active Cameras</p>
-                                        <h4 class="mb-2 text-success">{{ dashboard_data.basic_stats.active_cameras }}</h4>
+                                        <h4 class="mb-2 text-success">{{ dashboard_data.active_cameras|default:"0" }}</h4>
                                         <p class="text-muted mb-0">
-                                            <small>{{ dashboard_data.basic_stats.inactive_cameras }} inactive</small>
+                                            <small>{{ dashboard_data.total_cameras|add:"-"|add:dashboard_data.active_cameras|default:"0" }} inactive</small>
                                         </p>
                                     </div>
                                     <div class="flex-shrink-0">
@@ -76,9 +76,9 @@
                                 <div class="d-flex align-items-center">
                                     <div class="flex-grow-1">
                                         <p class="text-truncate font-size-14 mb-2">Current Occupancy</p>
-                                        <h4 class="mb-2 text-info">{{ dashboard_data.occupancy_summary.total_current_occupancy }}</h4>
+                                        <h4 class="mb-2 text-info">{{ dashboard_data.total_current_occupancy|default:"0" }}</h4>
                                         <p class="text-muted mb-0">
-                                            <small>{{ dashboard_data.occupancy_summary.avg_occupancy_percentage }}% of capacity</small>
+                                            <small>Across all regions</small>
                                         </p>
                                     </div>
                                     <div class="flex-shrink-0">
@@ -95,9 +95,9 @@
                                 <div class="d-flex align-items-center">
                                     <div class="flex-grow-1">
                                         <p class="text-truncate font-size-14 mb-2">Data Points (24h)</p>
-                                        <h4 class="mb-2 text-warning">{{ dashboard_data.activity_stats.recent_data_points_24h|floatformat:0 }}</h4>
+                                        <h4 class="mb-2 text-warning">{{ dashboard_data.recent_data_points|floatformat:0|default:"0" }}</h4>
                                         <p class="text-muted mb-0">
-                                            <small>{{ dashboard_data.activity_stats.avg_data_points_per_hour|floatformat:0 }}/hour avg</small>
+                                            <small>{{ dashboard_data.recent_data_points|div:24|floatformat:0|default:"0" }}/hour avg</small>
                                         </p>
                                     </div>
                                     <div class="flex-shrink-0">
