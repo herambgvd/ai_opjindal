@@ -97,19 +97,6 @@
             font-weight: bold;
         }
 
-        .confidence-indicator {
-            position: absolute;
-            top: 5px;
-            left: 5px;
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-        }
-
-        .confidence-high { background-color: #28a745; }
-        .confidence-medium { background-color: #ffc107; }
-        .confidence-low { background-color: #dc3545; }
-
         .floor-name h1 {
             font-size: 1.5rem;
             font-weight: bold;
@@ -162,9 +149,9 @@
         .medium-occupancy { background-color: #f1d317; color: #333; }
         .high-occupancy { background-color: rgb(237, 33, 33); color: white; }
 
-        .smart-indicator {
-            background: linear-gradient(45deg, #102d74, #1e40af);
-            border: 2px solid #3b82f6;
+        .enhanced-indicator {
+            background: linear-gradient(45deg, #6a11cb, #2575fc);
+            border: 2px solid #2575fc;
         }
 
         @media (max-width: 600px) {
@@ -248,18 +235,11 @@
     <div class="dashboard">
         {% for region in occupancy_data %}
             <div class="floor-card 
-                {% if region.calculation_method|slice:":5" == "smart" or region.calculation_method|slice:":6" == "hybrid" %}smart-indicator{% elif region.occupancy_percentage < 50 %}low-occupancy{% elif region.occupancy_percentage < 75 %}medium-occupancy{% else %}high-occupancy{% endif %}">
-
-                <!-- Confidence Indicator -->
-                <div class="confidence-indicator
-                    {% if region.confidence_score >= 0.7 %}confidence-high
-                    {% elif region.confidence_score >= 0.4 %}confidence-medium
-                    {% else %}confidence-low{% endif %}"
-                    title="Confidence: {{ region.confidence_score }}"></div>
+                {% if region.calculation_method == "enhanced_baseline" %}enhanced-indicator{% elif region.occupancy_percentage < 50 %}low-occupancy{% elif region.occupancy_percentage < 75 %}medium-occupancy{% else %}high-occupancy{% endif %}">
 
                 <!-- Calculation Method Badge -->
                 <div class="calculation-badge" title="Method: {{ region.calculation_method }}">
-                    {% if region.calculation_method|slice:":5" == "smart" or region.calculation_method|slice:":6" == "hybrid" %}
+                    {% if region.calculation_method == "enhanced_baseline" %}
                         SMART
                     {% else %}
                         BASIC
@@ -275,9 +255,9 @@
                 </div>
 
                 <!-- Enhanced occupancy information -->
-                {% if region.smart_occupancy != region.occupancy_by_in_out and region.confidence_score > 0.3 %}
+                {% if region.estimated_occupancy != region.occupancy_by_in_out and region.calculation_method == "enhanced_baseline" %}
                 <div class="occupancy-methods">
-                    Smart: {{ region.smart_occupancy }} | Basic: {{ region.occupancy_by_in_out }}
+                    Enhanced: {{ region.estimated_occupancy }} | Basic: {{ region.occupancy_by_in_out }}
                 </div>
                 {% endif %}
 
@@ -286,8 +266,8 @@
                         <div class="icon"><i class="ri-user-fill"></i></div>
                         <div class="value">{{ region.current_count }}</div>
                         <div>Inside</div>
-                        {% if region.confidence_score >= 0.7 %}
-                            <div style="font-size: 0.7rem; margin-top: 2px;">✓ High Confidence</div>
+                        {% if region.calculation_method == "enhanced_baseline" %}
+                            <div style="font-size: 0.7rem; margin-top: 2px;">✓ Smart Detection</div>
                         {% endif %}
                     </div>
                     <div class="detail available">
@@ -303,7 +283,7 @@
                 </div>
                 
                 <!-- Debug information for development -->
-                {% if region.calculation_method != "no_cameras" and region.calculation_method != "no_data" %}
+                {% if region.calculation_method != "no_cameras" %}
                 <div style="font-size: 0.6rem; color: rgba(255,255,255,0.6); margin-top: 5px; text-align: center;">
                     In: {{ region.total_in_count }} | Out: {{ region.total_out_count }}
                 </div>
