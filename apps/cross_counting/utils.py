@@ -831,7 +831,8 @@ class TablePartitioningManager:
                     'current_occupancy': 0,
                     'occupancy_percentage': 0.0,
                     'camera_count': 0,
-                    'status': 'no_cameras'
+                    'status': 'no_cameras',
+                    'cameras': []  # Empty camera list for consistency
                 })
                 continue
 
@@ -842,9 +843,31 @@ class TablePartitioningManager:
                 {
                     'current_count': 0,
                     'occupancy_percentage': 0.0,
-                    'calculation_method': 'unknown'
+                    'calculation_method': 'unknown',
+                    'total_in_count': 0,
+                    'total_out_count': 0,
+                    'occupancy_by_in_out': 0
                 }
             )
+
+            # Prepare camera details for each camera in the region
+            camera_details = []
+            for camera in cameras:
+                # Get the latest data for this camera
+                latest_data = CrossCountingData.objects.filter(
+                    camera=camera
+                ).order_by('-created_at').first()
+
+                camera_info = {
+                    'id': str(camera.id),
+                    'name': camera.name,
+                    'status': 'active' if camera.status else 'inactive',
+                    'latest_in_count': latest_data.cc_in_count if latest_data else 0,
+                    'latest_out_count': latest_data.cc_out_count if latest_data else 0,
+                    'latest_total_count': latest_data.cc_total_count if latest_data else 0,
+                    'last_updated': latest_data.created_at if latest_data else None
+                }
+                camera_details.append(camera_info)
 
             enhanced_regions.append({
                 'region_id': region.id,
@@ -852,9 +875,13 @@ class TablePartitioningManager:
                 'max_occupancy': region.occupancy,
                 'current_occupancy': region_occupancy['current_count'],
                 'occupancy_percentage': region_occupancy['occupancy_percentage'],
+                'total_in_count': region_occupancy['total_in_count'],
+                'total_out_count': region_occupancy['total_out_count'],
+                'occupancy_by_in_out': region_occupancy['occupancy_by_in_out'],
                 'camera_count': cameras.count(),
                 'status': 'active' if region_occupancy['current_count'] > 0 else 'empty',
-                'calculation_method': region_occupancy.get('calculation_method', 'basic_in_out')
+                'calculation_method': region_occupancy.get('calculation_method', 'basic_in_out'),
+                'cameras': camera_details  # Add camera details to the region data
             })
 
         return enhanced_regions
