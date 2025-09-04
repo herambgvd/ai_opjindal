@@ -251,6 +251,15 @@ class TablePartitioningManager:
                     'cameras': camera_details
                 })
 
+        # Don't serialize datetime data for template rendering - Django templates handle datetime objects natively
+        return enhanced
+
+    @staticmethod
+    def get_enhanced_dashboard_data_serialized() -> List[Dict[str, Any]]:
+        """
+        Enhanced dashboard data with datetime serialization for JSON APIs.
+        """
+        enhanced = TablePartitioningManager.get_enhanced_dashboard_data()
         return serialize_datetime_data(enhanced)
 
     @staticmethod
