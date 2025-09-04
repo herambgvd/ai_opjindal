@@ -9,16 +9,20 @@
         .region-card {
             transition: transform 0.2s ease-in-out;
         }
+
         .region-card:hover {
             transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
         }
+
         .camera-item {
             transition: background-color 0.2s ease;
         }
+
         .camera-item:hover {
             background-color: #f8f9fa !important;
         }
+
         .region-summary-icon {
             font-size: 1.5rem;
         }
@@ -29,6 +33,7 @@
     <div class="main-content">
         <div class="page-content">
             <div class="container-fluid" id="main-content">
+
                 {% block pagetitle %}
                     {% include "partials/page-title.html" with pagetitle="Dashboard" title="Platform Overview" subtitle="Real-time Analytics" %}
                 {% endblock pagetitle %}
@@ -59,7 +64,10 @@
                                         <p class="text-truncate font-size-14 mb-2">Active Cameras</p>
                                         <h4 class="mb-2 text-success">{{ dashboard_data.active_cameras|default:"0" }}</h4>
                                         <p class="text-muted mb-0">
-                                            <small>{{ dashboard_data.total_cameras|add:"-"|add:dashboard_data.active_cameras|default:"0" }} inactive</small>
+                                            <small>
+                                                {{ dashboard_data.total_cameras|default:0|add:"-"|add:dashboard_data.active_cameras|default:0 }}
+                                                inactive
+                                            </small>
                                         </p>
                                     </div>
                                     <div class="flex-shrink-0">
@@ -96,8 +104,7 @@
                                     <div class="flex-grow-1">
                                         <p class="text-truncate font-size-14 mb-2">Data Points (24h)</p>
                                         <h4 class="mb-2 text-warning">{{ dashboard_data.recent_data_points|floatformat:0|default:"0" }}</h4>
-                                        <p class="text-muted mb-0">
-                                        </p>
+                                        <p class="text-muted mb-0"></p>
                                     </div>
                                     <div class="flex-shrink-0">
                                         <i class="mdi mdi-chart-line font-size-24 text-warning"></i>
@@ -126,47 +133,70 @@
                                                             <i class="mdi mdi-map-marker me-1"></i>{{ region.region_name }}
                                                         </h6>
                                                         <div class="text-end">
-                                                            <small class="text-muted">{{ region.camera_count }} camera{{ region.camera_count|pluralize }}</small>
+                                                            <small class="text-muted">{{ region.camera_count }}
+                                                                camera{{ region.camera_count|pluralize }}</small>
                                                             <div class="mt-1">
-                                                                <span class="badge 
-                                                                    {% if region.occupancy_percentage < 50 %}bg-success
-                                                                    {% elif region.occupancy_percentage < 80 %}bg-warning
-                                                                    {% else %}bg-danger{% endif %}">
-                                                                    {{ region.occupancy_percentage }}% occupied
-                                                                </span>
+                              <span class="badge
+                                {% if region.occupancy_percentage < 50 %}bg-success
+                                {% elif region.occupancy_percentage < 80 %}bg-warning
+                                {% else %}bg-danger{% endif %}">
+                                {{ region.occupancy_percentage }}% occupied
+                              </span>
+                                                            </div>
+                                                            <div class="mt-1">
+                                                                <small class="text-muted">
+                                                                    <i class="mdi mdi-calculator-variant-outline me-1"></i>
+                                                                    {{ region.calculation_method|default:"delta_since_midnight" }}
+                                                                </small>
                                                             </div>
                                                         </div>
                                                     </div>
                                                 </div>
+
                                                 <div class="card-body">
+                                                    <!-- Region metrics -->
                                                     <div class="row mb-3">
                                                         <div class="col-4 text-center">
                                                             <div class="text-primary">
                                                                 <i class="mdi mdi-account-group font-size-20"></i>
                                                             </div>
-                                                            <h6 class="mt-1 mb-0">{{ region.occupancy_by_in_out }}</h6>
+                                                            <h6 class="mt-1 mb-0">{{ region.current_occupancy|default:"0" }}</h6>
                                                             <small class="text-muted">Current</small>
                                                         </div>
                                                         <div class="col-4 text-center">
                                                             <div class="text-success">
                                                                 <i class="mdi mdi-arrow-right font-size-20"></i>
                                                             </div>
-                                                            <h6 class="mt-1 mb-0">{{ region.total_in_count }}</h6>
-                                                            <small class="text-muted">Total In</small>
+                                                            <h6 class="mt-1 mb-0">{{ region.total_in_count|default:"0" }}</h6>
+                                                            <small class="text-muted">Total In (today)</small>
                                                         </div>
                                                         <div class="col-4 text-center">
                                                             <div class="text-danger">
                                                                 <i class="mdi mdi-arrow-left font-size-20"></i>
                                                             </div>
-                                                            <h6 class="mt-1 mb-0">{{ region.total_out_count }}</h6>
-                                                            <small class="text-muted">Total Out</small>
+                                                            <h6 class="mt-1 mb-0">{{ region.total_out_count|default:"0" }}</h6>
+                                                            <small class="text-muted">Total Out (today)</small>
                                                         </div>
                                                     </div>
-                                                    
+
+                                                    <!-- (Optional) Available capacity row — uncomment to show
+                        <div class="row mb-3">
+                          <div class="col-12 text-center">
+                            <div class="text-secondary"><i class="mdi mdi-door-open font-size-20"></i></div>
+                            <h6 class="mt-1 mb-0">
+                              {{ region.max_occupancy|default:0|add:"-"|add:region.current_occupancy|default:0 }}
+                            </h6>
+                            <small class="text-muted">Available</small>
+                          </div>
+                        </div>
+                        -->
+
+                                                    <!-- Camera details -->
                                                     <div class="border-top pt-3">
                                                         <h6 class="text-muted mb-2">
                                                             <i class="mdi mdi-camera me-1"></i>Camera Details
                                                         </h6>
+
                                                         {% if region.cameras %}
                                                             <div class="row">
                                                                 {% for camera in region.cameras %}
@@ -183,22 +213,29 @@
                                                                                 <div>
                                                                                     <strong class="font-size-13">{{ camera.name }}</strong>
                                                                                     {% if camera.last_updated %}
-                                                                                        <br><small class="text-muted">{{ camera.last_updated|timesince }} ago</small>
+                                                                                        <br>
+                                                                                        <small class="text-muted">{{ camera.last_updated|timesince }}
+                                                                                            ago</small>
                                                                                     {% else %}
-                                                                                        <br><small class="text-muted">No recent data</small>
+                                                                                        <br><small class="text-muted">No
+                                                                                        recent data</small>
                                                                                     {% endif %}
                                                                                 </div>
                                                                             </div>
                                                                             <div class="text-end">
                                                                                 <div class="d-flex">
                                                                                     <div class="me-3">
-                                                                                        <small class="text-success">In: {{ camera.latest_in_count }}</small>
+                                                                                        <small class="text-success">IN: {{ camera.latest_in_count|default:"0" }}</small>
                                                                                     </div>
                                                                                     <div class="me-3">
-                                                                                        <small class="text-danger">Out: {{ camera.latest_out_count }}</small>
+                                                                                        <small class="text-danger">OUT: {{ camera.latest_out_count|default:"0" }}</small>
                                                                                     </div>
                                                                                     <div>
-                                                                                        <small class="text-primary">Diff: {{ camera.latest_in_count|add:"-"|add:camera.latest_out_count }}</small>
+                                                                                        <small class="text-primary"
+                                                                                               title="Cumulative IN−OUT reported by the device (not per-interval)">
+                                                                                            Net
+                                                                                            (total): {{ camera.latest_in_count|default:0|add:"-"|add:camera.latest_out_count|default:0 }}
+                                                                                        </small>
                                                                                     </div>
                                                                                 </div>
                                                                             </div>
@@ -208,7 +245,8 @@
                                                             </div>
                                                         {% else %}
                                                             <p class="text-muted mb-0">
-                                                                <i class="mdi mdi-information-outline me-1"></i>No active cameras in this region
+                                                                <i class="mdi mdi-information-outline me-1"></i>No
+                                                                active cameras in this region
                                                             </p>
                                                         {% endif %}
                                                     </div>
@@ -220,7 +258,8 @@
                                             <div class="text-center py-4">
                                                 <i class="mdi mdi-map-marker-off font-size-48 text-muted"></i>
                                                 <h5 class="mt-3 text-muted">No regions configured</h5>
-                                                <p class="text-muted">Add regions and cameras to see detailed analytics</p>
+                                                <p class="text-muted">Add regions and cameras to see detailed
+                                                    analytics</p>
                                             </div>
                                         </div>
                                     {% endfor %}
@@ -229,92 +268,6 @@
                         </div>
                     </div>
                 </div>
-
-                <!-- System Health -->
-              <!--  <div class="row">
-                    <div class="col-xl-8">
-                        <div class="card">
-                            <div class="card-header">
-                                <h5 class="card-title mb-0">System Health Overview</h5>
-                            </div>
-                            <div class="card-body">
-                                <div class="row">
-                                    {% if dashboard_data.system_health %}
-                                        <div class="col-md-3 text-center">
-                                            <div class="mb-3">
-                                                <i class="mdi mdi-server font-size-24 text-primary"></i>
-                                                <h6 class="mt-2 mb-0">{{ dashboard_data.system_health.active_devices|default:"N/A" }}</h6>
-                                                <small class="text-muted">Active Devices</small>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-3 text-center">
-                                            <div class="mb-3">
-                                                <i class="mdi mdi-clock-outline font-size-24 text-info"></i>
-                                                <h6 class="mt-2 mb-0">{{ dashboard_data.system_health.avg_processing_delay_seconds|floatformat:2|default:"N/A" }}s</h6>
-                                                <small class="text-muted">Processing Delay</small>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-3 text-center">
-                                            <div class="mb-3">
-                                                <i class="mdi mdi-alert-circle font-size-24 {% if dashboard_data.system_health.active_alarms > 0 %}text-danger{% else %}text-success{% endif %}"></i>
-                                                <h6 class="mt-2 mb-0 {% if dashboard_data.system_health.active_alarms > 0 %}text-danger{% else %}text-success{% endif %}">
-                                                    {{ dashboard_data.system_health.active_alarms|default:"0" }}
-                                                </h6>
-                                                <small class="text-muted">Active Alarms</small>
-                                            </div>
-                                        </div>
-                                    {% endif %}
-                                    {% if dashboard_data.data_volume %}
-                                        <div class="col-md-3 text-center">
-                                            <div class="mb-3">
-                                                <i class="mdi mdi-database font-size-24 text-warning"></i>
-                                                <h6 class="mt-2 mb-0">{{ dashboard_data.data_volume.total_records|floatformat:0 }}</h6>
-                                                <small class="text-muted">Total Records</small>
-                                            </div>
-                                        </div>
-                                    {% endif %}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="col-xl-4">
-                        <div class="card">
-                            <div class="card-header">
-                                <h5 class="card-title mb-0">System Health</h5>
-                            </div>
-                            <div class="card-body">
-                                {% if dashboard_data.system_health %}
-                                    <div class="mb-3">
-                                        <p class="text-muted mb-1">Active Devices</p>
-                                        <h6 class="mb-0">{{ dashboard_data.system_health.active_devices|default:"N/A" }}</h6>
-                                    </div>
-                                    <div class="mb-3">
-                                        <p class="text-muted mb-1">Processing Delay</p>
-                                        <h6 class="mb-0">{{ dashboard_data.system_health.avg_processing_delay_seconds|floatformat:2|default:"N/A" }}s</h6>
-                                    </div>
-                                    <div class="mb-3">
-                                        <p class="text-muted mb-1">Active Alarms</p>
-                                        <h6 class="mb-0 {% if dashboard_data.system_health.active_alarms > 0 %}text-danger{% else %}text-success{% endif %}">
-                                            {{ dashboard_data.system_health.active_alarms|default:"0" }}
-                                        </h6>
-                                    </div>
-                                {% endif %}
-
-                                {% if dashboard_data.data_volume %}
-                                    <div class="mb-3">
-                                        <p class="text-muted mb-1">Total Records</p>
-                                        <h6 class="mb-0">{{ dashboard_data.data_volume.total_records|floatformat:0 }}</h6>
-                                    </div>
-                                    <div class="mb-3">
-                                        <p class="text-muted mb-1">Avg Daily Records</p>
-                                        <h6 class="mb-0">{{ dashboard_data.data_volume.avg_daily_records|floatformat:0 }}</h6>
-                                    </div>
-                                {% endif %}
-                            </div>
-                        </div>
-                    </div>
-                </div>-->
 
                 <!-- Quick Actions -->
                 <div class="row">
@@ -326,22 +279,26 @@
                             <div class="card-body">
                                 <div class="row">
                                     <div class="col-md-3">
-                                        <a href="{% url 'cross_counting:daily_analysis' %}" class="btn btn-primary w-100 mb-2">
+                                        <a href="{% url 'cross_counting:daily_analysis' %}"
+                                           class="btn btn-primary w-100 mb-2">
                                             <i class="mdi mdi-chart-bar me-1"></i> Daily Analysis
                                         </a>
                                     </div>
                                     <div class="col-md-3">
-                                        <a href="{% url 'cross_counting:comparative_analysis' %}" class="btn btn-info w-100 mb-2">
+                                        <a href="{% url 'cross_counting:comparative_analysis' %}"
+                                           class="btn btn-info w-100 mb-2">
                                             <i class="mdi mdi-compare me-1"></i> Comparative Analysis
                                         </a>
                                     </div>
                                     <div class="col-md-3">
-                                        <a href="{% url 'cross_counting:comprehensive_analysis' %}" class="btn btn-success w-100 mb-2">
+                                        <a href="{% url 'cross_counting:comprehensive_analysis' %}"
+                                           class="btn btn-success w-100 mb-2">
                                             <i class="mdi mdi-chart-timeline me-1"></i> Comprehensive Analysis
                                         </a>
                                     </div>
                                     <div class="col-md-3">
-                                        <a href="{% url 'web:public_occupancy_display' %}" class="btn btn-warning w-100 mb-2" target="_blank">
+                                        <a href="{% url 'web:public_occupancy_display' %}"
+                                           class="btn btn-warning w-100 mb-2" target="_blank">
                                             <i class="mdi mdi-television me-1"></i> Public Display
                                         </a>
                                     </div>
@@ -350,18 +307,20 @@
                         </div>
                     </div>
                 </div>
-            </div>
-        </div>
+
+            </div> <!-- container-fluid -->
+        </div> <!-- page-content -->
 
         {% block footer %}
             {% include "partials/footer.html" %}
         {% endblock footer %}
-    </div>
+    </div> <!-- main-content -->
 {% endblock content %}
 
 {% block extra_js %}
     <script>
-        setTimeout(function() {
+        // Auto-refresh every 30s
+        setTimeout(function () {
             location.reload();
         }, 30000);
     </script>
