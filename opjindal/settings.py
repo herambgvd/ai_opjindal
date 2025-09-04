@@ -84,11 +84,11 @@ WSGI_APPLICATION = 'opjindal.wsgi.application'
 DATABASES = {
     "default": {
         "ENGINE": "timescale.db.backends.postgresql",
-        "NAME": env("DJANGO_DATABASE_NAME", default="ai_op_jindal"),
+        "NAME": env("DJANGO_DATABASE_NAME", default="op_jindal"),
         "USER": env("DJANGO_DATABASE_USER", default="postgres"),
         "PASSWORD": env("DJANGO_DATABASE_PASSWORD", default="Gvd@6001"),
         "HOST": env("DJANGO_DATABASE_HOST", default="localhost"),
-        "PORT": env("DJANGO_DATABASE_PORT", default="5433"),
+        "PORT": env("DJANGO_DATABASE_PORT", default="5432"),
     }
 }
 

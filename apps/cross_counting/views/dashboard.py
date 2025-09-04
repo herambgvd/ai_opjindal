@@ -26,7 +26,24 @@ def enhanced_dashboard(request):
         
     except Exception as e:
         logger.error(f"Error loading dashboard: {e}")
-        return render(request, 'dashboard/main.html', {'title': 'Dashboard'})
+        # Provide default empty data structure to prevent template errors
+        default_dashboard_data = {
+            'total_regions': 0,
+            'total_cameras': 0,
+            'active_cameras': 0,
+            'recent_data_points': 0,
+            'total_current_occupancy': 0,
+            'health_metrics': {},
+            'volume_stats': {},
+            'occupancy_data': []
+        }
+        context = {
+            'dashboard_data': default_dashboard_data,
+            'enhanced_regions': [],
+            'title': 'Dashboard',
+            'error': 'Unable to load dashboard data. Please try again later.'
+        }
+        return render(request, 'dashboard/main.html', context)
 
 
 @cache_page(60)
