@@ -16,18 +16,12 @@ def enhanced_dashboard(request):
     try:
         dashboard_data = TablePartitioningManager.get_dashboard_statistics()
         enhanced_regions = TablePartitioningManager.get_enhanced_dashboard_data()
-        
-        context = {
-            'dashboard_data': dashboard_data,
-            'enhanced_regions': enhanced_regions,
-            'title': 'Platform Dashboard'
-        }
-        return render(request, 'dashboard/main.html', context)
-        
+
     except Exception as e:
         logger.error(f"Error loading dashboard: {e}")
-        # Provide default empty data structure to prevent template errors
-        default_dashboard_data = {
+
+        # SAFE DEFAULTS so the template never crashes
+        dashboard_data = {
             'total_regions': 0,
             'total_cameras': 0,
             'active_cameras': 0,
@@ -35,15 +29,20 @@ def enhanced_dashboard(request):
             'total_current_occupancy': 0,
             'health_metrics': {},
             'volume_stats': {},
-            'occupancy_data': []
+            'occupancy_data': [],
         }
-        context = {
-            'dashboard_data': default_dashboard_data,
-            'enhanced_regions': [],
-            'title': 'Dashboard',
-            'error': 'Unable to load dashboard data. Please try again later.'
-        }
-        return render(request, 'dashboard/main.html', context)
+        enhanced_regions = []
+
+    # Render with guaranteed keys
+    return render(
+        request,
+        'dashboard/main.html',
+        {
+            'dashboard_data': dashboard_data,
+            'enhanced_regions': enhanced_regions,
+            'title': 'Platform Dashboard',
+        },
+    )
 
 
 @cache_page(60)
