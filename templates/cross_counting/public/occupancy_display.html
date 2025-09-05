@@ -2,287 +2,197 @@
 <html lang="en">
 {% load static %}
 <head>
-    <meta charset="UTF-8"/>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <!-- Auto refresh every 10s -->
-    <meta http-equiv="refresh" content="10"/>
-    <title>Vidya Devi Jindal Dining Block</title>
-    <link href="https://cdn.jsdelivr.net/npm/remixicon/fonts/remixicon.css" rel="stylesheet"/>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <!-- Auto refresh every 10s -->
+  <meta http-equiv="refresh" content="10"/>
+  <title>Vidya Devi Jindal Dining Block</title>
+  <link href="https://cdn.jsdelivr.net/npm/remixicon/fonts/remixicon.css" rel="stylesheet"/>
 
-    <style>
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
 
-        body {
-            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-            background: #f4f4f4;
-            padding: 10px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-        }
+    body {
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      background: #f4f4f4;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
 
-        .header {
-            text-align: center;
-            margin-bottom: 15px;
-        }
+    .header { text-align: center; margin-bottom: 15px; }
 
-        h1 {
-            font-size: 1.8rem;
-            font-weight: 700;
-            color: #0c0c0b;
-            margin-bottom: 6px;
-        }
+    h1 {
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: #0c0c0b;
+      margin-bottom: 6px;
+    }
 
-        .last-updated {
-            font-size: 0.9rem;
-            color: #666;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-        }
+    .last-updated {
+      font-size: 0.9rem;
+      color: #666;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
 
-        .refresh-indicator {
-            width: 8px;
-            height: 8px;
-            background: #28a745;
-            border-radius: 50%;
-            animation: pulse 2s infinite;
-        }
+    .refresh-indicator {
+      width: 8px; height: 8px; background: #28a745; border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse { 0%{opacity:1} 50%{opacity:.5} 100%{opacity:1} }
 
-        @keyframes pulse {
-            0% {
-                opacity: 1
-            }
-            50% {
-                opacity: .5
-            }
-            100% {
-                opacity: 1
-            }
-        }
+    .dashboard {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      width: 100%;
+      max-width: 680px;
+    }
 
-        .dashboard {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 10px;
-            width: 100%;
-            max-width: 680px;
-        }
+    .floor-card {
+      padding: 12px; border-radius: 12px;
+      box-shadow: 0 4px 8px rgba(0,0,0,.1);
+      color: #fff; display: flex; flex-direction: column; align-items: center;
+      position: relative; transition: transform .25s ease; min-height: 180px;
+    }
+    .floor-card:hover { transform: translateY(-3px); }
 
-        .floor-card {
-            padding: 12px;
-            border-radius: 12px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, .1);
-            color: #fff;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            position: relative;
-            transition: transform .25s ease;
-            min-height: 180px;
-        }
+    .calculation-badge {
+      position: absolute; top: 6px; right: 6px;
+      background: rgba(255,255,255,.2); color: #fff;
+      padding: 2px 8px; border-radius: 999px; font-size: .7rem; font-weight: 700; letter-spacing: .3px;
+    }
 
-        .floor-card:hover {
-            transform: translateY(-3px);
-        }
+    .floor-name h2 { font-size: 1.3rem; font-weight: 700; color: #fff; text-align: center; }
 
-        .calculation-badge {
-            position: absolute;
-            top: 6px;
-            right: 6px;
-            background: rgba(255, 255, 255, .2);
-            color: #fff;
-            padding: 2px 8px;
-            border-radius: 999px;
-            font-size: .7rem;
-            font-weight: 700;
-            letter-spacing: .3px;
-        }
+    .occupied h3 {
+      font-size: 1.1rem; font-weight: 700; text-align: center; margin: 6px 0 2px;
+    }
 
-        .floor-name h2 {
-            font-size: 1.3rem;
-            font-weight: 700;
-            color: #fff;
-            text-align: center;
-        }
+    .details { display: flex; justify-content: space-evenly; width: 100%; margin-top: 8px; gap: 8px; }
+    .detail { display: flex; flex-direction: column; align-items: center; min-width: 110px; }
+    .icon { font-size: 2rem; }
+    .value { font-size: 1.3rem; font-weight: 800; margin-top: 2px; }
+    .label { font-size: .85rem; opacity: .92; }
 
-        .occupied h3 {
-            font-size: 1.1rem;
-            font-weight: 700;
-            text-align: center;
-            margin: 6px 0 2px;
-        }
+    /* color states based on occupancy % */
+    .low-occupancy { background: #12439e; }            /* < 50% */
+    .medium-occupancy { background: #ffc107; color: #333; } /* 50–74% */
+    .high-occupancy { background: #dc3545; }           /* >= 75% */
 
-        .details {
-            display: flex;
-            justify-content: space-evenly;
-            width: 100%;
-            margin-top: 8px;
-            gap: 8px;
-        }
+    /* correction badge (optional) */
+    .correction-pill {
+      position: absolute; left: 6px; top: 6px;
+      background: rgba(0,0,0,.25); border: 1px solid rgba(255,255,255,.35);
+      color: #fff; border-radius: 999px; padding: 2px 8px; font-size: .7rem; font-weight: 700;
+    }
 
-        .detail {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            min-width: 110px;
-        }
+    /* responsive */
+    @media (max-width: 600px) {
+      .dashboard { grid-template-columns: 1fr 1fr; gap: 8px; }
+      .floor-card { padding: 10px; min-height: 160px; }
+      .floor-name h2 { font-size: 1.15rem; }
+      .occupied h3 { font-size: 1rem; }
+      .icon { font-size: 1.8rem; }
+      .value { font-size: 1.1rem; }
+    }
+  </style>
 
-        .icon {
-            font-size: 2rem;
-        }
-
-        .value {
-            font-size: 1.3rem;
-            font-weight: 800;
-            margin-top: 2px;
-        }
-
-        .label {
-            font-size: .85rem;
-            opacity: .92;
-        }
-
-        /* color states based on occupancy % */
-        .low-occupancy {
-            background: #427ae6;
-        }
-
-        /* < 50% */
-        .medium-occupancy {
-            background: #ffc107;
-            color: #333;
-        }
-
-        /* 50–74% */
-        .high-occupancy {
-            background: #dc3545;
-        }
-
-        /* >= 75% */
-
-        /* responsive */
-        @media (max-width: 600px) {
-            .dashboard {
-                grid-template-columns: 1fr 1fr;
-                gap: 8px;
-            }
-
-            .floor-card {
-                padding: 10px;
-                min-height: 160px;
-            }
-
-            .floor-name h2 {
-                font-size: 1.15rem;
-            }
-
-            .occupied h3 {
-                font-size: 1rem;
-            }
-
-            .icon {
-                font-size: 1.8rem;
-            }
-
-            .value {
-                font-size: 1.1rem;
-            }
-        }
-    </style>
-
-    <script>
-        // purely cosmetic last-updated clock
-        document.addEventListener('DOMContentLoaded', function () {
-            const el = document.getElementById('last-updated-time');
-            if (el) {
-                const now = new Date();
-                el.textContent = now.toLocaleTimeString();
-            }
-        });
-    </script>
+  <script>
+    // cosmetic last-updated clock for the header
+    document.addEventListener('DOMContentLoaded', function() {
+      const el = document.getElementById('last-updated-time');
+      if (el) el.textContent = new Date().toLocaleTimeString();
+    });
+  </script>
 </head>
 
 <body>
-<div class="header">
+  <div class="header">
     <h1>Vidya Devi Jindal Dining Block</h1>
     <div class="last-updated">
-        <span class="refresh-indicator"></span>
-        <span>Last Updated: <span id="last-updated-time">{{ "now"|date:"H:i:s" }}</span></span>
-        <span style="margin-left: 10px;">Auto-refresh: 10s</span>
+      <span class="refresh-indicator"></span>
+      <span>Last Updated: <span id="last-updated-time">{{ "now"|date:"H:i:s" }}</span></span>
+      <span style="margin-left:10px;">Auto-refresh: 10s</span>
     </div>
-</div>
+  </div>
 
-<div class="dashboard">
+  <div class="dashboard">
     {% if occupancy_data %}
-        {% for region in occupancy_data %}
-            <div class="floor-card
+      {% for region in occupancy_data %}
+        <div class="floor-card
           {% if region.occupancy_percentage < 50 %}low-occupancy
           {% elif region.occupancy_percentage < 75 %}medium-occupancy
           {% else %}high-occupancy{% endif %}">
 
-                <!-- method badge -->
-                <div class="calculation-badge" title="Calculation method">
-                    {{ region.calculation_method|default:"delta_since_midnight"|upper }}
-                </div>
+          <!-- left badge if correction applied -->
+{#          {% if region.correction_applied %}#}
+{#            <div class="correction-pill" title="Negative-floor applied">#}
+{#              AUTO-FLOOR • +{{ region.correction_value }}#}
+{#            </div>#}
+{#          {% endif %}#}
 
-                <!-- region name -->
-                <div class="floor-name">
-                    <h2>{{ region.region_name }}</h2>
-                </div>
+          <!-- method badge (right) -->
+{#          <div class="calculation-badge" title="Calculation method">#}
+{#            {{ region.calculation_method|default:"delta_since_midnight"|upper }}#}
+{#          </div>#}
 
-                <!-- occupancy percent -->
-                <div class="occupied">
-                    <h3>Occupied: {{ region.occupancy_percentage|default:"0" }}%</h3>
-                </div>
+          <!-- region name -->
+          <div class="floor-name">
+            <h2>{{ region.region_name }}</h2>
+          </div>
 
-                <!-- key metrics -->
-                <div class="details">
-                    <div class="detail">
-                        <div class="icon"><i class="ri-user-fill"></i></div>
-                        <div class="value">{{ region.current_count|default:"0" }}</div>
-                        <div class="label">Inside</div>
-                    </div>
-                    <div class="detail">
-                        <div class="icon"><i class="ri-door-open-line"></i></div>
-                        <div class="value">{{ region.available_count|default:"0" }}</div>
-                        <div class="label">Available</div>
-                    </div>
-                </div>
+          <!-- occupancy percent -->
+          <div class="occupied">
+            <h3>Occupied: {{ region.occupancy_percentage|default:"0" }}%</h3>
+          </div>
 
-                <!-- small footer showing today's movement (optional, helpful) -->
-                <div style="margin-top: 10px; font-size: .85rem; opacity: .9; text-align: center;">
-                    <span title="Total IN since midnight">IN: {{ region.total_in_count|default:"0" }}</span>
-                    &nbsp;•&nbsp;
-                    <span title="Total OUT since midnight">OUT: {{ region.total_out_count|default:"0" }}</span>
-                </div>
+          <!-- key metrics -->
+          <div class="details">
+            <div class="detail">
+              <div class="icon"><i class="ri-user-fill"></i></div>
+              <div class="value">{{ region.current_count|default:"0" }}</div>
+              <div class="label">Inside</div>
             </div>
-        {% endfor %}
-    {% else %}
-        <div class="floor-card low-occupancy">
-            <div class="floor-name"><h2>No Regions</h2></div>
-            <div class="occupied"><h3>Occupied: 0%</h3></div>
-            <div class="details">
-                <div class="detail">
-                    <div class="icon"><i class="ri-user-fill"></i></div>
-                    <div class="value">0</div>
-                    <div class="label">Inside</div>
-                </div>
-                <div class="detail">
-                    <div class="icon"><i class="ri-door-open-line"></i></div>
-                    <div class="value">0</div>
-                    <div class="label">Available</div>
-                </div>
+            <div class="detail">
+              <div class="icon"><i class="ri-door-open-line"></i></div>
+              <div class="value">{{ region.available_count|default:"0" }}</div>
+              <div class="label">Available</div>
             </div>
+          </div>
+
+          <!-- small footer: movement since midnight -->
+{#          <div style="margin-top: 10px; font-size: .85rem; opacity: .9; text-align: center;">#}
+{#            <span title="Total IN since midnight">IN: {{ region.total_in_count|default:"0" }}</span>#}
+{#            &nbsp;•&nbsp;#}
+{#            <span title="Total OUT since midnight">OUT: {{ region.total_out_count|default:"0" }}</span>#}
+{#          </div>#}
         </div>
+      {% endfor %}
+    {% else %}
+      <div class="floor-card low-occupancy">
+        <div class="floor-name"><h2>No Regions</h2></div>
+        <div class="occupied"><h3>Occupied: 0%</h3></div>
+        <div class="details">
+          <div class="detail">
+            <div class="icon"><i class="ri-user-fill"></i></div>
+            <div class="value">0</div>
+            <div class="label">Inside</div>
+          </div>
+          <div class="detail">
+            <div class="icon"><i class="ri-door-open-line"></i></div>
+            <div class="value">0</div>
+            <div class="label">Available</div>
+          </div>
+        </div>
+      </div>
     {% endif %}
-</div>
+  </div>
 </body>
 </html>

@@ -1,6 +1,6 @@
 """
 Time-series utilities for CrossCountingData analytics
-Delta-based occupancy with midnight reset (no schema change required)
+Delta-based occupancy with midnight reset + negative-floor correction (no schema change required)
 """
 
 import logging
@@ -13,6 +13,13 @@ from django.utils import timezone
 from django.utils.timezone import localtime
 
 logger = logging.getLogger(__name__)
+
+# ----------------------------------------------------
+# Configuration (tune per deployment if needed)
+# ----------------------------------------------------
+NEGATIVE_FLOOR_T = 20          # net should never go below -T after correction
+GRACE_MINUTES_AFTER_MIDNIGHT = 20  # skip correction in first N minutes after midnight
+MAX_CORRECTION_PER_CALL = 300  # safety cap to avoid runaway corrections in a single call
 
 
 # ------------------------------
@@ -115,6 +122,7 @@ class TablePartitioningManager:
     Assumptions:
       - Devices reset cumulative counters to 0 at local midnight.
       - We compute deltas from FIRST-of-day cumulative to LATEST-of-now cumulative per camera.
+      - Region-level negative-floor correction bounds net to >= -T for display, without mutating DB.
     """
 
     # ---------- PUBLIC APIs used by your views ----------
@@ -123,22 +131,28 @@ class TablePartitioningManager:
     def get_current_occupancy_data() -> List[Dict[str, Any]]:
         """
         Current occupancy per region for public display (delta since local midnight).
+
         Steps:
           - Window = [today local midnight .. now]
           - Per active camera: FIRST cumulative of day & LATEST cumulative of now
           - ΔIN = max(0, latest_in - first_in), ΔOUT = max(0, latest_out - first_out)
-          - Region occupancy = max(0, ΣΔIN − ΣΔOUT)
+          - Region SUMs: ΣΔIN, ΣΔOUT
+          - NEGATIVE-FLOOR: ensure net >= -NEGATIVE_FLOOR_T via just-enough virtual IN (display only)
+          - Region occupancy = max(0, corrected_net)
           - Display cap by region.occupancy
         """
         from .models import Region, Camera
 
         results = []
+
         now = timezone.now()
         local_now = localtime(now)
-        # Asia/Kolkata already configured in your project; localtime honors that.
         local_midnight = local_now.replace(hour=0, minute=0, second=0, microsecond=0)
         start = timezone.make_aware(local_midnight.replace(tzinfo=None)) if local_midnight.tzinfo is None else local_midnight
         end = now
+
+        minutes_since_midnight = int((local_now - local_midnight).total_seconds() // 60)
+        apply_correction = minutes_since_midnight >= GRACE_MINUTES_AFTER_MIDNIGHT
 
         regions = Region.objects.all()
         for region in regions:
@@ -154,6 +168,8 @@ class TablePartitioningManager:
                     "occupancy_by_in_out": 0,
                     "calculation_method": "delta_since_midnight",
                     "available_count": region.occupancy,
+                    "correction_applied": False,
+                    "correction_value": 0,
                 })
                 continue
 
@@ -172,8 +188,20 @@ class TablePartitioningManager:
                 sum_in_delta += din
                 sum_out_delta += dout
 
-            occ = max(0, sum_in_delta - sum_out_delta)  # guard >= 0 (region level)
-            current_count = min(occ, region.occupancy)
+            # --- Negative-floor correction (display only) ---
+            net_raw = int(sum_in_delta - sum_out_delta)
+            correction = 0
+            if apply_correction and net_raw < -NEGATIVE_FLOOR_T:
+                # Just-enough correction so that net >= -T, capped for safety
+                correction = min(max(0, -(net_raw + NEGATIVE_FLOOR_T)), MAX_CORRECTION_PER_CALL)
+
+            corrected_in = int(sum_in_delta + correction)
+            net_corrected = int(corrected_in - sum_out_delta)
+
+            # Final occupancy shown
+            occ_display = max(0, net_corrected)
+            current_count = min(occ_display, region.occupancy)
+
             occ_pct = (current_count / region.occupancy * 100) if region.occupancy > 0 else 0.0
             occ_pct = min(occ_pct, 100.0)
             available = max(0, region.occupancy - int(current_count))
@@ -183,11 +211,17 @@ class TablePartitioningManager:
                 "current_count": int(current_count),
                 "max_occupancy": region.occupancy,
                 "occupancy_percentage": round(occ_pct, 1),
-                "total_in_count": int(sum_in_delta),
-                "total_out_count": int(sum_out_delta),
-                "occupancy_by_in_out": int(occ),
-                "calculation_method": "delta_since_midnight",
+                # Expose both original deltas and corrected IN for transparency in UI if needed
+                "total_in_count": int(corrected_in),      # corrected (display)
+                "total_out_count": int(sum_out_delta),    # raw delta
+                "occupancy_by_in_out": int(occ_display),  # corrected occupancy
+                "calculation_method": "delta_since_midnight + negative_floor",
                 "available_count": available,
+                "correction_applied": bool(correction),
+                "correction_value": int(correction),
+                "original_in_delta": int(sum_in_delta),   # optional: for debugging / admin UI
+                "original_net": int(net_raw),
+                "net_after_correction": int(net_corrected),
             })
 
         return results
@@ -196,6 +230,7 @@ class TablePartitioningManager:
     def get_enhanced_dashboard_data() -> List[Dict[str, Any]]:
         """
         Enhanced dashboard data with occupancy analysis and camera details.
+        Returns datetime objects for template filters like |timesince.
         """
         from .models import Region, Camera, CrossCountingData
 
@@ -219,7 +254,7 @@ class TablePartitioningManager:
                     'last_updated': latest.created_at if latest else None
                 })
 
-            occ = occ_map.get(region.name, None)
+            occ = occ_map.get(region.name)
             if occ:
                 enhanced.append({
                     'region_id': region.id,
@@ -232,7 +267,7 @@ class TablePartitioningManager:
                     'occupancy_by_in_out': occ['occupancy_by_in_out'],
                     'camera_count': cameras_qs.count(),
                     'status': 'active' if occ['current_count'] > 0 else 'empty',
-                    'calculation_method': occ.get('calculation_method', 'delta_since_midnight'),
+                    'calculation_method': occ.get('calculation_method', 'delta_since_midnight + negative_floor'),
                     'cameras': camera_details
                 })
             else:
@@ -247,11 +282,11 @@ class TablePartitioningManager:
                     'occupancy_by_in_out': 0,
                     'camera_count': cameras_qs.count(),
                     'status': 'empty',
-                    'calculation_method': 'delta_since_midnight',
+                    'calculation_method': 'delta_since_midnight + negative_floor',
                     'cameras': camera_details
                 })
 
-        # Don't serialize datetime data for template rendering - Django templates handle datetime objects natively
+        # Keep datetimes for template |timesince
         return enhanced
 
     @staticmethod
@@ -264,7 +299,7 @@ class TablePartitioningManager:
 
     @staticmethod
     def get_dashboard_statistics() -> Dict[str, Any]:
-        """High-level stats + current occupancy."""
+        """High-level stats + current occupancy (serialized for templates that expect plain data)."""
         from .models import Region, Camera, CrossCountingData
 
         total_regions = Region.objects.count()
