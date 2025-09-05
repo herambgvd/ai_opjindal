@@ -184,33 +184,46 @@ class TablePartitioningManager:
 
             # --- Completely rewritten and simplified correction logic
             if apply_correction and net_raw < -NEGATIVE_FLOOR_T:
-                # Step 1: Bring net to exactly -NEGATIVE_FLOOR_T by reducing OUT count
-                target_net = -NEGATIVE_FLOOR_T  # We want net = -20
-                correction_needed = abs(net_raw - target_net)  # How much to correct
-                correction = min(correction_needed, MAX_CORRECTION_PER_CALL)
+                # Strategy: Instead of maintaining -20 floor, try to get to reasonable positive occupancy
 
-                # Apply correction by reducing OUT count (represents "lost" exit events)
-                corrected_out = max(0, int(sum_out_delta - correction))
-                net_corrected = int(corrected_in - corrected_out)
+                # Step 1: Check recent activity to see if there's genuine positive movement
+                recent_start = now - timedelta(minutes=RECENT_WINDOW_MIN)
+                recent_per_cam = TablePartitioningManager._first_and_latest_for_cameras(cameras, recent_start, end)
 
-                # Step 2: If STILL negative after correction, apply snap-to-zero-plus
-                if net_corrected < 0:
-                    recent_start = now - timedelta(minutes=RECENT_WINDOW_MIN)
-                    recent_per_cam = TablePartitioningManager._first_and_latest_for_cameras(cameras, recent_start, end)
-                    recent_in_delta = 0
-                    recent_out_delta = 0
-                    for r in recent_per_cam:
-                        r_first_in = r['first_in'] or 0
-                        r_first_out = r['first_out'] or 0
-                        r_last_in = r['last_in'] if r['last_in'] is not None else r_first_in
-                        r_last_out = r['last_out'] if r['last_out'] is not None else r_first_out
-                        recent_in_delta += max(0, r_last_in - r_first_in)
-                        recent_out_delta += max(0, r_last_out - r_first_out)
-                    # Add recent positive movement to IN count to push to positive territory
-                    recent_net = max(0, int(recent_in_delta - recent_out_delta))
+                recent_in_delta = 0
+                recent_out_delta = 0
+                for r in recent_per_cam:
+                    r_first_in = r['first_in'] or 0
+                    r_first_out = r['first_out'] or 0
+                    r_last_in = r['last_in'] if r['last_in'] is not None else r_first_in
+                    r_last_out = r['last_out'] if r['last_out'] is not None else r_first_out
+                    recent_in_delta += max(0, r_last_in - r_first_in)
+                    recent_out_delta += max(0, r_last_out - r_first_out)
+
+                recent_net = int(recent_in_delta - recent_out_delta)
+
+                # Step 2: Apply correction based on recent activity
+                if recent_net > 0:
+                    # There's recent positive movement - add it to IN count
+                    correction = min(recent_net, MAX_CORRECTION_PER_CALL)
+                    corrected_in = int(sum_in_delta + correction)
+                    net_corrected = int(corrected_in - corrected_out)
+                else:
+                    # No recent positive movement - reduce OUT count moderately
+                    # Only reduce enough to get a reasonable occupancy, not maintain artificial floor
+                    max_reasonable_reduction = min(abs(net_raw) // 2, MAX_CORRECTION_PER_CALL)
+                    correction = max_reasonable_reduction
+                    corrected_out = max(0, int(sum_out_delta - correction))
+                    net_corrected = int(corrected_in - corrected_out)
+
+                # Step 3: If still very negative, apply minimal correction to avoid zero-lock
+                if net_corrected < -10:  # Allow some negative occupancy instead of forcing to zero
+                    additional_correction = min(10, MAX_CORRECTION_PER_CALL - correction)
                     if recent_net > 0:
-                        corrected_in = int(corrected_in + recent_net)
-                        net_corrected = int(corrected_in - corrected_out)
+                        corrected_in = int(corrected_in + additional_correction)
+                    else:
+                        corrected_out = max(0, int(corrected_out - additional_correction))
+                    net_corrected = int(corrected_in - corrected_out)
 
             # Final display occupancy
             occ_display = max(0, net_corrected)
