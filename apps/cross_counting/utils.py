@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 # ----------------------------------------------------
 # Configuration (tune per deployment if needed)
 # ----------------------------------------------------
-NEGATIVE_FLOOR_T = 20              # allow net to go at most -20 before correction
+NEGATIVE_FLOOR_T = 10              # allow net to go at most -20 before correction
 GRACE_MINUTES_AFTER_MIDNIGHT = 20  # avoid corrections in first N minutes after reset
 MAX_CORRECTION_PER_CALL = 300      # safety cap
 RECENT_WINDOW_MIN = 15             # "snap-to-zero-plus": add recent inflow if net < 0
@@ -219,7 +219,7 @@ class TablePartitioningManager:
                     correction = out_reduction
                     net_corrected = int(corrected_in - corrected_out)
 
-                elif negative_severity > 50:  # Moderate negative occupancy
+                elif negative_severity > 40:  # Moderate negative occupancy
                     # Apply moderate correction
                     if recent_net > 0:
                         # Boost IN count with recent activity plus estimated missing counts
@@ -234,7 +234,7 @@ class TablePartitioningManager:
 
                     net_corrected = int(corrected_in - corrected_out)
 
-                else:  # Small negative occupancy (20-50)
+                else:  # Small negative occupancy (20-40)
                     # Apply conservative correction
                     if recent_net > 0:
                         # Add recent positive movement
@@ -248,9 +248,9 @@ class TablePartitioningManager:
                     net_corrected = int(corrected_in - corrected_out)
 
                 # Step 3: Final safety check - ensure we get reasonable positive occupancy
-                if net_corrected <= 0 and minutes_since_midnight > 60:  # After first hour, be more aggressive
+                if net_corrected <= 0 and minutes_since_midnight > 40:  # After first hour, be more aggressive
                     # Apply emergency correction to prevent zero-lock during business hours
-                    emergency_boost = min(20, MAX_CORRECTION_PER_CALL - correction)
+                    emergency_boost = min(10, MAX_CORRECTION_PER_CALL - correction)
                     corrected_in = int(corrected_in + emergency_boost)
                     net_corrected = int(corrected_in - corrected_out)
 
