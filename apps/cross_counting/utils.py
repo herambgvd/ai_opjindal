@@ -157,6 +157,7 @@ class TablePartitioningManager:
                     "correction_applied": False,
                     "correction_value": 0,
                     "original_in_delta": 0,
+                    "original_out_delta": 0,
                     "original_net": 0,
                     "net_after_correction": 0,
                 })
@@ -178,30 +179,38 @@ class TablePartitioningManager:
             net_raw = int(sum_in_delta - sum_out_delta)
             correction = 0
             corrected_in = int(sum_in_delta)
+            corrected_out = int(sum_out_delta)
             net_corrected = int(net_raw)
 
-            # --- Negative-floor clamp first (display-only correction)
+            # --- Improved Negative-floor correction logic
             if apply_correction and net_raw < -NEGATIVE_FLOOR_T:
-                correction = min(max(0, -(net_raw + NEGATIVE_FLOOR_T)), MAX_CORRECTION_PER_CALL)
-                corrected_in = int(sum_in_delta + correction)
-                net_corrected = int(corrected_in - sum_out_delta)
+                # Calculate how much we need to correct to bring net to -NEGATIVE_FLOOR_T
+                correction_needed = abs(net_raw + NEGATIVE_FLOOR_T)
+                correction = min(correction_needed, MAX_CORRECTION_PER_CALL)
 
-                # --- Snap-to-Zero-Plus: add *recent window delta* (last - first per camera in window)
-                recent_start = now - timedelta(minutes=RECENT_WINDOW_MIN)
-                recent_per_cam = TablePartitioningManager._first_and_latest_for_cameras(cameras, recent_start, end)
+                # Apply correction by reducing OUT count (more logical than increasing IN)
+                # This represents "lost" exit events that weren't properly counted
+                corrected_out = max(0, int(sum_out_delta - correction))
+                net_corrected = int(corrected_in - corrected_out)
 
-                recent_in_delta = 0
-                recent_out_delta = 0
-                for r in recent_per_cam:
-                    r_first_in = r['first_in'] or 0
-                    r_first_out = r['first_out'] or 0
-                    r_last_in = r['last_in'] if r['last_in'] is not None else r_first_in
-                    r_last_out = r['last_out'] if r['last_out'] is not None else r_first_out
-                    recent_in_delta += max(0, r_last_in - r_first_in)
-                    recent_out_delta += max(0, r_last_out - r_first_out)
+                # --- Snap-to-Zero-Plus: add *recent window delta* if still negative
+                if net_corrected < 0:
+                    recent_start = now - timedelta(minutes=RECENT_WINDOW_MIN)
+                    recent_per_cam = TablePartitioningManager._first_and_latest_for_cameras(cameras, recent_start, end)
 
-                recent_net = max(0, int(recent_in_delta - recent_out_delta))
-                net_corrected = int(max(0, net_corrected) + recent_net)
+                    recent_in_delta = 0
+                    recent_out_delta = 0
+                    for r in recent_per_cam:
+                        r_first_in = r['first_in'] or 0
+                        r_first_out = r['first_out'] or 0
+                        r_last_in = r['last_in'] if r['last_in'] is not None else r_first_in
+                        r_last_out = r['last_out'] if r['last_out'] is not None else r_first_out
+                        recent_in_delta += max(0, r_last_in - r_first_in)
+                        recent_out_delta += max(0, r_last_out - r_first_out)
+
+                    # Add recent positive movement to help get out of negative territory
+                    recent_net = max(0, int(recent_in_delta - recent_out_delta))
+                    net_corrected = int(net_corrected + recent_net)
 
             # Final display occupancy
             occ_display = max(0, net_corrected)
@@ -209,20 +218,24 @@ class TablePartitioningManager:
             occ_pct = min((current_count / region.occupancy * 100) if region.occupancy > 0 else 0.0, 100.0)
             available = max(0, int(region.occupancy - current_count))
 
+            # Calculate if any correction was applied
+            correction_applied = (corrected_in != sum_in_delta) or (corrected_out != sum_out_delta) or (net_corrected != net_raw)
+
             results.append({
                 "region_name": region.name,
                 "current_count": current_count,
                 "max_occupancy": int(region.occupancy),
                 "occupancy_percentage": round(occ_pct, 1),
-                "total_in_count": int(corrected_in),  # corrected IN (display)
-                "total_out_count": int(sum_out_delta),  # raw OUT delta since midnight
-                "occupancy_by_in_out": occ_display,  # corrected occupancy
-                "calculation_method": "snap_to_zero_plus",
+                "total_in_count": int(corrected_in),     # consistent with calculation
+                "total_out_count": int(corrected_out),   # consistent with calculation
+                "occupancy_by_in_out": occ_display,     # corrected occupancy
+                "calculation_method": "improved_negative_floor_correction",
                 "available_count": available,
-                "correction_applied": bool(correction or net_raw < 0),
+                "correction_applied": correction_applied,
                 "correction_value": int(correction),
-                "original_in_delta": int(sum_in_delta),  # debug/admin
-                "original_net": int(net_raw),
+                "original_in_delta": int(sum_in_delta),  # debug: original IN delta
+                "original_out_delta": int(sum_out_delta), # debug: original OUT delta
+                "original_net": int(net_raw),            # debug: original net
                 "net_after_correction": int(net_corrected),
             })
 
