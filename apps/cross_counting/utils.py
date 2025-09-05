@@ -184,7 +184,7 @@ class TablePartitioningManager:
 
             # --- Completely rewritten and simplified correction logic
             if apply_correction and net_raw < -NEGATIVE_FLOOR_T:
-                # Strategy: Instead of maintaining -20 floor, try to get to reasonable positive occupancy
+                # Strategy: When IN accuracy is low vs OUT accuracy, we need more aggressive corrections
 
                 # Step 1: Check recent activity to see if there's genuine positive movement
                 recent_start = now - timedelta(minutes=RECENT_WINDOW_MIN)
@@ -202,27 +202,56 @@ class TablePartitioningManager:
 
                 recent_net = int(recent_in_delta - recent_out_delta)
 
-                # Step 2: Apply correction based on recent activity
-                if recent_net > 0:
-                    # There's recent positive movement - add it to IN count
-                    correction = min(recent_net, MAX_CORRECTION_PER_CALL)
-                    corrected_in = int(sum_in_delta + correction)
-                    net_corrected = int(corrected_in - corrected_out)
-                else:
-                    # No recent positive movement - reduce OUT count moderately
-                    # Only reduce enough to get a reasonable occupancy, not maintain artificial floor
-                    max_reasonable_reduction = min(abs(net_raw) // 2, MAX_CORRECTION_PER_CALL)
-                    correction = max_reasonable_reduction
-                    corrected_out = max(0, int(sum_out_delta - correction))
+                # Step 2: Determine the correction strategy based on the severity of negative occupancy
+                negative_severity = abs(net_raw)
+
+                if negative_severity > 100:  # Very high negative occupancy (severe IN undercounting)
+                    # Apply aggressive correction: Assume significant IN undercounting
+                    # Reduce OUT count by up to 80% of the negative amount
+                    out_reduction = min(int(negative_severity * 0.8), MAX_CORRECTION_PER_CALL)
+                    corrected_out = max(0, int(sum_out_delta - out_reduction))
+
+                    # Also add estimated missing IN count based on recent activity patterns
+                    if recent_net > 0:
+                        in_boost = min(recent_net * 2, MAX_CORRECTION_PER_CALL // 2)  # Double recent positive movement
+                        corrected_in = int(sum_in_delta + in_boost)
+
+                    correction = out_reduction
                     net_corrected = int(corrected_in - corrected_out)
 
-                # Step 3: If still very negative, apply minimal correction to avoid zero-lock
-                if net_corrected < -10:  # Allow some negative occupancy instead of forcing to zero
-                    additional_correction = min(10, MAX_CORRECTION_PER_CALL - correction)
+                elif negative_severity > 50:  # Moderate negative occupancy
+                    # Apply moderate correction
                     if recent_net > 0:
-                        corrected_in = int(corrected_in + additional_correction)
+                        # Boost IN count with recent activity plus estimated missing counts
+                        in_boost = min(recent_net + (negative_severity // 3), MAX_CORRECTION_PER_CALL)
+                        corrected_in = int(sum_in_delta + in_boost)
+                        correction = in_boost
                     else:
-                        corrected_out = max(0, int(corrected_out - additional_correction))
+                        # Reduce OUT count moderately
+                        out_reduction = min(negative_severity // 2, MAX_CORRECTION_PER_CALL)
+                        corrected_out = max(0, int(sum_out_delta - out_reduction))
+                        correction = out_reduction
+
+                    net_corrected = int(corrected_in - corrected_out)
+
+                else:  # Small negative occupancy (20-50)
+                    # Apply conservative correction
+                    if recent_net > 0:
+                        # Add recent positive movement
+                        correction = min(recent_net, MAX_CORRECTION_PER_CALL)
+                        corrected_in = int(sum_in_delta + correction)
+                    else:
+                        # Reduce OUT count conservatively
+                        correction = min(negative_severity // 3, MAX_CORRECTION_PER_CALL)
+                        corrected_out = max(0, int(sum_out_delta - correction))
+
+                    net_corrected = int(corrected_in - corrected_out)
+
+                # Step 3: Final safety check - ensure we get reasonable positive occupancy
+                if net_corrected <= 0 and minutes_since_midnight > 60:  # After first hour, be more aggressive
+                    # Apply emergency correction to prevent zero-lock during business hours
+                    emergency_boost = min(20, MAX_CORRECTION_PER_CALL - correction)
+                    corrected_in = int(corrected_in + emergency_boost)
                     net_corrected = int(corrected_in - corrected_out)
 
             # Final display occupancy
