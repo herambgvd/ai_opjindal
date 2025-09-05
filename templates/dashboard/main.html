@@ -230,12 +230,12 @@
                                                                                     <div class="me-3">
                                                                                         <small class="text-danger">OUT: {{ camera.latest_out_count|default:"0" }}</small>
                                                                                     </div>
-                                                                                    <div>
-                                                                                        Net
-                                                                                        (total): {{ camera.latest_in_count|default_if_none:0|add:-camera.latest_out_count|default_if_none:0 }}
-
-                                                                                    </div>
-                                                                                </div>
+{#                                                                                    <div>#}
+{#                                                                                        Net#}
+{#                                                                                        (total): {{ camera.latest_in_count|default_if_none:0|add:-camera.latest_out_count|default_if_none:0 }}#}
+{##}
+{#                                                                                    </div>#}
+{#                                                                                </div>#}
                                                                             </div>
                                                                         </div>
                                                                     </div>
