@@ -231,12 +231,8 @@
                                                                                         <small class="text-danger">OUT: {{ camera.latest_out_count|default:"0" }}</small>
                                                                                     </div>
                                                                                     <div>
-                                                                                        {% with net=camera.latest_in_count|default_if_none:0|add:-camera.latest_out_count|default_if_none:0 %}
-                                                                                            <small class="text-primary"
-                                                                                                   title="Cumulative IN−OUT reported by the device (not per-interval)">
-                                                                                                Net (total): {{ net }}
-                                                                                            </small>
-                                                                                        {% endwith %}
+                                                                                        Net
+                                                                                        (total): {{ camera.latest_in_count|default_if_none:0|add:-camera.latest_out_count|default_if_none:0 }}
 
                                                                                     </div>
                                                                                 </div>
