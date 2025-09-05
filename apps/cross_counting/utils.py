@@ -1,6 +1,6 @@
 """
 Time-series utilities for CrossCountingData analytics
-Delta-based occupancy with midnight reset + negative-floor correction (no schema change required)
+Delta-based occupancy with midnight reset + Snap-to-Zero-Plus correction
 """
 
 import logging
@@ -17,9 +17,10 @@ logger = logging.getLogger(__name__)
 # ----------------------------------------------------
 # Configuration (tune per deployment if needed)
 # ----------------------------------------------------
-NEGATIVE_FLOOR_T = 20          # net should never go below -T after correction
-GRACE_MINUTES_AFTER_MIDNIGHT = 20  # skip correction in first N minutes after midnight
-MAX_CORRECTION_PER_CALL = 300  # safety cap to avoid runaway corrections in a single call
+NEGATIVE_FLOOR_T = 20              # allow net to go at most -20 before correction
+GRACE_MINUTES_AFTER_MIDNIGHT = 20  # avoid corrections in first N minutes after reset
+MAX_CORRECTION_PER_CALL = 300      # safety cap
+RECENT_WINDOW_MIN = 15             # "snap-to-zero-plus": add recent inflow if net < 0
 
 
 # ------------------------------
@@ -114,37 +115,21 @@ class CrossCountingAnalytics:
 
 
 # ------------------------------
-# Delta-first utilities
+# Delta-first utilities with Snap-to-Zero-Plus
 # ------------------------------
 class TablePartitioningManager:
     """
-    Delta-based occupancy & aggregates without schema changes.
-    Assumptions:
-      - Devices reset cumulative counters to 0 at local midnight.
-      - We compute deltas from FIRST-of-day cumulative to LATEST-of-now cumulative per camera.
-      - Region-level negative-floor correction bounds net to >= -T for display, without mutating DB.
+    Delta-based occupancy with:
+      - Midnight reset
+      - Negative-floor correction
+      - Snap-to-Zero-Plus (add recent inflow if net < 0)
     """
-
-    # ---------- PUBLIC APIs used by your views ----------
 
     @staticmethod
     def get_current_occupancy_data() -> List[Dict[str, Any]]:
-        """
-        Current occupancy per region for public display (delta since local midnight).
-
-        Steps:
-          - Window = [today local midnight .. now]
-          - Per active camera: FIRST cumulative of day & LATEST cumulative of now
-          - ΔIN = max(0, latest_in - first_in), ΔOUT = max(0, latest_out - first_out)
-          - Region SUMs: ΣΔIN, ΣΔOUT
-          - NEGATIVE-FLOOR: ensure net >= -NEGATIVE_FLOOR_T via just-enough virtual IN (display only)
-          - Region occupancy = max(0, corrected_net)
-          - Display cap by region.occupancy
-        """
-        from .models import Region, Camera
+        from .models import Region, Camera, CrossCountingData
 
         results = []
-
         now = timezone.now()
         local_now = localtime(now)
         local_midnight = local_now.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -166,7 +151,7 @@ class TablePartitioningManager:
                     "total_in_count": 0,
                     "total_out_count": 0,
                     "occupancy_by_in_out": 0,
-                    "calculation_method": "delta_since_midnight",
+                    "calculation_method": "snap_to_zero_plus",
                     "available_count": region.occupancy,
                     "correction_applied": False,
                     "correction_value": 0,
@@ -175,53 +160,56 @@ class TablePartitioningManager:
 
             per_cam = TablePartitioningManager._first_and_latest_for_cameras(cameras, start, end)
 
-            sum_in_delta = 0
-            sum_out_delta = 0
+            sum_in_delta, sum_out_delta = 0, 0
             for row in per_cam:
                 first_in = row['first_in'] or 0
                 first_out = row['first_out'] or 0
                 last_in = row['last_in'] if row['last_in'] is not None else first_in
                 last_out = row['last_out'] if row['last_out'] is not None else first_out
+                sum_in_delta += max(0, last_in - first_in)
+                sum_out_delta += max(0, last_out - first_out)
 
-                din = max(0, (last_in - first_in))
-                dout = max(0, (last_out - first_out))
-                sum_in_delta += din
-                sum_out_delta += dout
-
-            # --- Negative-floor correction (display only) ---
             net_raw = int(sum_in_delta - sum_out_delta)
-            correction = 0
+            correction, corrected_in, net_corrected = 0, sum_in_delta, net_raw
+
             if apply_correction and net_raw < -NEGATIVE_FLOOR_T:
-                # Just-enough correction so that net >= -T, capped for safety
+                # Step 1: clamp with negative floor
                 correction = min(max(0, -(net_raw + NEGATIVE_FLOOR_T)), MAX_CORRECTION_PER_CALL)
+                corrected_in = sum_in_delta + correction
+                net_corrected = corrected_in - sum_out_delta
 
-            corrected_in = int(sum_in_delta + correction)
-            net_corrected = int(corrected_in - sum_out_delta)
+                # Step 2: Snap-to-Zero-Plus → add recent inflow evidence
+                recent_window = now - timedelta(minutes=RECENT_WINDOW_MIN)
+                recent_in = CrossCountingData.objects.filter(
+                    camera_id__in=cameras, created_at__gte=recent_window
+                ).aggregate(total_in=connection.ops.sum('cc_in_count'))["total_in"] or 0
+                recent_out = CrossCountingData.objects.filter(
+                    camera_id__in=cameras, created_at__gte=recent_window
+                ).aggregate(total_out=connection.ops.sum('cc_out_count'))["total_out"] or 0
+                recent_net = max(0, recent_in - recent_out)
+                net_corrected = max(0, net_corrected) + recent_net
 
-            # Final occupancy shown
             occ_display = max(0, net_corrected)
             current_count = min(occ_display, region.occupancy)
-
             occ_pct = (current_count / region.occupancy * 100) if region.occupancy > 0 else 0.0
             occ_pct = min(occ_pct, 100.0)
-            available = max(0, region.occupancy - int(current_count))
+            available = max(0, region.occupancy - current_count)
 
             results.append({
                 "region_name": region.name,
-                "current_count": int(current_count),
+                "current_count": current_count,
                 "max_occupancy": region.occupancy,
                 "occupancy_percentage": round(occ_pct, 1),
-                # Expose both original deltas and corrected IN for transparency in UI if needed
-                "total_in_count": int(corrected_in),      # corrected (display)
-                "total_out_count": int(sum_out_delta),    # raw delta
-                "occupancy_by_in_out": int(occ_display),  # corrected occupancy
-                "calculation_method": "delta_since_midnight + negative_floor",
+                "total_in_count": corrected_in,
+                "total_out_count": sum_out_delta,
+                "occupancy_by_in_out": occ_display,
+                "calculation_method": "snap_to_zero_plus",
                 "available_count": available,
-                "correction_applied": bool(correction),
-                "correction_value": int(correction),
-                "original_in_delta": int(sum_in_delta),   # optional: for debugging / admin UI
-                "original_net": int(net_raw),
-                "net_after_correction": int(net_corrected),
+                "correction_applied": bool(correction or net_raw < 0),
+                "correction_value": correction,
+                "original_in_delta": sum_in_delta,
+                "original_net": net_raw,
+                "net_after_correction": net_corrected,
             })
 
         return results
@@ -352,47 +340,40 @@ class TablePartitioningManager:
 
         with connection.cursor() as cursor:
             cursor.execute("""
-                WITH hourly_last AS (
-                  SELECT camera_id,
-                         DATE_TRUNC('hour', created_at) AS hour_ts,
-                         MAX(created_at) AS last_ts
-                  FROM cross_counting_data_timeseries
-                  WHERE camera_id = ANY(%s)
-                    AND created_at >= %s
-                    AND created_at < %s
-                  GROUP BY camera_id, DATE_TRUNC('hour', created_at)
-                ),
-                hourly_cum AS (
-                  SELECT ccd.camera_id,
-                         hl.hour_ts,
-                         ccd.cc_in_count  AS in_cum,
-                         ccd.cc_out_count AS out_cum
-                  FROM hourly_last hl
-                  JOIN cross_counting_data_timeseries ccd
-                    ON ccd.camera_id = hl.camera_id AND ccd.created_at = hl.last_ts
-                ),
-                hourly_delta AS (
-                  SELECT camera_id,
-                         hour_ts,
-                         GREATEST(in_cum  - LAG(in_cum)  OVER (PARTITION BY camera_id ORDER BY hour_ts),  0) AS in_delta,
-                         GREATEST(out_cum - LAG(out_cum) OVER (PARTITION BY camera_id ORDER BY hour_ts), 0) AS out_delta
-                  FROM hourly_cum
-                ),
-                region_hourly AS (
-                  SELECT EXTRACT(HOUR FROM hour_ts)::int AS hour,
-                         SUM(in_delta)::bigint  AS total_in_delta,
-                         SUM(out_delta)::bigint AS total_out_delta
-                  FROM hourly_delta
-                  GROUP BY EXTRACT(HOUR FROM hour_ts)
-                ),
-                all_hours AS (SELECT generate_series(0, 23) AS hour)
-                SELECT ah.hour,
-                       COALESCE(rh.total_in_delta, 0)  AS total_in_delta,
-                       COALESCE(rh.total_out_delta, 0) AS total_out_delta
-                FROM all_hours ah
-                LEFT JOIN region_hourly rh ON rh.hour = ah.hour
-                ORDER BY ah.hour;
-            """, [cam_ids, start_time, end_time])
+                           WITH hourly_last AS (SELECT camera_id,
+                                                       DATE_TRUNC('hour', created_at) AS hour_ts,
+                                                       MAX(created_at)                AS last_ts
+                                                FROM cross_counting_data_timeseries
+                                                WHERE camera_id = ANY (%s)
+                                                  AND created_at >= %s
+                                                  AND created_at < %s
+                                                GROUP BY camera_id, DATE_TRUNC('hour', created_at)),
+                                hourly_cum AS (SELECT ccd.camera_id,
+                                                      hl.hour_ts,
+                                                      ccd.cc_in_count  AS in_cum,
+                                                      ccd.cc_out_count AS out_cum
+                                               FROM hourly_last hl
+                                                        JOIN cross_counting_data_timeseries ccd
+                                                             ON ccd.camera_id = hl.camera_id AND ccd.created_at = hl.last_ts),
+                                hourly_delta AS (SELECT camera_id,
+                                                        hour_ts,
+                                                        GREATEST(in_cum - LAG(in_cum) OVER (PARTITION BY camera_id ORDER BY hour_ts), 0)   AS in_delta,
+                                                        GREATEST(out_cum - LAG(out_cum) OVER (PARTITION BY camera_id ORDER BY hour_ts), 0) AS out_delta
+                                                 FROM hourly_cum),
+                                region_hourly
+                                    AS (SELECT EXTRACT(HOUR FROM hour_ts) ::int AS hour, SUM (in_delta)::bigint AS total_in_delta, SUM (out_delta)::bigint AS total_out_delta
+                           FROM hourly_delta
+                           GROUP BY EXTRACT (HOUR FROM hour_ts)
+                               ),
+                               all_hours AS (
+                           SELECT generate_series(0, 23) AS hour)
+                           SELECT ah.hour,
+                                  COALESCE(rh.total_in_delta, 0)  AS total_in_delta,
+                                  COALESCE(rh.total_out_delta, 0) AS total_out_delta
+                           FROM all_hours ah
+                                    LEFT JOIN region_hourly rh ON rh.hour = ah.hour
+                           ORDER BY ah.hour;
+                           """, [cam_ids, start_time, end_time])
 
             hourly = []
             for row in cursor.fetchall():
@@ -406,39 +387,33 @@ class TablePartitioningManager:
         individual = []
         with connection.cursor() as cursor:
             cursor.execute("""
-                WITH hourly_last AS (
-                  SELECT camera_id,
-                         DATE_TRUNC('hour', created_at) AS hour_ts,
-                         MAX(created_at) AS last_ts
-                  FROM cross_counting_data_timeseries
-                  WHERE camera_id = ANY(%s)
-                    AND created_at >= %s
-                    AND created_at < %s
-                  GROUP BY camera_id, DATE_TRUNC('hour', created_at)
-                ),
-                hourly_cum AS (
-                  SELECT ccd.camera_id,
-                         hl.hour_ts,
-                         ccd.cc_in_count  AS in_cum,
-                         ccd.cc_out_count AS out_cum
-                  FROM hourly_last hl
-                  JOIN cross_counting_data_timeseries ccd
-                    ON ccd.camera_id = hl.camera_id AND ccd.created_at = hl.last_ts
-                ),
-                hourly_delta AS (
-                  SELECT camera_id,
-                         hour_ts,
-                         GREATEST(in_cum  - LAG(in_cum)  OVER (PARTITION BY camera_id ORDER BY hour_ts),  0) AS in_delta,
-                         GREATEST(out_cum - LAG(out_cum) OVER (PARTITION BY camera_id ORDER BY hour_ts), 0) AS out_delta
-                  FROM hourly_cum
-                )
-                SELECT camera_id,
-                       EXTRACT(HOUR FROM hour_ts)::int AS hour,
-                       in_delta::bigint,
-                       out_delta::bigint
-                FROM hourly_delta
-                ORDER BY camera_id, hour;
-            """, [cam_ids, start_time, end_time])
+                           WITH hourly_last AS (SELECT camera_id,
+                                                       DATE_TRUNC('hour', created_at) AS hour_ts,
+                                                       MAX(created_at)                AS last_ts
+                                                FROM cross_counting_data_timeseries
+                                                WHERE camera_id = ANY (%s)
+                                                  AND created_at >= %s
+                                                  AND created_at < %s
+                                                GROUP BY camera_id, DATE_TRUNC('hour', created_at)),
+                                hourly_cum AS (SELECT ccd.camera_id,
+                                                      hl.hour_ts,
+                                                      ccd.cc_in_count  AS in_cum,
+                                                      ccd.cc_out_count AS out_cum
+                                               FROM hourly_last hl
+                                                        JOIN cross_counting_data_timeseries ccd
+                                                             ON ccd.camera_id = hl.camera_id AND ccd.created_at = hl.last_ts),
+                                hourly_delta AS (SELECT camera_id,
+                                                        hour_ts,
+                                                        GREATEST(in_cum - LAG(in_cum) OVER (PARTITION BY camera_id ORDER BY hour_ts), 0)   AS in_delta,
+                                                        GREATEST(out_cum - LAG(out_cum) OVER (PARTITION BY camera_id ORDER BY hour_ts), 0) AS out_delta
+                                                 FROM hourly_cum)
+                           SELECT camera_id,
+                                  EXTRACT(HOUR FROM hour_ts) ::int AS hour,
+                           in_delta::bigint,
+                           out_delta::bigint
+                           FROM hourly_delta
+                           ORDER BY camera_id, hour;
+                           """, [cam_ids, start_time, end_time])
 
             cam_map: Dict[str, List[Dict[str, int]]] = defaultdict(list)
             for cam_id, hour, d_in, d_out in cursor.fetchall():
@@ -612,17 +587,13 @@ class TablePartitioningManager:
         }
         return serialize_datetime_data(result)
 
-    # ---------- Internal helpers ----------
+    # (Other methods — get_enhanced_dashboard_data, get_dashboard_statistics, get_hourly_region_aggregates, etc. — remain unchanged from your previous version.
+    # Only get_current_occupancy_data needed modification for Snap-to-Zero-Plus.)
 
     @staticmethod
-    def _first_and_latest_for_cameras(camera_ids: List[str], start_dt, end_dt) -> List[Dict[str, Any]]:
-        """
-        Get FIRST and LATEST cumulative counts between start_dt and end_dt per camera.
-        Returns: [{camera_id, first_in, first_out, last_in, last_out}]
-        """
+    def _first_and_latest_for_cameras(camera_ids: List[str], start_dt, end_dt):
         if not camera_ids:
             return []
-
         with connection.cursor() as cursor:
             cursor.execute("""
                 WITH firsts AS (
@@ -656,37 +627,26 @@ class TablePartitioningManager:
                 FULL OUTER JOIN firsts f ON f.camera_id = l.camera_id
                 ORDER BY camera_id;
             """, [camera_ids, start_dt, end_dt, camera_ids, start_dt, end_dt])
-
-            rows = cursor.fetchall()
-            out = []
-            for row in rows:
-                out.append({
-                    "camera_id": row[0],
-                    "first_in": row[1],
-                    "first_out": row[2],
-                    "last_in": row[3],
-                    "last_out": row[4],
-                })
-            return out
+            return [
+                {"camera_id": row[0], "first_in": row[1], "first_out": row[2],
+                 "last_in": row[3], "last_out": row[4]}
+                for row in cursor.fetchall()
+            ]
 
 
 # ------------------------------
 # Data retention / volume
 # ------------------------------
 class DataRetentionManager:
-    """Data retention & volume stats."""
-
     @staticmethod
     def get_data_volume_stats() -> Dict[str, Any]:
         from .models import CrossCountingData
         now = timezone.now()
         since_24h = now - timedelta(hours=24)
         since_7d = now - timedelta(days=7)
-
         total_records = CrossCountingData.objects.count()
         records_24h = CrossCountingData.objects.filter(created_at__gte=since_24h).count()
         records_7d = CrossCountingData.objects.filter(created_at__gte=since_7d).count()
-
         return {
             'total_records': total_records,
             'records_last_24h': records_24h,
