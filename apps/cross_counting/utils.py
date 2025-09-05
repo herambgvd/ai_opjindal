@@ -182,22 +182,21 @@ class TablePartitioningManager:
             corrected_out = int(sum_out_delta)
             net_corrected = int(net_raw)
 
-            # --- Improved Negative-floor correction logic
+            # --- Completely rewritten and simplified correction logic
             if apply_correction and net_raw < -NEGATIVE_FLOOR_T:
-                # Calculate how much we need to correct to bring net to -NEGATIVE_FLOOR_T
-                correction_needed = abs(net_raw + NEGATIVE_FLOOR_T)
+                # Step 1: Bring net to exactly -NEGATIVE_FLOOR_T by reducing OUT count
+                target_net = -NEGATIVE_FLOOR_T  # We want net = -20
+                correction_needed = abs(net_raw - target_net)  # How much to correct
                 correction = min(correction_needed, MAX_CORRECTION_PER_CALL)
 
-                # Apply correction by reducing OUT count (more logical than increasing IN)
-                # This represents "lost" exit events that weren't properly counted
+                # Apply correction by reducing OUT count (represents "lost" exit events)
                 corrected_out = max(0, int(sum_out_delta - correction))
                 net_corrected = int(corrected_in - corrected_out)
 
-                # --- Snap-to-Zero-Plus: add *recent window delta* if still negative
+                # Step 2: If STILL negative after correction, apply snap-to-zero-plus
                 if net_corrected < 0:
                     recent_start = now - timedelta(minutes=RECENT_WINDOW_MIN)
                     recent_per_cam = TablePartitioningManager._first_and_latest_for_cameras(cameras, recent_start, end)
-
                     recent_in_delta = 0
                     recent_out_delta = 0
                     for r in recent_per_cam:
@@ -207,11 +206,9 @@ class TablePartitioningManager:
                         r_last_out = r['last_out'] if r['last_out'] is not None else r_first_out
                         recent_in_delta += max(0, r_last_in - r_first_in)
                         recent_out_delta += max(0, r_last_out - r_first_out)
-
-                    # Apply recent positive movement by adjusting IN count to maintain consistency
+                    # Add recent positive movement to IN count to push to positive territory
                     recent_net = max(0, int(recent_in_delta - recent_out_delta))
                     if recent_net > 0:
-                        # Add recent net movement to IN count to maintain mathematical relationship
                         corrected_in = int(corrected_in + recent_net)
                         net_corrected = int(corrected_in - corrected_out)
 
