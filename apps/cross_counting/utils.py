@@ -587,9 +587,6 @@ class TablePartitioningManager:
         }
         return serialize_datetime_data(result)
 
-    # (Other methods — get_enhanced_dashboard_data, get_dashboard_statistics, get_hourly_region_aggregates, etc. — remain unchanged from your previous version.
-    # Only get_current_occupancy_data needed modification for Snap-to-Zero-Plus.)
-
     @staticmethod
     def _first_and_latest_for_cameras(camera_ids: List[str], start_dt, end_dt):
         if not camera_ids:
