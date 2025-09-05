@@ -208,9 +208,12 @@ class TablePartitioningManager:
                         recent_in_delta += max(0, r_last_in - r_first_in)
                         recent_out_delta += max(0, r_last_out - r_first_out)
 
-                    # Add recent positive movement to help get out of negative territory
+                    # Apply recent positive movement by adjusting IN count to maintain consistency
                     recent_net = max(0, int(recent_in_delta - recent_out_delta))
-                    net_corrected = int(net_corrected + recent_net)
+                    if recent_net > 0:
+                        # Add recent net movement to IN count to maintain mathematical relationship
+                        corrected_in = int(corrected_in + recent_net)
+                        net_corrected = int(corrected_in - corrected_out)
 
             # Final display occupancy
             occ_display = max(0, net_corrected)
