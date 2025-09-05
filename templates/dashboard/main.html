@@ -143,12 +143,12 @@
                                 {{ region.occupancy_percentage }}% occupied
                               </span>
                                                             </div>
-{#                                                            <div class="mt-1">#}
-{#                                                                <small class="text-muted">#}
-{#                                                                    <i class="mdi mdi-calculator-variant-outline me-1"></i>#}
-{#                                                                    {{ region.calculation_method|default:"delta_since_midnight" }}#}
-{#                                                                </small>#}
-{#                                                            </div>#}
+                                                            {#                                                            <div class="mt-1">#}
+                                                            {#                                                                <small class="text-muted">#}
+                                                            {#                                                                    <i class="mdi mdi-calculator-variant-outline me-1"></i>#}
+                                                            {#                                                                    {{ region.calculation_method|default:"delta_since_midnight" }}#}
+                                                            {#                                                                </small>#}
+                                                            {#                                                            </div>#}
                                                         </div>
                                                     </div>
                                                 </div>
@@ -231,11 +231,13 @@
                                                                                         <small class="text-danger">OUT: {{ camera.latest_out_count|default:"0" }}</small>
                                                                                     </div>
                                                                                     <div>
-                                                                                        <small class="text-primary"
-                                                                                               title="Cumulative IN−OUT reported by the device (not per-interval)">
-                                                                                            Net
-                                                                                            (total): {{ camera.latest_in_count|default:0|add:"-"|add:camera.latest_out_count|default:0 }}
-                                                                                        </small>
+                                                                                        {% with net=camera.latest_in_count|default_if_none:0|add:-camera.latest_out_count|default_if_none:0 %}
+                                                                                            <small class="text-primary"
+                                                                                                   title="Cumulative IN−OUT reported by the device (not per-interval)">
+                                                                                                Net (total): {{ net }}
+                                                                                            </small>
+                                                                                        {% endwith %}
+
                                                                                     </div>
                                                                                 </div>
                                                                             </div>
