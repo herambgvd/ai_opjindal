@@ -1,6 +1,6 @@
 """
 Time-series utilities for CrossCountingData analytics
-Delta-based occupancy with midnight reset + Snap-to-Zero-Plus correction
+Simple occupancy calculation: In - Out, set to zero if negative
 """
 
 import logging
@@ -13,15 +13,6 @@ from django.utils import timezone
 from django.utils.timezone import localtime
 
 logger = logging.getLogger(__name__)
-
-# ----------------------------------------------------
-# Configuration (tune per deployment if needed)
-# ----------------------------------------------------
-NEGATIVE_FLOOR_T = 20              # allow net to go at most -20 before correction
-GRACE_MINUTES_AFTER_MIDNIGHT = 20  # avoid corrections in first N minutes after reset
-MAX_CORRECTION_PER_CALL = 300      # safety cap
-RECENT_WINDOW_MIN = 15             # "snap-to-zero-plus": add recent inflow if net < 0
-
 
 # ------------------------------
 # Generic serializers
@@ -115,14 +106,11 @@ class CrossCountingAnalytics:
 
 
 # ------------------------------
-# Delta-first utilities with Snap-to-Zero-Plus
+# Simple occupancy utilities
 # ------------------------------
 class TablePartitioningManager:
     """
-    Delta-based occupancy with:
-      - Midnight reset
-      - Negative-floor correction
-      - Snap-to-Zero-Plus (add recent inflow if net < 0)
+    Simple occupancy calculation: In - Out, set to zero if negative
     """
 
     @staticmethod
@@ -137,9 +125,6 @@ class TablePartitioningManager:
             local_midnight.replace(tzinfo=None)) if local_midnight.tzinfo is None else local_midnight
         end = now
 
-        minutes_since_midnight = int((local_now - local_midnight).total_seconds() // 60)
-        apply_correction = minutes_since_midnight >= GRACE_MINUTES_AFTER_MIDNIGHT
-
         regions = Region.objects.all()
         for region in regions:
             cameras = list(Camera.objects.filter(region=region, status=True).values_list('id', flat=True))
@@ -152,7 +137,7 @@ class TablePartitioningManager:
                     "total_in_count": 0,
                     "total_out_count": 0,
                     "occupancy_by_in_out": 0,
-                    "calculation_method": "snap_to_zero_plus",
+                    "calculation_method": "basic_in_out",
                     "available_count": region.occupancy,
                     "correction_applied": False,
                     "correction_value": 0,
@@ -176,109 +161,31 @@ class TablePartitioningManager:
                 sum_in_delta += max(0, last_in - first_in)
                 sum_out_delta += max(0, last_out - first_out)
 
-            net_raw = int(sum_in_delta - sum_out_delta)
-            correction = 0
-            corrected_in = int(sum_in_delta)
-            corrected_out = int(sum_out_delta)
-            net_corrected = int(net_raw)
-
-            # --- Completely rewritten and simplified correction logic
-            if apply_correction and net_raw < -NEGATIVE_FLOOR_T:
-                # Strategy: When IN accuracy is low vs OUT accuracy, we need more aggressive corrections
-
-                # Step 1: Check recent activity to see if there's genuine positive movement
-                recent_start = now - timedelta(minutes=RECENT_WINDOW_MIN)
-                recent_per_cam = TablePartitioningManager._first_and_latest_for_cameras(cameras, recent_start, end)
-
-                recent_in_delta = 0
-                recent_out_delta = 0
-                for r in recent_per_cam:
-                    r_first_in = r['first_in'] or 0
-                    r_first_out = r['first_out'] or 0
-                    r_last_in = r['last_in'] if r['last_in'] is not None else r_first_in
-                    r_last_out = r['last_out'] if r['last_out'] is not None else r_first_out
-                    recent_in_delta += max(0, r_last_in - r_first_in)
-                    recent_out_delta += max(0, r_last_out - r_first_out)
-
-                recent_net = int(recent_in_delta - recent_out_delta)
-
-                # Step 2: Determine the correction strategy based on the severity of negative occupancy
-                negative_severity = abs(net_raw)
-
-                if negative_severity > 100:  # Very high negative occupancy (severe IN undercounting)
-                    # Apply aggressive correction: Assume significant IN undercounting
-                    # Reduce OUT count by up to 80% of the negative amount
-                    out_reduction = min(int(negative_severity * 0.8), MAX_CORRECTION_PER_CALL)
-                    corrected_out = max(0, int(sum_out_delta - out_reduction))
-
-                    # Also add estimated missing IN count based on recent activity patterns
-                    if recent_net > 0:
-                        in_boost = min(recent_net * 2, MAX_CORRECTION_PER_CALL // 2)  # Double recent positive movement
-                        corrected_in = int(sum_in_delta + in_boost)
-
-                    correction = out_reduction
-                    net_corrected = int(corrected_in - corrected_out)
-
-                elif negative_severity > 40:  # Moderate negative occupancy
-                    # Apply moderate correction
-                    if recent_net > 0:
-                        # Boost IN count with recent activity plus estimated missing counts
-                        in_boost = min(recent_net + (negative_severity // 3), MAX_CORRECTION_PER_CALL)
-                        corrected_in = int(sum_in_delta + in_boost)
-                        correction = in_boost
-                    else:
-                        # Reduce OUT count moderately
-                        out_reduction = min(negative_severity // 2, MAX_CORRECTION_PER_CALL)
-                        corrected_out = max(0, int(sum_out_delta - out_reduction))
-                        correction = out_reduction
-
-                    net_corrected = int(corrected_in - corrected_out)
-
-                else:  # Small negative occupancy (20-50)
-                    # Apply conservative correction
-                    if recent_net > 0:
-                        # Add recent positive movement
-                        correction = min(recent_net, MAX_CORRECTION_PER_CALL)
-                        corrected_in = int(sum_in_delta + correction)
-                    else:
-                        # Reduce OUT count conservatively
-                        correction = min(negative_severity // 3, MAX_CORRECTION_PER_CALL)
-                        corrected_out = max(0, int(sum_out_delta - correction))
-
-                    net_corrected = int(corrected_in - corrected_out)
-
-                # Step 3: Final safety check - ensure we get reasonable positive occupancy
-                if net_corrected <= 0 and minutes_since_midnight > 60:  # After first hour, be more aggressive
-                    # Apply emergency correction to prevent zero-lock during business hours
-                    emergency_boost = min(20, MAX_CORRECTION_PER_CALL - correction)
-                    corrected_in = int(corrected_in + emergency_boost)
-                    net_corrected = int(corrected_in - corrected_out)
+            # Simple calculation: In - Out, set to zero if negative
+            net_occupancy = int(sum_in_delta - sum_out_delta)
+            current_occupancy = max(0, net_occupancy)  # Set to zero if negative
 
             # Final display occupancy
-            occ_display = max(0, net_corrected)
-            current_count = int(min(occ_display, region.occupancy))
+            current_count = int(min(current_occupancy, region.occupancy))
             occ_pct = min((current_count / region.occupancy * 100) if region.occupancy > 0 else 0.0, 100.0)
             available = max(0, int(region.occupancy - current_count))
-
-            # Calculate if any correction was applied
-            correction_applied = (corrected_in != sum_in_delta) or (corrected_out != sum_out_delta) or (net_corrected != net_raw)
 
             results.append({
                 "region_name": region.name,
                 "current_count": current_count,
                 "max_occupancy": int(region.occupancy),
                 "occupancy_percentage": round(occ_pct, 1),
-                "total_in_count": int(corrected_in),     # consistent with calculation
-                "total_out_count": int(corrected_out),   # consistent with calculation
-                "occupancy_by_in_out": occ_display,     # corrected occupancy
-                "calculation_method": "improved_negative_floor_correction",
+                "total_in_count": int(sum_in_delta),
+                "total_out_count": int(sum_out_delta),
+                "occupancy_by_in_out": current_occupancy,
+                "calculation_method": "basic_in_out",
                 "available_count": available,
-                "correction_applied": correction_applied,
-                "correction_value": int(correction),
-                "original_in_delta": int(sum_in_delta),  # debug: original IN delta
-                "original_out_delta": int(sum_out_delta), # debug: original OUT delta
-                "original_net": int(net_raw),            # debug: original net
-                "net_after_correction": int(net_corrected),
+                "correction_applied": False,
+                "correction_value": 0,
+                "original_in_delta": int(sum_in_delta),
+                "original_out_delta": int(sum_out_delta),
+                "original_net": int(net_occupancy),
+                "net_after_correction": int(current_occupancy),
             })
 
         return results
@@ -324,7 +231,7 @@ class TablePartitioningManager:
                     'occupancy_by_in_out': occ['occupancy_by_in_out'],
                     'camera_count': cameras_qs.count(),
                     'status': 'active' if occ['current_count'] > 0 else 'empty',
-                    'calculation_method': occ.get('calculation_method', 'delta_since_midnight + negative_floor'),
+                    'calculation_method': occ.get('calculation_method', 'basic_in_out'),
                     'cameras': camera_details
                 })
             else:
@@ -339,7 +246,7 @@ class TablePartitioningManager:
                     'occupancy_by_in_out': 0,
                     'camera_count': cameras_qs.count(),
                     'status': 'empty',
-                    'calculation_method': 'delta_since_midnight + negative_floor',
+                    'calculation_method': 'basic_in_out',
                     'cameras': camera_details
                 })
 
