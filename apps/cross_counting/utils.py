@@ -152,6 +152,7 @@ class TablePartitioningManager:
                 # Get the latest record for this camera from today using Django ORM
                 latest_record = CrossCountingData.objects.filter(
                     camera=camera,
+                    created_at__date=today
                 ).order_by('-created_at').first()
 
                 if latest_record:
