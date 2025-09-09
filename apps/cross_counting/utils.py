@@ -10,7 +10,6 @@ from typing import List, Dict, Any
 
 from django.db import connection
 from django.utils import timezone
-from django.utils.timezone import localtime
 
 logger = logging.getLogger(__name__)
 
@@ -115,20 +114,14 @@ class TablePartitioningManager:
 
     @staticmethod
     def get_current_occupancy_data() -> List[Dict[str, Any]]:
-        from .models import Region, Camera
+        from .models import Region, Camera, CrossCountingData
 
         results = []
-        now = timezone.now()
-        local_now = localtime(now)
-        local_midnight = local_now.replace(hour=0, minute=0, second=0, microsecond=0)
-        start = timezone.make_aware(
-            local_midnight.replace(tzinfo=None)) if local_midnight.tzinfo is None else local_midnight
-        end = now
-
         regions = Region.objects.all()
+
         for region in regions:
-            cameras = list(Camera.objects.filter(region=region, status=True).values_list('id', flat=True))
-            if not cameras:
+            cameras = Camera.objects.filter(region=region, status=True)
+            if not cameras.exists():
                 results.append({
                     "region_name": region.name,
                     "current_count": 0,
@@ -137,7 +130,7 @@ class TablePartitioningManager:
                     "total_in_count": 0,
                     "total_out_count": 0,
                     "occupancy_by_in_out": 0,
-                    "calculation_method": "basic_in_out",
+                    "calculation_method": "latest_cumulative",
                     "available_count": region.occupancy,
                     "correction_applied": False,
                     "correction_value": 0,
@@ -148,42 +141,40 @@ class TablePartitioningManager:
                 })
                 continue
 
-            # --- Day window (midnight -> now) using FIRST/LAST per camera
-            per_cam = TablePartitioningManager._first_and_latest_for_cameras(cameras, start, end)
+            # Fetch latest cumulative counts for all cameras in the region
+            total_in_count = 0
+            total_out_count = 0
 
-            sum_in_delta = 0
-            sum_out_delta = 0
-            for row in per_cam:
-                first_in = row['first_in'] or 0
-                first_out = row['first_out'] or 0
-                last_in = row['last_in'] if row['last_in'] is not None else first_in
-                last_out = row['last_out'] if row['last_out'] is not None else first_out
-                sum_in_delta += max(0, last_in - first_in)
-                sum_out_delta += max(0, last_out - first_out)
+            for camera in cameras:
+                latest_data = CrossCountingData.objects.filter(camera=camera).order_by('-created_at').first()
+                if latest_data:
+                    total_in_count += latest_data.cc_in_count
+                    total_out_count += latest_data.cc_out_count
 
-            # Simple calculation: In - Out, set to zero if negative
-            net_occupancy = int(sum_in_delta - sum_out_delta)
+            # Calculate occupancy: In - Out, set to zero if negative
+            net_occupancy = total_in_count - total_out_count
             current_occupancy = max(0, net_occupancy)  # Set to zero if negative
 
-            # Final display occupancy
-            current_count = int(min(current_occupancy, region.occupancy))
-            occ_pct = min((current_count / region.occupancy * 100) if region.occupancy > 0 else 0.0, 100.0)
-            available = max(0, int(region.occupancy - current_count))
+            # Final display occupancy (capped at region max occupancy)
+            current_count = min(current_occupancy, region.occupancy)
+            occ_pct = (current_count / region.occupancy * 100) if region.occupancy > 0 else 0.0
+            occ_pct = min(occ_pct, 100.0)  # Cap at 100%
+            available = max(0, region.occupancy - current_count)
 
             results.append({
                 "region_name": region.name,
-                "current_count": current_count,
+                "current_count": int(current_count),
                 "max_occupancy": int(region.occupancy),
                 "occupancy_percentage": round(occ_pct, 1),
-                "total_in_count": int(sum_in_delta),
-                "total_out_count": int(sum_out_delta),
-                "occupancy_by_in_out": current_occupancy,
-                "calculation_method": "basic_in_out",
-                "available_count": available,
+                "total_in_count": int(total_in_count),
+                "total_out_count": int(total_out_count),
+                "occupancy_by_in_out": int(current_occupancy),
+                "calculation_method": "latest_cumulative",
+                "available_count": int(available),
                 "correction_applied": False,
                 "correction_value": 0,
-                "original_in_delta": int(sum_in_delta),
-                "original_out_delta": int(sum_out_delta),
+                "original_in_delta": int(total_in_count),
+                "original_out_delta": int(total_out_count),
                 "original_net": int(net_occupancy),
                 "net_after_correction": int(current_occupancy),
             })
@@ -195,19 +186,53 @@ class TablePartitioningManager:
         """
         Enhanced dashboard data with occupancy analysis and camera details.
         Returns datetime objects for template filters like |timesince.
+        Uses latest cumulative counts instead of midnight-based calculations.
         """
         from .models import Region, Camera, CrossCountingData
 
-        regions = Region.objects.all()
-        occ_list = TablePartitioningManager.get_current_occupancy_data()
-        occ_map = {row['region_name']: row for row in occ_list}
+        # Optimize queries with prefetch_related to reduce database hits
+        regions = Region.objects.prefetch_related(
+            'cameras'
+        ).all()
+
         enhanced = []
 
         for region in regions:
-            cameras_qs = Camera.objects.filter(region=region, status=True)
+            cameras_qs = region.cameras.filter(status=True)
+
+            # Get latest data for all cameras in this region with a single query
+            camera_ids = list(cameras_qs.values_list('id', flat=True))
+
+            # Fetch latest data for each camera in this region
+            latest_data = {}
+            if camera_ids:
+                # Get the latest record for each camera using a single query
+                from django.db.models import Max
+
+                # Get the max created_at for each camera
+                max_times = CrossCountingData.objects.filter(
+                    camera_id__in=camera_ids
+                ).values('camera_id').annotate(
+                    max_time=Max('created_at')
+                )
+
+                # Now get the actual records with those max times
+                for item in max_times:
+                    latest_record = CrossCountingData.objects.filter(
+                        camera_id=item['camera_id'],
+                        created_at=item['max_time']
+                    ).first()
+                    if latest_record:
+                        latest_data[str(item['camera_id'])] = latest_record
+
+            # Calculate totals for the region
+            total_in_count = 0
+            total_out_count = 0
             camera_details = []
+
             for cam in cameras_qs:
-                latest = CrossCountingData.objects.filter(camera=cam).order_by('-created_at').first()
+                latest = latest_data.get(str(cam.id))
+
                 camera_details.append({
                     'id': str(cam.id),
                     'name': cam.name,
@@ -218,37 +243,33 @@ class TablePartitioningManager:
                     'last_updated': latest.created_at if latest else None
                 })
 
-            occ = occ_map.get(region.name)
-            if occ:
-                enhanced.append({
-                    'region_id': region.id,
-                    'region_name': region.name,
-                    'max_occupancy': region.occupancy,
-                    'current_occupancy': occ['current_count'],
-                    'occupancy_percentage': occ['occupancy_percentage'],
-                    'total_in_count': occ['total_in_count'],
-                    'total_out_count': occ['total_out_count'],
-                    'occupancy_by_in_out': occ['occupancy_by_in_out'],
-                    'camera_count': cameras_qs.count(),
-                    'status': 'active' if occ['current_count'] > 0 else 'empty',
-                    'calculation_method': occ.get('calculation_method', 'basic_in_out'),
-                    'cameras': camera_details
-                })
-            else:
-                enhanced.append({
-                    'region_id': region.id,
-                    'region_name': region.name,
-                    'max_occupancy': region.occupancy,
-                    'current_occupancy': 0,
-                    'occupancy_percentage': 0.0,
-                    'total_in_count': 0,
-                    'total_out_count': 0,
-                    'occupancy_by_in_out': 0,
-                    'camera_count': cameras_qs.count(),
-                    'status': 'empty',
-                    'calculation_method': 'basic_in_out',
-                    'cameras': camera_details
-                })
+                if latest:
+                    total_in_count += latest.cc_in_count
+                    total_out_count += latest.cc_out_count
+
+            # Calculate occupancy: In - Out, set to zero if negative
+            net_occupancy = total_in_count - total_out_count
+            current_occupancy = max(0, net_occupancy)  # Set to zero if negative
+
+            # Final display occupancy (capped at region max occupancy)
+            current_count = min(current_occupancy, region.occupancy)
+            occ_pct = (current_count / region.occupancy * 100) if region.occupancy > 0 else 0.0
+            occ_pct = min(occ_pct, 100.0)  # Cap at 100%
+
+            enhanced.append({
+                'region_id': region.id,
+                'region_name': region.name,
+                'max_occupancy': region.occupancy,
+                'current_occupancy': int(current_count),
+                'occupancy_percentage': round(occ_pct, 1),
+                'total_in_count': int(total_in_count),
+                'total_out_count': int(total_out_count),
+                'occupancy_by_in_out': int(current_occupancy),
+                'camera_count': cameras_qs.count(),
+                'status': 'active' if current_count > 0 else 'empty',
+                'calculation_method': 'latest_cumulative',
+                'cameras': camera_details
+            })
 
         # Keep datetimes for template |timesince
         return enhanced
