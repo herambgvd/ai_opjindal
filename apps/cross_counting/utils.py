@@ -114,38 +114,40 @@ class TablePartitioningManager:
 
     @staticmethod
     def get_current_occupancy_data() -> List[Dict[str, Any]]:
-        from .models import Region, Camera, CrossCountingData
+        from .models import Region
 
         results = []
+        regions = Region.objects.all()
 
-        # Get today's date range from 12:01 AM to 11:59 PM
-        today = timezone.now().date()
-        start_of_day = timezone.make_aware(datetime.combine(today, datetime.min.time().replace(hour=0, minute=1)))
-        end_of_day = timezone.make_aware(datetime.combine(today, datetime.max.time().replace(hour=23, minute=59)))
-
-        # Use optimized query with select_related to reduce database hits
-        regions = Region.objects.prefetch_related(
-            'cameras__cross_counting_data'
-        ).all()
+        # Use last 24 hours instead of strict today to capture recent data
+        since_24h = timezone.now() - timedelta(hours=24)
 
         for region in regions:
-            # Get active cameras for this region
-            active_cameras = region.cameras.filter(status=True)
+            # Use raw SQL to get latest counts for all active cameras in this region
+            with connection.cursor() as cursor:
+                cursor.execute("""
+                    WITH latest_records AS (
+                        SELECT DISTINCT ON (c.id) 
+                               c.id as camera_id,
+                               ccd.cc_in_count,
+                               ccd.cc_out_count,
+                               ccd.created_at
+                        FROM cross_counting_camera c
+                        LEFT JOIN cross_counting_data_timeseries ccd ON c.id = ccd.camera_id
+                        WHERE c.region_id = %s 
+                          AND c.status = true
+                          AND ccd.created_at >= %s
+                        ORDER BY c.id, ccd.created_at DESC
+                    )
+                    SELECT 
+                        COALESCE(SUM(cc_in_count), 0) as total_in_count,
+                        COALESCE(SUM(cc_out_count), 0) as total_out_count
+                    FROM latest_records;
+                """, [region.id, since_24h])
 
-            total_in_count = 0
-            total_out_count = 0
-
-            # For each active camera, get the latest record from today
-            for camera in active_cameras:
-                latest_record = CrossCountingData.objects.filter(
-                    camera=camera,
-                    created_at__gte=start_of_day,
-                    created_at__lte=end_of_day
-                ).order_by('-created_at').first()
-
-                if latest_record:
-                    total_in_count += latest_record.cc_in_count or 0
-                    total_out_count += latest_record.cc_out_count or 0
+                row = cursor.fetchone()
+                total_in_count = int(row[0]) if row[0] else 0
+                total_out_count = int(row[1]) if row[1] else 0
 
             # Calculate occupancy: In - Out, set to zero if negative
             net_occupancy = total_in_count - total_out_count
@@ -165,7 +167,7 @@ class TablePartitioningManager:
                 "total_in_count": int(total_in_count),
                 "total_out_count": int(total_out_count),
                 "occupancy_by_in_out": int(current_occupancy),
-                "calculation_method": "latest_cumulative_optimized",
+                "calculation_method": "latest_cumulative_raw_sql_24h",
                 "available_count": int(available),
                 "correction_applied": False,
                 "correction_value": 0,
@@ -182,59 +184,94 @@ class TablePartitioningManager:
         """
         Enhanced dashboard data with occupancy analysis and camera details.
         Returns datetime objects for template filters like |timesince.
-        Uses optimized Django ORM with prefetch_related for performance.
+        Uses raw SQL for optimal performance with last 24 hours data.
         """
-        from .models import Region, Camera, CrossCountingData
+        from .models import Region
 
-        # Get today's date range from 12:01 AM to 11:59 PM
-        today = timezone.now().date()
-        start_of_day = timezone.make_aware(datetime.combine(today, datetime.min.time().replace(hour=0, minute=1)))
-        end_of_day = timezone.make_aware(datetime.combine(today, datetime.max.time().replace(hour=23, minute=59)))
+        # Use last 24 hours instead of strict today to capture recent data
+        since_24h = timezone.now() - timedelta(hours=24)
 
         enhanced = []
-
-        # Use optimized query with prefetch_related to reduce database hits
-        regions = Region.objects.prefetch_related('cameras').all()
+        regions = Region.objects.all()
 
         for region in regions:
-            # Get active cameras for this region
-            active_cameras = region.cameras.filter(status=True)
+            # Use raw SQL to get latest data for all active cameras in this region with camera details
+            with connection.cursor() as cursor:
+                cursor.execute("""
+                    WITH latest_records AS (
+                        SELECT DISTINCT ON (c.id) 
+                               c.id as camera_id,
+                               c.name as camera_name,
+                               c.status as camera_status,
+                               ccd.cc_in_count,
+                               ccd.cc_out_count,
+                               ccd.cc_total_count,
+                               ccd.created_at
+                        FROM cross_counting_camera c
+                        LEFT JOIN cross_counting_data_timeseries ccd ON c.id = ccd.camera_id
+                        WHERE c.region_id = %s 
+                          AND c.status = true
+                          AND ccd.created_at >= %s
+                        ORDER BY c.id, ccd.created_at DESC
+                    ),
+                    totals AS (
+                        SELECT 
+                            COALESCE(SUM(cc_in_count), 0) as total_in_count,
+                            COALESCE(SUM(cc_out_count), 0) as total_out_count,
+                            COUNT(*) as active_camera_count
+                        FROM latest_records
+                        WHERE cc_in_count IS NOT NULL
+                    ),
+                    all_cameras AS (
+                        SELECT 
+                            c.id as camera_id,
+                            c.name as camera_name,
+                            c.status as camera_status
+                        FROM cross_counting_camera c
+                        WHERE c.region_id = %s AND c.status = true
+                    )
+                    SELECT 
+                        ac.camera_id,
+                        ac.camera_name,
+                        ac.camera_status,
+                        COALESCE(lr.cc_in_count, 0) as latest_in_count,
+                        COALESCE(lr.cc_out_count, 0) as latest_out_count,
+                        COALESCE(lr.cc_total_count, 0) as latest_total_count,
+                        lr.created_at as last_updated,
+                        COALESCE(t.total_in_count, 0) as total_in_count,
+                        COALESCE(t.total_out_count, 0) as total_out_count,
+                        COALESCE(t.active_camera_count, 0) as active_camera_count
+                    FROM all_cameras ac
+                    LEFT JOIN latest_records lr ON ac.camera_id = lr.camera_id
+                    CROSS JOIN totals t
+                    ORDER BY ac.camera_name;
+                """, [region.id, since_24h, region.id])
 
-            total_in_count = 0
-            total_out_count = 0
-            camera_details = []
+                rows = cursor.fetchall()
 
-            # For each active camera, get the latest record from today and build camera details
-            for camera in active_cameras:
-                latest_record = CrossCountingData.objects.filter(
-                    camera=camera,
-                    created_at__gte=start_of_day,
-                    created_at__lte=end_of_day
-                ).order_by('-created_at').first()
+                if rows:
+                    # Extract totals from first row (all rows have same totals due to CROSS JOIN)
+                    total_in_count = int(rows[0][7]) if rows[0][7] else 0
+                    total_out_count = int(rows[0][8]) if rows[0][8] else 0
+                    camera_count = len([r for r in rows if r[3] is not None or r[4] is not None])  # Count cameras with data
 
-                if latest_record:
-                    total_in_count += latest_record.cc_in_count or 0
-                    total_out_count += latest_record.cc_out_count or 0
-
-                    camera_details.append({
-                        'id': str(camera.id),
-                        'name': camera.name,
-                        'status': 'active' if camera.status else 'inactive',
-                        'latest_in_count': latest_record.cc_in_count or 0,
-                        'latest_out_count': latest_record.cc_out_count or 0,
-                        'latest_total_count': latest_record.cc_total_count or 0,
-                        'last_updated': latest_record.created_at  # Keep as datetime for template filters
-                    })
+                    # Build camera details
+                    camera_details = []
+                    for row in rows:
+                        camera_details.append({
+                            'id': str(row[0]),
+                            'name': row[1],
+                            'status': 'active' if row[2] else 'inactive',
+                            'latest_in_count': int(row[3]) if row[3] else 0,
+                            'latest_out_count': int(row[4]) if row[4] else 0,
+                            'latest_total_count': int(row[5]) if row[5] else 0,
+                            'last_updated': row[6]  # Keep as datetime for template filters
+                        })
                 else:
-                    camera_details.append({
-                        'id': str(camera.id),
-                        'name': camera.name,
-                        'status': 'active' if camera.status else 'inactive',
-                        'latest_in_count': 0,
-                        'latest_out_count': 0,
-                        'latest_total_count': 0,
-                        'last_updated': None
-                    })
+                    total_in_count = 0
+                    total_out_count = 0
+                    camera_count = 0
+                    camera_details = []
 
             # Calculate occupancy: In - Out, set to zero if negative
             net_occupancy = total_in_count - total_out_count
@@ -254,9 +291,9 @@ class TablePartitioningManager:
                 'total_in_count': int(total_in_count),
                 'total_out_count': int(total_out_count),
                 'occupancy_by_in_out': int(current_occupancy),
-                'camera_count': active_cameras.count(),
+                'camera_count': camera_count,
                 'status': 'active' if current_count > 0 else 'empty',
-                'calculation_method': 'latest_cumulative_optimized',
+                'calculation_method': 'latest_cumulative_raw_sql_24h',
                 'cameras': camera_details
             })
 
