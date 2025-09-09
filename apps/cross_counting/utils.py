@@ -114,8 +114,7 @@ class TablePartitioningManager:
 
     @staticmethod
     def get_current_occupancy_data() -> List[Dict[str, Any]]:
-        from .models import Region, Camera, CrossCountingData
-        from django.db.models import Max
+        from .models import Region, Camera
 
         results = []
         regions = Region.objects.all()
@@ -150,19 +149,27 @@ class TablePartitioningManager:
             total_out_count = 0
 
             if camera_ids:
-                # Use raw SQL to get the latest record for each camera in a single query
+                # Use improved raw SQL to get the absolute latest record for each camera
                 with connection.cursor() as cursor:
+                    # First, get the maximum created_at for each camera to ensure we get the latest
                     cursor.execute("""
-                        SELECT DISTINCT ON (camera_id) 
-                               camera_id,
-                               cc_in_count,
-                               cc_out_count
-                        FROM cross_counting_data_timeseries 
-                        WHERE camera_id = ANY(%s)
-                        ORDER BY camera_id, created_at DESC
+                        WITH latest_times AS (
+                            SELECT camera_id, MAX(created_at) as max_created_at
+                            FROM cross_counting_data_timeseries 
+                            WHERE camera_id = ANY(%s)
+                            GROUP BY camera_id
+                        )
+                        SELECT ccd.camera_id,
+                               ccd.cc_in_count,
+                               ccd.cc_out_count,
+                               ccd.created_at
+                        FROM cross_counting_data_timeseries ccd
+                        INNER JOIN latest_times lt ON ccd.camera_id = lt.camera_id 
+                                                   AND ccd.created_at = lt.max_created_at
+                        ORDER BY ccd.created_at DESC
                     """, [camera_ids])
 
-                    for camera_id, in_count, out_count in cursor.fetchall():
+                    for camera_id, in_count, out_count, created_at in cursor.fetchall():
                         total_in_count += in_count or 0
                         total_out_count += out_count or 0
 
@@ -203,7 +210,7 @@ class TablePartitioningManager:
         Returns datetime objects for template filters like |timesince.
         Uses latest cumulative counts instead of midnight-based calculations.
         """
-        from .models import Region, Camera, CrossCountingData
+        from .models import Region, Camera
 
         # Optimize queries with prefetch_related to reduce database hits
         regions = Region.objects.prefetch_related(
@@ -218,24 +225,30 @@ class TablePartitioningManager:
             # Get latest data for all cameras in this region with a single efficient query
             camera_ids = list(cameras_qs.values_list('id', flat=True))
 
-            # Fetch latest data for each camera in this region using raw SQL
+            # Fetch latest data for each camera in this region using improved raw SQL
             latest_data = {}
             total_in_count = 0
             total_out_count = 0
 
             if camera_ids:
-                # Use raw SQL to get the latest record for each camera in a single query
+                # Use improved raw SQL to get the absolute latest record for each camera
                 with connection.cursor() as cursor:
                     cursor.execute("""
-                        SELECT DISTINCT ON (camera_id) 
-                               camera_id,
-                               cc_in_count,
-                               cc_out_count,
-                               cc_total_count,
-                               created_at
-                        FROM cross_counting_data_timeseries 
-                        WHERE camera_id = ANY(%s)
-                        ORDER BY camera_id, created_at DESC
+                        WITH latest_times AS (
+                            SELECT camera_id, MAX(created_at) as max_created_at
+                            FROM cross_counting_data_timeseries 
+                            WHERE camera_id = ANY(%s)
+                            GROUP BY camera_id
+                        )
+                        SELECT ccd.camera_id,
+                               ccd.cc_in_count,
+                               ccd.cc_out_count,
+                               ccd.cc_total_count,
+                               ccd.created_at
+                        FROM cross_counting_data_timeseries ccd
+                        INNER JOIN latest_times lt ON ccd.camera_id = lt.camera_id 
+                                                   AND ccd.created_at = lt.max_created_at
+                        ORDER BY ccd.created_at DESC
                     """, [camera_ids])
 
                     for camera_id, in_count, out_count, total_count, created_at in cursor.fetchall():
