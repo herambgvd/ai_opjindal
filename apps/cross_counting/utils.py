@@ -119,6 +119,7 @@ class TablePartitioningManager:
 
         results = []
         regions = Region.objects.all()
+        today = timezone.now().date()  # Get today's date for timeseries filtering
 
         for region in regions:
             cameras = Camera.objects.filter(region=region, status=True)
@@ -143,13 +144,15 @@ class TablePartitioningManager:
                 continue
 
             # Fetch latest cumulative counts for all cameras in the region using Django ORM
+            # Filter by today's date for timeseries alignment
             total_in_count = 0
             total_out_count = 0
 
             for camera in cameras:
-                # Get the latest record for this camera using Django ORM
+                # Get the latest record for this camera from today using Django ORM
                 latest_record = CrossCountingData.objects.filter(
-                    camera=camera
+                    camera=camera,
+                    created_at__date=today
                 ).order_by('-created_at').first()
 
                 if latest_record:
@@ -197,6 +200,7 @@ class TablePartitioningManager:
 
         # Optimize queries with prefetch_related to reduce database hits
         regions = Region.objects.prefetch_related('cameras').all()
+        today = timezone.now().date()  # Get today's date for timeseries filtering
 
         enhanced = []
 
@@ -204,14 +208,16 @@ class TablePartitioningManager:
             cameras_qs = region.cameras.filter(status=True)
 
             # Fetch latest data for each camera using Django ORM
+            # Filter by today's date for timeseries alignment
             total_in_count = 0
             total_out_count = 0
             camera_details = []
 
             for camera in cameras_qs:
-                # Get the latest record for this camera using Django ORM
+                # Get the latest record for this camera from today using Django ORM
                 latest_record = CrossCountingData.objects.filter(
-                    camera=camera
+                    camera=camera,
+                    created_at__date=today
                 ).order_by('-created_at').first()
 
                 if latest_record:
