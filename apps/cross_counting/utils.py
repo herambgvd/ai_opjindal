@@ -115,6 +115,7 @@ class TablePartitioningManager:
     @staticmethod
     def get_current_occupancy_data() -> List[Dict[str, Any]]:
         from .models import Region, Camera, CrossCountingData
+        from django.db.models import Max
 
         results = []
         regions = Region.objects.all()
@@ -141,15 +142,29 @@ class TablePartitioningManager:
                 })
                 continue
 
-            # Fetch latest cumulative counts for all cameras in the region
+            # Get camera IDs for this region
+            camera_ids = list(cameras.values_list('id', flat=True))
+
+            # Fetch latest cumulative counts for all cameras in the region efficiently
             total_in_count = 0
             total_out_count = 0
 
-            for camera in cameras:
-                latest_data = CrossCountingData.objects.filter(camera=camera).order_by('-created_at').first()
-                if latest_data:
-                    total_in_count += latest_data.cc_in_count
-                    total_out_count += latest_data.cc_out_count
+            if camera_ids:
+                # Use raw SQL to get the latest record for each camera in a single query
+                with connection.cursor() as cursor:
+                    cursor.execute("""
+                        SELECT DISTINCT ON (camera_id) 
+                               camera_id,
+                               cc_in_count,
+                               cc_out_count
+                        FROM cross_counting_data_timeseries 
+                        WHERE camera_id = ANY(%s)
+                        ORDER BY camera_id, created_at DESC
+                    """, [camera_ids])
+
+                    for camera_id, in_count, out_count in cursor.fetchall():
+                        total_in_count += in_count or 0
+                        total_out_count += out_count or 0
 
             # Calculate occupancy: In - Out, set to zero if negative
             net_occupancy = total_in_count - total_out_count
@@ -200,36 +215,41 @@ class TablePartitioningManager:
         for region in regions:
             cameras_qs = region.cameras.filter(status=True)
 
-            # Get latest data for all cameras in this region with a single query
+            # Get latest data for all cameras in this region with a single efficient query
             camera_ids = list(cameras_qs.values_list('id', flat=True))
 
-            # Fetch latest data for each camera in this region
+            # Fetch latest data for each camera in this region using raw SQL
             latest_data = {}
-            if camera_ids:
-                # Get the latest record for each camera using a single query
-                from django.db.models import Max
-
-                # Get the max created_at for each camera
-                max_times = CrossCountingData.objects.filter(
-                    camera_id__in=camera_ids
-                ).values('camera_id').annotate(
-                    max_time=Max('created_at')
-                )
-
-                # Now get the actual records with those max times
-                for item in max_times:
-                    latest_record = CrossCountingData.objects.filter(
-                        camera_id=item['camera_id'],
-                        created_at=item['max_time']
-                    ).first()
-                    if latest_record:
-                        latest_data[str(item['camera_id'])] = latest_record
-
-            # Calculate totals for the region
             total_in_count = 0
             total_out_count = 0
-            camera_details = []
 
+            if camera_ids:
+                # Use raw SQL to get the latest record for each camera in a single query
+                with connection.cursor() as cursor:
+                    cursor.execute("""
+                        SELECT DISTINCT ON (camera_id) 
+                               camera_id,
+                               cc_in_count,
+                               cc_out_count,
+                               cc_total_count,
+                               created_at
+                        FROM cross_counting_data_timeseries 
+                        WHERE camera_id = ANY(%s)
+                        ORDER BY camera_id, created_at DESC
+                    """, [camera_ids])
+
+                    for camera_id, in_count, out_count, total_count, created_at in cursor.fetchall():
+                        latest_data[str(camera_id)] = {
+                            'cc_in_count': in_count or 0,
+                            'cc_out_count': out_count or 0,
+                            'cc_total_count': total_count or 0,
+                            'created_at': created_at
+                        }
+                        total_in_count += in_count or 0
+                        total_out_count += out_count or 0
+
+            # Build camera details
+            camera_details = []
             for cam in cameras_qs:
                 latest = latest_data.get(str(cam.id))
 
@@ -237,15 +257,11 @@ class TablePartitioningManager:
                     'id': str(cam.id),
                     'name': cam.name,
                     'status': 'active' if cam.status else 'inactive',
-                    'latest_in_count': latest.cc_in_count if latest else 0,
-                    'latest_out_count': latest.cc_out_count if latest else 0,
-                    'latest_total_count': latest.cc_total_count if latest else 0,
-                    'last_updated': latest.created_at if latest else None
+                    'latest_in_count': latest['cc_in_count'] if latest else 0,
+                    'latest_out_count': latest['cc_out_count'] if latest else 0,
+                    'latest_total_count': latest['cc_total_count'] if latest else 0,
+                    'last_updated': latest['created_at'] if latest else None
                 })
-
-                if latest:
-                    total_in_count += latest.cc_in_count
-                    total_out_count += latest.cc_out_count
 
             # Calculate occupancy: In - Out, set to zero if negative
             net_occupancy = total_in_count - total_out_count
